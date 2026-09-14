@@ -39,11 +39,11 @@ const csv = (rows: string[][]): string =>
 
 const ROW = {
   camille: [
-    '13/09/2026 10:00:00', 'Dubois', 'Camille', 'camille@ayaatma.fr', '06 01 02 03 04',
+    '13/09/2026 10:00:00', 'Dubois', 'Camille', 'camille@example.org', '06 01 02 03 04',
     'Végétarien', 'Fruits à coque', 'Disponible tout le week-end',
   ],
   dominique: [
-    '13/09/2026 11:00:00', 'Roy', 'Dominique', 'dominique@ayaatma.fr', '06 05 06 07 08',
+    '13/09/2026 11:00:00', 'Roy', 'Dominique', 'dominique@example.org', '06 05 06 07 08',
     'Sans restriction', 'Non', '',
   ],
 };
@@ -76,7 +76,7 @@ test('allergies and diet do not steal each other, whichever order they come in',
 });
 
 test('a missing name column stops the import instead of importing nobodies', () => {
-  const result = importOrganisers('Prénom,Adresse e-mail\nCamille,c@ayaatma.fr');
+  const result = importOrganisers('Prénom,Adresse e-mail\nCamille,c@example.org');
   assert.equal(result.organisers.length, 0);
   assert.ok(result.issues.some((i) => i.severity === 'error' && i.code === 'colonne-manquante'));
 });
@@ -99,7 +99,7 @@ test('a row becomes a organiser with their answers and a code', () => {
   const person = organisers[0]!;
   assert.equal(person.firstName, 'Camille');
   assert.equal(person.lastName, 'Dubois');
-  assert.equal(person.email, 'camille@ayaatma.fr');
+  assert.equal(person.email, 'camille@example.org');
   assert.equal(person.phone, '06 01 02 03 04');
   assert.equal(person.diet, 'Végétarien');
   assert.equal(person.allergies, 'Fruits à coque');
@@ -137,7 +137,7 @@ const existingCamille: Organiser = {
   key: 'resp-camille-dubois',
   firstName: 'Camille',
   lastName: 'Dubois',
-  email: 'camille@ayaatma.fr',
+  email: 'camille@example.org',
   phone: '06 00 00 00 00',
   accessCode: 'DEJAENVOYE1234',
   montageFrom: null,
@@ -164,7 +164,7 @@ test('a re-import keeps the key the poles point at, and the code already sent ou
 
 test('the address identifies the person, to the case', () => {
   const shouting = [...ROW.camille];
-  shouting[3] = 'CAMILLE@AYAATMA.FR';
+  shouting[3] = 'CAMILLE@EXAMPLE.ORG';
   const { organisers } = importOrganisers(csv([shouting]), { existing: [existingCamille] });
   assert.equal(organisers.length, 1);
 });
@@ -231,7 +231,7 @@ test('two people with the same name and no address stay two people', () => {
   // The opposite failure to the one above, and the more dangerous: merging real homonyms would
   // give one of them the other's poles and code.
   const first = ['', 'Martin', 'Claude', '', '06 01', '', '', ''];
-  const second = ['', 'Martin', 'Claude', 'claude.martin@ayaatma.fr', '06 02', '', '', ''];
+  const second = ['', 'Martin', 'Claude', 'claude.martin@example.org', '06 02', '', '', ''];
   const { organisers } = importOrganisers(csv([first, second]));
   assert.equal(organisers.length, 2, 'une adresse et pas d\'adresse ne sont pas la même identité');
 });

@@ -200,8 +200,8 @@ test('the same person on two poles becomes one person with two roles', () => {
   const plan = normalisePlan({
     ...fresh,
     organisers: [
-      legacyOrganiser({ key: 'bar--c', poleKey: 'bar', email: 'c@ayaatma.fr' }),
-      legacyOrganiser({ key: 'plonge--c', poleKey: 'plonge', email: 'C@Ayaatma.FR' }),
+      legacyOrganiser({ key: 'bar--c', poleKey: 'bar', email: 'c@example.org' }),
+      legacyOrganiser({ key: 'plonge--c', poleKey: 'plonge', email: 'C@Example.ORG' }),
     ],
     leaderRoles: undefined,
   });

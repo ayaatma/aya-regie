@@ -287,7 +287,7 @@ test('the journal reads back newest first, with the two clocks kept apart', asyn
         kind: 'enregistrement',
         message: "Échec de l'enregistrement: réseau injoignable",
         detail: { version: 8 },
-        actor: 'regie@ayaatma.fr',
+        actor: 'regie@example.org',
         session: 'abcd1234',
       },
     ],

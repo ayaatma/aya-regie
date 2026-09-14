@@ -518,7 +518,7 @@ test('the settings screen lists the organisers as people, with their codes', () 
     ...plan,
     organisers: [
       {
-        key: 'l1', firstName: 'Camille', lastName: 'Dubois', email: 'c@ayaatma.fr',
+        key: 'l1', firstName: 'Camille', lastName: 'Dubois', email: 'c@example.org',
         phone: '0600000000', accessCode: 'ABCDEFGH234567', diet: 'Végétarien',
         allergies: 'Fruits à coque', note: '', montageFrom: null, demontageUntil: null, montagePoleKeys: [], demontagePoleKeys: [],
       },
@@ -1230,7 +1230,7 @@ test('the diagnostic block reads in the order things happened, not the screen or
         kind: 'enregistrement',
         message: "Échec de l'enregistrement: réseau injoignable",
         detail: { version: 8 },
-        actor: 'regie@ayaatma.fr',
+        actor: 'regie@example.org',
         session: 'abcd1234',
       },
       {
@@ -1241,7 +1241,7 @@ test('the diagnostic block reads in the order things happened, not the screen or
         kind: 'edition',
         message: 'déplacement de Marie Perrin',
         detail: null,
-        actor: 'regie@ayaatma.fr',
+        actor: 'regie@example.org',
         session: 'abcd1234',
       },
     ],
@@ -1278,7 +1278,7 @@ const schedule = {
       fin: '2027-03-13T17:00:00.000Z',
       pole: 'Bar / Service',
       responsables: [
-        { nom: 'Claire Dubois', telephone: '06 11 22 33 44', email: 'claire@ayaatma.fr' },
+        { nom: 'Claire Dubois', telephone: '06 11 22 33 44', email: 'claire@example.org' },
       ],
       avec: ['Jean M.', 'Sofia B.'],
     },

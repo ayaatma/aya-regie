@@ -89,8 +89,8 @@ test('the login card offers the password first and keeps the link within reach',
 });
 
 test('the account bar names the account whose password is being changed', () => {
-  const html = renderToStaticMarkup(<AccountBar email="regie@ayaatma.fr" onClose={() => {}} />);
-  assert.match(html, /regie@ayaatma\.fr/);
+  const html = renderToStaticMarkup(<AccountBar email="regie@example.org" onClose={() => {}} />);
+  assert.match(html, /regie@example.org/);
   // Two fields, because the second is what catches a typo repeated identically in the first,
   // and the address carried along so a password manager files what it saves under the account.
   assert.equal(html.match(/type="password"/g)?.length, 2);

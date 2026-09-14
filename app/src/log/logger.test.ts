@@ -154,7 +154,7 @@ test('every entry carries the same session, so two organisers can be told apart'
   const target = sink();
   const journal = logger();
   journal.attach(target);
-  journal.setActor('regie@ayaatma.fr');
+  journal.setActor('regie@example.org');
 
   journal.info('edition', 'une');
   journal.info('edition', 'deux');
@@ -163,6 +163,6 @@ test('every entry carries the same session, so two organisers can be told apart'
   const entries = target.batches[0]!.entries;
   assert.equal(entries[0]?.session, journal.session);
   assert.equal(entries[1]?.session, journal.session);
-  assert.equal(entries[0]?.actor, 'regie@ayaatma.fr');
+  assert.equal(entries[0]?.actor, 'regie@example.org');
   assert.notEqual(journal.session, logger().session, 'un onglet, une session');
 });
