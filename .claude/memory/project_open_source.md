@@ -24,3 +24,11 @@ orgas, catering, artists, ticketing, any event (see [[feature-generic-event]],
   the hook, see [[feedback-migration-state-hook]]).
 - Internal identifiers, the schema and migrations were NOT renamed; the subdomain
   `planning.ayaatma.fr` was not changed as of this date.
+- `user_profile.md` left the repository on 2026-09-14 (it named the developer's employer and a
+  local path) and lives in the machine-local Claude memory instead; the working-style rules
+  stayed, neutral, in [[feedback-working-style]]. Commit e241fd8 still holds it: history was not
+  rewritten, by decision.
+- Test email addresses use `@example.org`, never the association's real domain.
+- Volunteer access codes stay at 8 characters (about 40 bits), organiser codes at 14: judged
+  enough by the developer on 2026-09-14, even with the code and the RPC public. Do not raise it
+  again unless abuse is observed.
