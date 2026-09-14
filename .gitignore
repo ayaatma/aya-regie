@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+.env
+.env.local
+.env.deploy.local
+*.log
+.DS_Store
+
+# The visual preview of a phase grid, written by app/src/screens/phasePreview.tsx.
+phase-preview.html
+
+# Local snapshot of the database's migration state, rewritten by every npm run migrate.
+db/.migration-state.json

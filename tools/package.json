@@ -1,0 +1,40 @@
+{
+  "name": "lototekno-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Synthetic data generator for the Loto Tekno volunteer planning tool.",
+  "scripts": {
+    "generate": "tsx src/generate.ts",
+    "import": "tsx src/import-cli.ts",
+    "typecheck": "tsc --noEmit",
+    "validate": "tsx src/validate-cli.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "solve": "tsx src/solve-cli.ts",
+    "fixture": "tsx src/fixture-cli.ts",
+    "fragmentation": "tsx src/fragmentation-cli.ts",
+    "groups": "tsx src/groups-cli.ts",
+    "converge": "tsx src/converge-cli.ts",
+    "converge-probe": "tsx src/converge-probe-cli.ts",
+    "buddy": "tsx src/buddy-cli.ts",
+    "preference": "tsx src/preference-cli.ts",
+    "sql-check": "tsx src/sql-check-cli.ts",
+    "anon-check": "tsx src/anon-check-cli.ts",
+    "schema-check": "tsx src/schema-check-cli.ts",
+    "db-check": "tsx src/db-check-cli.ts",
+    "migrate": "tsx src/migrate-cli.ts",
+    "deploy": "tsx src/deploy-cli.ts",
+    "orgas": "tsx src/orgas-cli.ts",
+    "form-csv": "tsx src/form-csv-cli.ts"
+  },
+  "devDependencies": {
+    "@pgsql/parser": "^1.5.0",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.23.1",
+    "basic-ftp": "^6.2.1",
+    "pg": "^8.23.0",
+    "ssh2-sftp-client": "^12.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,4724 @@
+/*
+ * The palette is deliberately cold and quiet: slate chrome, one blue accent.
+ *
+ * Red and the two oranges are spoken for. They mean "illegal", "8 h" and "6 h", they come from
+ * validate() and nowhere else, and they have to read as alarms. Nothing in the furniture is
+ * allowed to borrow them, which is why the accent is blue and the surfaces are neutral.
+ */
+
+:root {
+  color-scheme: light;
+
+  --ink: #16202b;
+  --ink-soft: #4a5766;
+  --ink-faint: #7b8899;
+
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-sunken: #f5f7fa;
+  --surface-raised: #ffffff;
+
+  --line: #d3dae3;
+  --line-strong: #b3bfcd;
+
+  --accent: #1f6feb;
+  --accent-soft: #e3edfd;
+  --accent-ink: #ffffff;
+
+  /* The three codes from the brief. Never used for anything else. */
+  --rouge: #c92a2a;
+  --rouge-bg: #fdecec;
+  --orange-fonce: #b8560f;
+  --orange-fonce-bg: #fbead9;
+  --orange-clair: #d9a441;
+  --orange-clair-bg: #fdf5e3;
+
+  --ok: #12805a;
+  --ok-bg: #e2f4ec;
+
+  /* The line-up's two other moments, beside the set in --accent. See .artist-band. */
+  --plateau: #7048a8;
+  --plateau-bg: #efe6fb;
+  --balances: #0f7b83;
+  --balances-bg: #dff4f5;
+
+  --shadow: 0 1px 2px rgba(22, 32, 43, 0.08), 0 4px 12px rgba(22, 32, 43, 0.06);
+  --radius: 6px;
+
+  --header-h: 52px;
+  --label-w: 190px;
+  --panel-w: 330px;
+  /** The "Info sélection" pane, beside the pools. See `.screen.has-info`. */
+  --info-w: 320px;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --ink: #e7edf4;
+    --ink-soft: #a5b2c1;
+    --ink-faint: #77869a;
+
+    --bg: #10161d;
+    --surface: #19212b;
+    --surface-sunken: #141b23;
+    --surface-raised: #212b36;
+
+    --line: #2c3742;
+    --line-strong: #3d4a58;
+
+    --accent: #4d8ff5;
+    --accent-soft: #1c2d47;
+    --accent-ink: #0c1218;
+
+    --rouge: #ff6b6b;
+    --rouge-bg: #3a1d1f;
+    --orange-fonce: #e8933f;
+    --orange-fonce-bg: #3a2a17;
+    --orange-clair: #e9c877;
+    --orange-clair-bg: #332c17;
+
+    --ok: #4ecb96;
+
+    --plateau: #b48ae8;
+    --plateau-bg: #2b2140;
+    --balances: #4fc6ce;
+    --balances-bg: #153538;
+    --ok-bg: #16302a;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   Shell
+   -------------------------------------------------------------------------- */
+
+.app {
+  display: grid;
+  grid-template-rows: var(--header-h) auto 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.topbar-brand {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.topbar-brand span {
+  color: var(--ink-faint);
+  font-weight: 450;
+  margin-left: 8px;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.tab {
+  border: 0;
+  background: transparent;
+  padding: 6px 11px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.tab[aria-current='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tab-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--rouge);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 17px;
+}
+
+.tab-badge.is-quiet {
+  background: var(--line-strong);
+  color: var(--ink);
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.save-state {
+  color: var(--ink-faint);
+  font-size: 12px;
+  min-width: 108px;
+  text-align: right;
+}
+
+.save-state.is-dirty {
+  color: var(--ink-soft);
+}
+
+/* --------------------------------------------------------------------------
+   Buttons and small controls
+   -------------------------------------------------------------------------- */
+
+.btn {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  padding: 5px 11px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  border-color: var(--ink-faint);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn.is-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.btn.is-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn.is-danger {
+  color: var(--rouge);
+  border-color: var(--rouge);
+}
+
+.btn.is-icon {
+  padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.select {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: inherit;
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  font: inherit;
+  max-width: 260px;
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Banners
+   -------------------------------------------------------------------------- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--orange-fonce-bg);
+  color: var(--ink);
+}
+
+.banner.is-error {
+  background: var(--rouge-bg);
+}
+
+.banner strong {
+  font-weight: 650;
+}
+
+.banner .banner-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Screen frame
+   -------------------------------------------------------------------------- */
+
+.screen {
+  display: grid;
+  grid-template-columns: 1fr var(--panel-w);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/*
+ * The planning screens, which carry two panes: the pools, then what is selected.
+ *
+ * TWO AND NOT ONE, since 2026-09-11, and the régisseur asked for it in so many words: picking
+ * somebody out of "Disponibles" and reading their fiche used to mean leaving the list. The info
+ * pane is narrower than the pool, because a list of names needs a fixed width to stay scannable
+ * while a fiche is prose and wraps. See `PoolPanel` and `InfoPanel`.
+ */
+.screen.has-info {
+  grid-template-columns: 1fr var(--panel-w) var(--info-w);
+}
+
+.screen.is-wide {
+  grid-template-columns: 1fr;
+}
+
+/* Under about 1500 px the grid itself would be squeezed to nothing, so the info pane narrows
+   first and the grid keeps what is left. */
+@media (max-width: 1500px) {
+  .screen.has-info {
+    grid-template-columns: 1fr var(--panel-w) minmax(240px, var(--info-w));
+  }
+}
+
+.screen-main {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 2px;
+}
+
+.toolbar-note {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+/*
+ * The zoom: one slider, and a button that makes the grid fill the width.
+ *
+ * It was a − and a + over five fixed steps, whose widest was not wide enough once a montage could
+ * be filtered down to one day. See `ZoomSlider` for why the track is logarithmic.
+ */
+.zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom-label {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.zoom-range {
+  width: 120px;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+
+
+/*
+ * A toolbar control that says what it is.
+ *
+ * The pole filter gets away with being a bare select because "Tous les pôles" names its own
+ * subject. The phase grid's day filter did not: it read "Tous les jours" between two zoom buttons
+ * and the régisseur did not find it at all. A word in front costs twenty pixels.
+ */
+.toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-field > span {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   The grid
+   -------------------------------------------------------------------------- */
+
+.grid-scroll {
+  overflow: auto;
+  background: var(--surface-sunken);
+  min-height: 0;
+}
+
+.grid-inner {
+  position: relative;
+}
+
+.grid-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.grid-corner {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  width: var(--label-w);
+  flex: 0 0 var(--label-w);
+  background: var(--surface);
+  border-right: 1px solid var(--line-strong);
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/*
+ * 43 px of day row and hours, then one 19 px row per line of the line-up. The height is set
+ * inline by TimeRuler from RULER_HEAD_H and ARTIST_ROW_H; 62 is the one-row case and the
+ * fallback for anything that renders the class without the component.
+ */
+.ruler {
+  position: relative;
+  height: 62px;
+}
+
+/* The day, above the hours: on the first hour and on every midnight. */
+.ruler-day {
+  position: absolute;
+  top: 2px;
+  height: 16px;
+  padding-left: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ruler-hour {
+  position: absolute;
+  top: 16px;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+  padding-left: 5px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ruler-hour.is-slot {
+  border-left: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+/*
+ * Midnight: the change of day, doubled so it reads down the whole grid. It reaches up through
+ * the day row so the day's name sits right of its own line.
+ */
+.ruler-hour.is-midnight {
+  top: 0;
+  border-left: 3px double var(--ink-soft);
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding-top: 16px;
+}
+
+.ruler-artists {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 19px;
+}
+
+/*
+ * One moment of an act. A set is the accent, a changement de plateau is violet, balances are
+ * teal: three things that happen on the same stage and must not read as one. Top and height
+ * are set inline, one row per overlapping band.
+ */
+.artist-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-soft);
+  border-left: 1px solid var(--accent);
+  border-radius: 2px;
+  font-size: 10px;
+  color: var(--accent);
+  padding: 1px 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 17px;
+}
+
+.artist-band.is-named {
+  font-weight: 700;
+}
+
+.artist-band.is-changeover {
+  background: var(--plateau-bg);
+  border-left-color: var(--plateau);
+  color: var(--plateau);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    rgba(112, 72, 168, 0.12) 6px 8px
+  );
+}
+
+.artist-band.is-soundcheck {
+  background: var(--balances-bg);
+  border-left-color: var(--balances);
+  color: var(--balances);
+}
+
+/* A pole row. */
+
+.lane-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--label-w);
+  flex: 0 0 var(--label-w);
+  background: var(--surface);
+  border-right: 1px solid var(--line-strong);
+  /* The pole's colour, on the one element that is always on screen however far you scroll. */
+  border-left: 4px solid var(--pole, transparent);
+  padding: 6px 10px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.lane-label-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lane-label-parent {
+  color: var(--ink-faint);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lane-label-stat {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.lane-label-stat.is-gap {
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+
+.lane-track {
+  position: relative;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--line) 0 1px,
+      transparent 1px var(--hour-w)
+    );
+}
+
+/* --------------------------------------------------------------------------
+   A pole and its sub-poles: the grid's unit of rhythm
+   -------------------------------------------------------------------------- */
+
+/*
+ * The group is what the eye separates, not the row.
+ *
+ * Bar, Bar / Service and Bar / Plonge are one place with three stations. They share a colour,
+ * they share one copy of the hour axis, and the space that matters is the space before the next
+ * pole, not between two stations of the same one.
+ */
+.pole-group {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-strong);
+  margin-bottom: 4px;
+}
+
+.pole-group:last-child {
+  border-bottom: 0;
+}
+
+.pole-group-head {
+  display: flex;
+  align-items: flex-end;
+  background: var(--surface-sunken);
+  padding-top: 12px;
+}
+
+.pole-group-title {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--label-w);
+  flex: 0 0 var(--label-w);
+  background: var(--surface-sunken);
+  border-left: 4px solid var(--pole, transparent);
+  border-right: 1px solid var(--line-strong);
+  padding: 0 10px 2px 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  /* The pole's own colour, on the one line that names it. */
+  color: var(--pole, var(--ink));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* The hour axis, repeated once per pole rather than once per row. */
+
+.lane-ruler {
+  position: relative;
+  height: 15px;
+}
+
+.lane-ruler-hour {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+  padding-left: 4px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lane-ruler-hour.is-slot {
+  border-left-color: var(--line-strong);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.lane-ruler-hour.is-midnight {
+  border-left: 3px double var(--ink-soft);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.lane-ruler-day {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.lane-block + .lane-block .lane-label {
+  border-top: 1px solid var(--line);
+}
+
+.lane {
+  display: flex;
+}
+
+
+/* A shift, one block, holding one box per volunteer needed. */
+
+.shift {
+  /* Height is set inline from the headcount, so `bottom` would over-constrain the box. */
+  position: absolute;
+  top: 3px;
+  border: 1px solid var(--line);
+  /* The pole's own colour, so a glance down the grid reads as places rather than as rows. */
+  border-left: 3px solid var(--pole, var(--line-strong));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--pole, transparent) 9%, var(--surface));
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.shift.is-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.shift.is-illegal {
+  opacity: 0.32;
+}
+
+/*
+ * A problem with the shift itself, drawn on the shift.
+ *
+ * Nothing but débutants is one shift short of an experienced pair of hands, not five faulty
+ * volunteers, so the border carries it and the boxes stay plain. Same language as the boxes:
+ * solid red for illegal, dashed orange for a tier 2 problem. Being short of people is neither.
+ */
+.shift.is-flagged {
+  border-color: var(--rouge);
+  border-left-color: var(--rouge);
+}
+
+.shift.is-warned {
+  border-color: var(--orange-fonce);
+  border-style: dashed;
+  border-left-style: solid;
+}
+
+
+
+
+
+
+/* One box: one volunteer needed. */
+
+.box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  flex: 0 0 24px;
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+  min-width: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.box.is-empty {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: default;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.box.is-dragging {
+  opacity: 0.35;
+}
+
+/*
+ * The selected volunteer, on their other shifts. A blue ring: "the same person is also here".
+ */
+.box.is-kin {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/*
+ * The one box that was picked, filled blue the way an illegal box is filled red.
+ *
+ * A ring around a 24 px box was easy to lose among fifteen poles, and it said the same thing as
+ * the rings on the person's other shifts. The fill separates the two questions: filled is the
+ * box you are on, ringed is the same person elsewhere. Blue says "this is the person", red says
+ * "this breaks a rule", and the two fills are never mistaken for one another.
+ */
+.box.is-picked {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  outline: none;
+}
+
+/*
+ * Picked and illegal at once. Red keeps the fill, because the broken rule matters more than the
+ * selection, and the selection falls back to the ring its siblings wear.
+ */
+.box.is-picked.is-illegal {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.box.is-swap-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: -1px;
+}
+
+/*
+ * There is deliberately no rule for `.box.is-cursor`.
+ *
+ * The keyboard cursor used to wear a dark ring. It only ever stands on an occupied box, and
+ * that box is the picked one, already filled blue: the ring said the same thing twice, and in
+ * the dark theme it read as a white border competing with the fill. The class stays on the
+ * element because GridScreen scrolls `.box.is-cursor` into view when the keys move it off
+ * screen, and the legend lost its "case au clavier" entry along with the colour.
+ */
+/*
+ * Red is one box, never one person.
+ *
+ * It says: this volunteer, on this shift, breaks a rule. The same person's other boxes stay
+ * plain, because there is nothing wrong with them. Attribution is done by validate(), which
+ * names the shifts each issue implicates.
+ */
+.box.is-illegal {
+  background: var(--rouge-bg);
+  border-color: var(--rouge);
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+/* A tier 2 problem: real, reported, not illegal. A dotted underline, not an alarm. */
+.box.is-warned {
+  border-color: var(--orange-fonce);
+  border-style: dashed;
+}
+
+/*
+ * Under the pointer: a box says it can be picked.
+ *
+ * A shade of the ink over whatever the box already is, rather than a colour of its own, so it
+ * works in both themes and borrows nothing from red, orange or blue. The picked box is left
+ * out: it is already the answer to "which one is it", and dimming it under the pointer would
+ * make the one box that must not flicker flicker.
+ */
+.box:not(.is-empty):not(.is-picked):hover {
+  background: color-mix(in srgb, var(--ink) 7%, var(--surface));
+}
+
+/* A box against the rules stays red under the pointer. Only the shade moves. */
+.box.is-illegal:not(.is-picked):hover {
+  background: color-mix(in srgb, var(--ink) 7%, var(--rouge-bg));
+}
+
+/*
+ * The long-day band, 6 h and 8 h. Not a fault, so not a filled alarm: a stripe down the left
+ * edge, the way a label is drawn rather than the way a warning is.
+ */
+/*
+ * The 6 h and 8 h marks: an emoji beside the name, not a coloured stripe.
+ *
+ * The stripes were `box-shadow: inset 3px 0 0` in two shades of orange down the left edge of a
+ * box, and they lost to everything around them: a box is already tinted by its pole, outlined in
+ * red when illegal and filled blue when picked. Reported as "pas assez clair", with the remedy:
+ * an emoji instead of a fourth colour code. See `volumeMark` for which glyph means which.
+ */
+.box-volume {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.box-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.box-stars {
+  flex: 0 0 auto;
+  letter-spacing: -1px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.box-lock {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.box-lock.is-button {
+  cursor: pointer;
+  opacity: 0.3;
+}
+
+/*
+ * The padlock lights up under the padlock itself, not under the box.
+ *
+ * Lighting it on the box's hover offered a button the pointer was nowhere near, and made every
+ * pass over the grid look like something was about to be locked.
+ */
+.box-lock.is-button:hover {
+  opacity: 0.9;
+}
+
+/* The legend, so an orange box is never a riddle. */
+
+.legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.legend-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  flex: 0 0 auto;
+}
+
+.legend-swatch.is-illegal {
+  background: var(--rouge-bg);
+  border-color: var(--rouge);
+}
+
+.legend-swatch.is-warned {
+  border-color: var(--orange-fonce);
+  border-style: dashed;
+}
+
+/* The two long days are glyphs now, so the legend shows the glyph and not a swatch. */
+.legend-mark {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.legend-swatch.is-empty {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Side panel
+   -------------------------------------------------------------------------- */
+
+.panel {
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.panel-tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 8px 4px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+}
+
+.panel-tab[aria-current='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+  background: var(--surface);
+}
+
+/* The info pane's head: one title instead of a row of tabs, and a way out of the selection. */
+.panel-tabs.is-single {
+  justify-content: space-between;
+}
+
+.panel-tab.is-title {
+  flex: 1 1 auto;
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  font-weight: 600;
+  background: var(--surface);
+}
+
+.panel-tab.is-close {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
+
+/* What kind of thing the info pane is describing, above its name. */
+.panel-kind {
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+/* The person under a box's own details: one rule, so the two do not read as one block. */
+.panel-divider {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+/* A name in the info pane that leads somewhere: another person, a créneau, a case. */
+.link-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.btn.is-small {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.panel-body {
+  overflow: auto;
+  padding: 10px 12px 24px;
+  min-height: 0;
+  /* An e-mail address or a long pole path is not a reason to give the pane a sideways scrollbar.
+     `anywhere` rather than `break-word` on purpose: only `anywhere` lowers the min-content width,
+     which is what actually stops the word pushing the column wider. */
+  overflow-wrap: anywhere;
+}
+
+.panel-body.is-drop {
+  background: var(--accent-soft);
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+.panel-title {
+  font-weight: 650;
+  margin: 0 0 2px;
+}
+
+.panel-sub {
+  color: var(--ink-faint);
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.panel-section {
+  margin-top: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   La fiche: ce que la personne a écrit, ce que l’outil en a fait, et la correction
+   -------------------------------------------------------------------------- */
+
+/*
+ * The doubt the importer had, at the top of the fiche.
+ *
+ * Orange, not red: a fiche to read is not a rule broken. Red belongs to `validate`, and
+ * spending it on "somebody should check this sentence" would leave nothing to say "this plan
+ * is illegal".
+ */
+.fiche-review {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--orange-fonce);
+  border-radius: var(--radius);
+  background: var(--orange-fonce-bg);
+}
+
+.fiche-review .panel-section-title {
+  color: var(--orange-fonce);
+}
+
+.fiche-review-reason {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+/*
+ * The answers as typed. A quoted block, deliberately not a form field: nothing here is
+ * editable, and it should not look as though it might be.
+ */
+.fiche-raw-answer {
+  margin: 0 0 6px;
+  padding-left: 8px;
+  border-left: 2px solid var(--line-strong);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.fiche-raw-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.fiche-edit .field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fiche-edit .field-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.fiche-edit .select {
+  max-width: 190px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fiche-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  position: sticky;
+  bottom: 0;
+  padding: 10px 0;
+  background: var(--surface);
+}
+
+/* The review queue, in the tab bar and in the list. */
+
+.panel-tab.is-review {
+  color: var(--orange-fonce);
+}
+
+.panel-tab.is-review[aria-current='true'] {
+  color: var(--orange-fonce);
+  border-bottom-color: var(--orange-fonce);
+}
+
+.pool-item.is-review {
+  border-color: var(--orange-fonce);
+  cursor: pointer;
+}
+
+.panel-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 6px;
+}
+
+.pool-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  margin-bottom: 3px;
+  cursor: grab;
+  min-width: 0;
+}
+
+.pool-item:hover {
+  border-color: var(--accent);
+}
+
+/* The row whose description is open in the pane next door. */
+.pool-item.is-picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* "À zéro", which used to be a tab and is now a mark on the one list. */
+.chip.is-zero {
+  flex: 0 0 auto;
+  font-size: 10px;
+}
+
+/* The two filters a phase adds above its list of available people: who, and which day. */
+.pool-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* One filter left in the pane: the day moved to the phase screen's toolbar. */
+.pool-filters.is-single {
+  grid-template-columns: 1fr;
+}
+
+.pool-filter {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pool-filter span {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+
+.pool-item-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pool-item-meta {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pool-empty {
+  color: var(--ink-faint);
+  font-size: 12px;
+  padding: 6px 0;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kv dt {
+  color: var(--ink-faint);
+}
+
+.kv dd {
+  margin: 0;
+  text-align: right;
+}
+
+.issue {
+  border-left: 3px solid var(--rouge);
+  background: var(--rouge-bg);
+  padding: 5px 8px;
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 4px;
+}
+
+.issue.is-tier2 {
+  border-left-color: var(--orange-fonce);
+  background: var(--orange-fonce-bg);
+}
+
+.issue-code {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  display: block;
+}
+
+.chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  margin: 0 3px 3px 0;
+}
+
+.chip.is-ok {
+  background: var(--ok-bg);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.chip.is-bad {
+  background: var(--rouge-bg);
+  border-color: var(--rouge);
+  color: var(--rouge);
+}
+
+/* --------------------------------------------------------------------------
+   Placeholder and loading states
+   -------------------------------------------------------------------------- */
+
+.centered {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 30px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 22px 26px;
+  box-shadow: var(--shadow);
+  max-width: 520px;
+}
+
+.card h1 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.card p {
+  margin: 0 0 14px;
+  color: var(--ink-soft);
+}
+
+.card code {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.stub {
+  padding: 26px;
+  color: var(--ink-soft);
+  max-width: 640px;
+}
+
+.stub h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.stub ul {
+  padding-left: 18px;
+}
+
+/* --------------------------------------------------------------------------
+   Spinner
+   -------------------------------------------------------------------------- */
+
+.spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: -2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Plan picker
+   -------------------------------------------------------------------------- */
+
+.picker {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.picker-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.picker-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.picker-label {
+  font-weight: 600;
+}
+
+.picker-detail {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Proposals
+   -------------------------------------------------------------------------- */
+
+.proposal-list {
+  overflow: auto;
+  padding: 12px 16px 30px;
+  min-height: 0;
+}
+
+.proposal {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-left-color: var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 5px;
+  max-width: 1100px;
+}
+
+.proposal.is-heavy {
+  border-left-color: var(--orange-fonce);
+}
+
+.proposal.is-accepted {
+  border-left-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.proposal.is-rejected {
+  opacity: 0.45;
+}
+
+.proposal-kind {
+  flex: 0 0 128px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+
+.proposal-kind.is-heavy {
+  color: var(--orange-fonce);
+}
+
+.proposal-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.proposal-who {
+  font-weight: 650;
+}
+
+.proposal-where {
+  color: var(--ink-soft);
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.proposal-arrow {
+  color: var(--ink-faint);
+}
+
+.proposal-why {
+  margin-top: 3px;
+  color: var(--ink-soft);
+}
+
+.proposal-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 5px;
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard
+   -------------------------------------------------------------------------- */
+
+.board {
+  overflow: auto;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 12px;
+  align-content: start;
+  min-height: 0;
+}
+
+.board-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px 15px 15px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.board-card.is-span2 {
+  grid-column: 1 / -1;
+}
+
+.board-card h2 {
+  margin: 0 0 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.board-note {
+  color: var(--ink-soft);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
+.board-empty {
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.stat.is-bad .stat-value {
+  color: var(--rouge);
+}
+
+.stat.is-ok .stat-value {
+  color: var(--ok);
+}
+
+.stat-label {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.bar {
+  display: flex;
+  height: 9px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  margin-bottom: 10px;
+}
+
+.bar-part.is-c1 {
+  background: var(--ok);
+}
+
+.bar-part.is-c2 {
+  background: var(--accent);
+}
+
+.bar-part.is-hc {
+  background: var(--orange-clair);
+}
+
+.alert {
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin: 0 0 10px;
+}
+
+.alert.is-bad {
+  background: var(--rouge-bg);
+  color: var(--rouge);
+}
+
+.alert.is-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.people li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.people-meta {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.kv dd.is-bad {
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Recruitment
+   -------------------------------------------------------------------------- */
+
+.gap-list {
+  overflow: auto;
+  padding: 12px 16px 30px;
+  min-height: 0;
+}
+
+.gap-group {
+  margin-bottom: 18px;
+  max-width: 1100px;
+}
+
+.gap-group h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px;
+}
+
+.gap-group-hours {
+  margin-left: auto;
+  color: var(--rouge);
+  font-variant-numeric: tabular-nums;
+}
+
+.gap-row {
+  display: grid;
+  grid-template-columns: 210px 100px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 4px;
+}
+
+.gap-when,
+.gap-count {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gap-count strong {
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--rouge);
+  font-variant-numeric: tabular-nums;
+}
+
+.gap-why p {
+  margin: 0 0 5px;
+}
+
+@media (max-width: 780px) {
+  .gap-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Setup
+   -------------------------------------------------------------------------- */
+
+.setup-list {
+  overflow: auto;
+  padding: 12px 16px 0;
+  min-height: 0;
+}
+
+.setup-pole {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 5px;
+  max-width: 900px;
+  overflow: hidden;
+}
+
+.setup-pole-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.setup-pole-head:hover {
+  background: var(--surface-sunken);
+}
+
+.setup-caret {
+  color: var(--ink-faint);
+}
+
+
+
+.setup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  font-weight: 700;
+  padding: 5px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.setup-table td {
+  padding: 4px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.setup-table td.is-bad {
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+.setup-number {
+  width: 60px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: inherit;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font: inherit;
+}
+
+.preview-issues {
+  margin: 5px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.banner.is-error .preview-issues li {
+  margin-bottom: 1px;
+}
+
+
+.setup-colour {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding-left: 10px;
+  cursor: pointer;
+}
+
+.setup-colour input[type='color'] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.setup-colour input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.setup-colour input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.proposal-requires {
+  font-size: 11px;
+  color: var(--orange-fonce);
+  margin: 2px 0 4px;
+}
+
+.proposal-line {
+  padding: 3px 0 0 10px;
+  border-left: 2px solid var(--line);
+  margin-top: 4px;
+}
+
+.proposal-line-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+
+/* A root pole and its sub-poles, in Réglages. The colour belongs to the group. */
+
+.setup-group {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pole, var(--line-strong));
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 8px;
+  max-width: 900px;
+  overflow: hidden;
+}
+
+.setup-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--line);
+}
+
+.setup-group-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--pole, var(--ink));
+}
+
+/*
+ * Le bandeau d'une section est un bouton qui la déplie, depuis le 2026-09-12.
+ *
+ * Il prend toute la ligne sauf ce qui est explicitement posé à côté (la case
+ * « Activer » d'une phase, les boutons d'un pôle), pour que la cible de clic
+ * soit le bandeau entier et pas un triangle de dix pixels. Il ne ressemble à
+ * rien: pas de fond, pas de bordure, l'aspect qu'avait le bandeau avant.
+ */
+.setup-group-toggle {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Le seul cas où le bouton n'est que le triangle: un bandeau de pôle, dont le
+   reste est un sélecteur de couleur, un champ de saisie et trois boutons. */
+.setup-group-toggle.is-caret {
+  flex: 0 0 auto;
+}
+
+.setup-group-toggle:hover .setup-group-title {
+  text-decoration: underline;
+}
+
+.setup-group-toggle .setup-caret {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+/* Ce qui se replie. Le padding du bas vit ici plutôt que sur la carte, pour
+   qu'une section repliée soit exactement un bandeau et rien d'autre. */
+.setup-group-body {
+  padding-bottom: 2px;
+}
+
+.setup-group-head .btn {
+  margin-left: auto;
+}
+
+.setup-pole {
+  border-top: 1px solid var(--line);
+}
+
+.setup-pole:first-of-type {
+  border-top: 0;
+}
+
+/*
+ * The bin, shown only while a box from the grid is being dragged.
+ *
+ * It grows and turns red under the pointer, so the gesture is confirmed before the button is
+ * released. It removes one assignment: the person stays in the plan, unplaced.
+ */
+.trash {
+  position: fixed;
+  right: calc(var(--panel-w) + 26px);
+  bottom: 26px;
+  z-index: 25;
+  width: 118px;
+  height: 118px;
+  border-radius: 14px;
+  border: 2px dashed var(--line-strong);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--ink-faint);
+  text-align: center;
+  padding: 6px;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.trash-icon {
+  font-size: 34px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+
+.trash-label {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.trash.is-hot {
+  border-color: var(--rouge);
+  border-style: solid;
+  background: var(--rouge-bg);
+  color: var(--rouge);
+  transform: scale(1.08);
+}
+
+.trash.is-hot .trash-icon {
+  transform: scale(1.15) rotate(-8deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trash,
+  .trash-icon {
+    transition: none;
+  }
+
+  .trash.is-hot,
+  .trash.is-hot .trash-icon {
+    transform: none;
+  }
+}
+
+/*
+ * A buddy of the selected volunteer.
+ *
+ * Green rather than the selection blue, because it answers a different question: blue is "this
+ * is the person", green is "this is who they asked to be with". Green also reads as a thing to
+ * satisfy rather than a thing to fix, which is what a buddy request is.
+ */
+.box.is-buddy {
+  outline: 2px solid var(--ok);
+  outline-offset: -1px;
+}
+
+.legend-swatch.is-buddy {
+  border-color: var(--ok);
+  box-shadow: inset 0 0 0 1px var(--ok);
+}
+
+.chip.is-warn {
+  background: var(--orange-fonce-bg);
+  border-color: var(--orange-fonce);
+  color: var(--orange-fonce);
+}
+
+/* --------------------------------------------------------------------------
+   Réglages
+   -------------------------------------------------------------------------- */
+
+.setup-name {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--pole, var(--ink));
+  border-radius: 4px;
+  padding: 2px 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.setup-name:hover {
+  border-color: var(--line);
+}
+
+.setup-name:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  outline: none;
+}
+
+.setup-group-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.setup-pole-name {
+  font-weight: 600;
+}
+
+.setup-pole-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 10px;
+}
+
+.setup-pole-line .setup-pole-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.setup-detail {
+  padding: 4px 12px 14px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.setup-detail .setup-table {
+  width: 100%;
+}
+
+.setup-defaults {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-start;
+}
+
+/* One editable rule, with its own explanation under it. */
+
+.setup-rules-card .setup-group-head {
+  border-left: 0;
+}
+
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 20px;
+  padding: 12px 14px 16px;
+}
+
+.rule {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  min-width: 0;
+}
+
+.rule.is-inline {
+  max-width: 260px;
+}
+
+.rule-label {
+  font-weight: 600;
+}
+
+.rule-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/*
+ * Réglages' own rows, redrawn inside a pane 240 to 320 px wide.
+ *
+ * ONE COLUMN, AND NOTHING WITH A FIXED MINIMUM. `.rules-grid` and `.rule-input` were written for
+ * the settings page, where a row has the width of the window: the grid asks for tracks of at
+ * least 240 px and the row puts two selects side by side. `InfoPanel` draws that very markup for
+ * an orga's fiche, so the second select ran off the edge and was clipped, reported as "les infos
+ * montage / démontage sont tronquées". Stacking them fixed the clipping and left the 240 px track
+ * asking for more room than the pane has, which is the horizontal scrollbar reported next.
+ *
+ * So: one column, no inner side padding (the pane already has its own), and every field free to
+ * be narrower than its own content. A long word cannot widen the pane either. Réglages is
+ * untouched: nothing outside these two asides carries the `panel` class.
+ */
+.panel .rules-grid {
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 8px 0 10px;
+}
+
+.panel .rule-input {
+  display: grid;
+  gap: 6px;
+}
+
+.panel .rule,
+.panel .rules-grid,
+.panel .orga-fiche {
+  min-width: 0;
+}
+
+.panel .select,
+.panel .rule input {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+
+.rule input[type='number'],
+.clock-input,
+.setup-number {
+  width: 72px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: inherit;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-suffix {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+/*
+ * The 24 h hour field. See components/ClockField.tsx.
+ *
+ * Sized for "21h30" and not a character more, so a column of them lines up and a row of two of
+ * them plus a duration still fits next to a name. The stepper is a pointer's copy of the arrow
+ * keys: it appears on hover or focus rather than sitting there permanently, because forty of
+ * them at once on the créneaux table would be all anybody sees.
+ */
+
+.clock-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.clock-input {
+  width: 80px;
+  padding: 3px 18px 3px 6px;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.clock-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.clock-field.is-narrow .clock-input {
+  width: 72px;
+  font-size: 12px;
+}
+
+.clock-field.is-bad .clock-input {
+  border-color: var(--rouge);
+  color: var(--rouge);
+}
+
+/*
+ * The day marker sits inside the field, as a superscript on the hour it belongs to.
+ *
+ * It was a badge notched over the top border first, which read as a label on the row above on a
+ * list where the rows are five pixels apart. Inside, it belongs to its own hour and cannot be
+ * read as anything else.
+ */
+.clock-day {
+  position: absolute;
+  right: 18px;
+  top: 2px;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--ink-faint);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.clock-steps {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.1s ease-out;
+}
+
+.clock-field:hover .clock-steps,
+.clock-field:focus-within .clock-steps {
+  opacity: 1;
+}
+
+.clock-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 11px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.clock-step:hover {
+  color: var(--accent);
+  background: var(--surface-sunken);
+}
+
+/* Two hours and what they add up to: a set, a tranche, a responsable's window. */
+
+.clock-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.clock-range-sep {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+
+.clock-range .rule-suffix {
+  margin-left: 2px;
+}
+
+.rule-hint {
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* Destructive actions state their price before the second click. */
+
+.setup-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.setup-confirm-text {
+  font-size: 12px;
+  color: var(--rouge);
+  max-width: 460px;
+}
+
+.setup-regen {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  width: 100%;
+}
+
+.setup-regen-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.setup-organisers {
+  padding: 8px 12px 12px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+}
+
+.setup-organiser {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.setup-organiser .setup-name {
+  flex: 0 1 200px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/*
+ * The phone and the e-mail take what is left of the line.
+ *
+ * They were a fixed 190 px each, which fitted until the hours next to them became clock fields
+ * and pushed the delete button onto a line of its own. Letting them stretch keeps the row on one
+ * line at any width, and they are the two fields that gain the most from being wider anyway.
+ */
+.setup-organiser .select {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.setup-add-root {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 900px;
+  margin: 10px 0 30px;
+}
+
+/*
+ * A pinned box cannot be picked up at all.
+ *
+ * The lock was honoured by the solver from the start but not by the pointer: a locked box could
+ * still be dragged, exchanged or binned. `draggable` is off now, and the cursor has to say so,
+ * because a box that ignores a drag with no explanation reads as a broken page.
+ */
+.box.is-locked {
+  cursor: default;
+  border-color: var(--ink-faint);
+}
+
+.box.is-locked .box-name {
+  font-weight: 600;
+}
+
+/* Who runs a pole, and when, on the pole's own hour axis. */
+
+.pole-group-axis {
+  position: relative;
+}
+
+/* An orga is over this pole's frise: letting go makes them responsable of it for two hours. */
+.pole-group-axis.is-drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-soft);
+}
+
+/*
+ * Three pixels taller than it was, because the band is a handle now and not only a label: it is
+ * dragged to move a responsable's hours and pinched at either edge to change one of them. A 13 px
+ * target with 6 px grips was reported as not working at all.
+ */
+/*
+ * La hauteur est posée en ligne par `OrganiserBand`, pas ici: elle vaut une ligne par
+ * responsable qui en chevauche un autre sur ce pôle. Le minimum garde la frise visible et
+ * cliquable quand elle est vide, ce qui est la cible du glisser-déposer d'un orga.
+ */
+.organiser-band {
+  position: relative;
+  min-height: 18px;
+}
+
+.organiser-band-item {
+  position: absolute;
+  /* `top` et `height` sont posés en ligne: ils portent la ligne du responsable. */
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--pole, var(--accent)) 22%, var(--surface));
+  border-left: 3px solid var(--pole, var(--accent));
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 9px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink);
+  font-weight: 600;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.organiser-band-item.is-moving {
+  cursor: grabbing;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/*
+ * The two edges of a responsable's band, pulled to change one of their hours.
+ *
+ * DRAWN, NOT HIDDEN. They were 6 px of nothing until the pointer happened to hover them, on a
+ * band that gave no sign of being draggable at all; the régisseur could not find them and
+ * reported the whole gesture as broken. They are 9 px wide now, with a permanent hairline that
+ * says "this end moves", and the band's own body slides the window so missing them costs nothing.
+ *
+ * Inside the band rather than straddling its edges, because the band clips its own overflow to
+ * keep a long name from spilling over the next one. Capped at a third of the width for the same
+ * reason the montage's grips are: on a short band two grips would cover each other and grabbing
+ * the right edge would grab the left.
+ */
+.organiser-band-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  max-width: 33%;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.organiser-band-grip::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--pole, var(--accent));
+  opacity: 0.55;
+}
+
+.organiser-band-grip.is-start {
+  left: 0;
+}
+
+.organiser-band-grip.is-start::after {
+  left: 2px;
+}
+
+.organiser-band-grip.is-end {
+  right: 0;
+}
+
+.organiser-band-grip.is-end::after {
+  right: 2px;
+}
+
+.organiser-band-item:hover .organiser-band-grip::after {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.panel-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.panel-contact .chip {
+  margin: 0;
+  text-decoration: none;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The pole lock, on the grid heading. Aimed at the solver, not at the pointer. */
+
+.pole-group-title {
+  gap: 6px;
+}
+
+.pole-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pole-lock {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+  opacity: 0.28;
+  flex: 0 0 auto;
+}
+
+.pole-group-head:hover .pole-lock {
+  opacity: 0.6;
+}
+
+.pole-lock.is-locked,
+.pole-group-head:hover .pole-lock.is-locked {
+  opacity: 1;
+}
+
+/* The event card: name, start, duration, line-up. */
+
+.setup-event .setup-group-head {
+  border-left: 0;
+}
+
+.setup-lineup {
+  padding: 4px 14px 14px;
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+}
+
+.setup-lineup .panel-sub {
+  margin: 0 0 4px;
+}
+
+.setup-event .rule .select {
+  max-width: 260px;
+}
+
+.setup-event .rule input[type='date'] {
+  max-width: 170px;
+}
+
+.setup-slots .import-note {
+  margin: 0;
+  padding: 0 14px;
+}
+
+.setup-slots .setup-organiser code {
+  font-size: 11px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+/* The "débordement accepté" of a preference tranche: a small number beside the hours. */
+.setup-overflow input[type='number'] {
+  width: 56px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: inherit;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Import
+   -------------------------------------------------------------------------- */
+
+.import-body {
+  overflow: auto;
+  padding: 12px 16px 30px;
+  min-height: 0;
+}
+
+.import-body .setup-group {
+  max-width: 1000px;
+}
+
+.import-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+}
+
+.import-url {
+  flex: 1 1 340px;
+  max-width: none;
+}
+
+.import-error,
+.import-note {
+  margin: 0 14px 12px;
+}
+
+.import-summary {
+  padding: 10px 14px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.import-summary p {
+  margin: 0;
+}
+
+.import-removal,
+.import-update {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 5px 14px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.import-removal-name {
+  font-weight: 650;
+  min-width: 180px;
+}
+
+.import-change {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.import-change s {
+  color: var(--ink-faint);
+}
+
+.import-added,
+.import-issues {
+  padding: 10px 14px 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Impression
+
+   The sheet is drawn on screen exactly as it prints: white paper, black ink,
+   A4 width. What comes out of the printer should never be a surprise, so the
+   only difference @media print makes is removing the application around it.
+   -------------------------------------------------------------------------- */
+
+.print-body {
+  overflow: auto;
+  min-height: 0;
+  padding: 16px 0 40px;
+  background: var(--surface-sunken);
+}
+
+.print-sheet {
+  width: 190mm;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #111111;
+  padding: 12mm 10mm;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.print-head h1 {
+  font-size: 20px;
+  margin: 0 0 2px;
+}
+
+.print-head p {
+  margin: 0 0 2px;
+}
+
+.print-meta {
+  font-size: 10px;
+  color: #555555;
+}
+
+.print-page {
+  break-after: page;
+  page-break-after: always;
+  padding-top: 10px;
+}
+
+.print-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+.print-page h2 {
+  font-size: 16px;
+  margin: 0 0 3px;
+  border-bottom: 1px solid #111111;
+  padding-bottom: 2px;
+}
+
+.print-page h3 {
+  font-size: 12px;
+  margin: 10px 0 3px;
+}
+
+.print-organisers {
+  margin: 0;
+  font-size: 11px;
+}
+
+.print-empty {
+  color: #777777;
+}
+
+.print-missing {
+  color: #000000;
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #999999;
+  padding: 2px 4px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.print-table th {
+  background: #eeeeee;
+  font-weight: 600;
+}
+
+.print-table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-col-when {
+  width: 26mm;
+  white-space: nowrap;
+}
+
+.print-col-count {
+  width: 18mm;
+  white-space: nowrap;
+}
+
+.print-col-tel {
+  width: 28mm;
+  white-space: nowrap;
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  .no-print,
+  .topbar,
+  .banner {
+    display: none !important;
+  }
+
+  .app,
+  .screen,
+  .screen-main,
+  .print-body {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: #ffffff;
+    padding: 0;
+  }
+
+  .print-sheet {
+    width: auto;
+    padding: 0;
+    box-shadow: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Vue nuit (téléphone)
+
+   A single column, large type and generous targets: this is read at arm's
+   length, in the dark, by somebody holding something else in the other hand.
+   Nothing here is interactive except the hour and the organisers' phone numbers.
+   -------------------------------------------------------------------------- */
+
+.night {
+  min-height: 100vh;
+  background: var(--surface-sunken);
+  padding-bottom: 40px;
+}
+
+.night-banner {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--orange-fonce-bg);
+  border-bottom: 2px solid var(--orange-fonce);
+  color: var(--ink);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.night-banner strong {
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--orange-fonce);
+}
+
+.night-banner span {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.night-head {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.night-head h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.night-clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.night-clock .btn.is-icon {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+}
+
+.night-hour {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 90px;
+  text-align: center;
+}
+
+.night-note {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.night-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.night-pole {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pole);
+  border-radius: var(--radius);
+  padding: 10px 12px 12px;
+}
+
+.night-pole h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  color: var(--pole);
+}
+
+.night-organisers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.night-organiser.is-off {
+  opacity: 0.55;
+}
+
+.night-organiser a {
+  font-weight: 600;
+}
+
+.night-lane {
+  margin-top: 10px;
+}
+
+.night-lane h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.night-shift {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 9px;
+  margin-bottom: 6px;
+}
+
+.night-shift.is-now {
+  border-color: var(--pole);
+  background: var(--surface-sunken);
+}
+
+.night-shift-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.night-count.is-gap {
+  color: var(--rouge);
+}
+
+.night-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.night-empty {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.night-foot {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.night-leave {
+  justify-self: start;
+}
+
+/* --------------------------------------------------------------------------
+   Connexion
+   -------------------------------------------------------------------------- */
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Deux champs et un bouton, empilés plutôt qu'en ligne: à la largeur de la carte, une adresse
+   email et un mot de passe côte à côte tombent tous les deux sous leur largeur lisible, et un
+   navigateur reconnaît beaucoup mieux le couple identifiant / mot de passe quand il est présenté
+   comme un formulaire de connexion ordinaire. */
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.login-form .text-input {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.text-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: inherit;
+  padding: 6px 9px;
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.text-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.picker-sep {
+  margin: 16px 0 8px;
+  color: var(--ink-soft);
+}
+
+/* La liste des responsables dans Réglages. Une ligne par personne, sur deux rangées: qui elle
+   est et ce qu'on peut faire d'elle au-dessus, ses champs libres en dessous. Les colonnes sont
+   fixes pour que les codes s'alignent, sinon l'oeil ne peut pas les parcourir. */
+
+/*
+ * La carte « Orgas », reprise le 2026-09-12: « il n'y a l'air d'y avoir aucun
+ * padding sur les infos ».
+ *
+ * Il n'y en avait aucun, littéralement. La liste était dans un `.setup-shifts`,
+ * une classe employée à cet endroit et nulle part ailleurs, à laquelle aucune
+ * règle ne correspondait: les lignes touchaient le bord de la carte et les deux
+ * paragraphes d'explication aussi. Elle a maintenant sa mise en page, calée sur
+ * celle de `.setup-lineup`, qui est ce que font les autres cartes.
+ */
+.setup-orgas-note {
+  margin: 0;
+  padding: 8px 14px 0;
+}
+
+.setup-orgas-list {
+  padding: 4px 14px 12px;
+}
+
+.setup-organiser-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px 12px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+/* La première ligne suit déjà la bordure du bandeau: deux traits collés font
+   un trait épais, et rien de plus. */
+.setup-orgas-list .setup-organiser-row:first-child {
+  border-top: none;
+  padding-top: 2px;
+}
+
+.setup-organiser-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setup-organiser-code,
+.setup-organiser-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Un code se recopie et se dicte: chiffres à chasse fixe, lettres espacées, jamais coupé. */
+.organiser-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.setup-organiser-fields {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.setup-organiser-fields .select {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+/* Le bloc d'ajout sous la liste des responsables d'un pôle: le bouton et le menu des personnes
+   déjà enregistrées sont deux façons de faire la même chose, donc ils vont ensemble. */
+.setup-organiser-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.setup-name.is-half {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+/* -------------------------------------------------------------------------
+   Historique. The table is setup-table with three additions: room to breathe
+   on rows carrying a sentence, the working copy marked as not being a kept
+   version, and a reason where a button would otherwise be.
+   ------------------------------------------------------------------------- */
+
+.history-table td {
+  padding: 8px 12px;
+  vertical-align: top;
+}
+
+.history-live {
+  background: var(--surface-sunken);
+  font-weight: 600;
+}
+
+.history-blocked {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* The name a régisseur has to re-type before a plan is deleted, and the row it sits in. */
+.picker-danger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.picker-danger-text {
+  font-size: 12px;
+  color: var(--rouge);
+  flex-basis: 100%;
+}
+
+.picker-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.picker-row .picker-item {
+  flex: 1;
+}
+
+/* -------------------------------------------------------------------------
+   Le point de sauvegarde: la barre qui demande son nom, et la confirmation.
+   Deux variantes de .banner, parce que c'est la même sorte de chose que la
+   bannière de conflit: une phrase sur le planning, avec les boutons qui y
+   répondent. Ni l'une ni l'autre n'est une alerte, d'où les fonds neutres.
+   ------------------------------------------------------------------------- */
+
+.banner.is-quiet {
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+
+.banner.is-ok {
+  background: var(--ok-bg);
+}
+
+.banner-note {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.banner-note.is-bad {
+  color: var(--rouge);
+}
+
+.banner .text-input {
+  min-width: 280px;
+}
+
+.history-auto {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* -------------------------------------------------------------------------
+   Le journal. Une table dense qu'on lit du plus récent au plus ancien, plus
+   le bloc de texte qui part dans un message. Le niveau est une couleur de
+   fond très pâle: rouge et orange sont réservés au moteur de validation, donc
+   on emprunte ici la teinte de fond et jamais la couleur d'alerte elle-même.
+   ------------------------------------------------------------------------- */
+
+.journal {
+  overflow: auto;
+  min-height: 0;
+  padding: 12px;
+}
+
+.journal-note {
+  color: var(--ink-faint);
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.journal-table {
+  font-size: 12px;
+}
+
+.journal-table td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.journal-table td:nth-child(4) {
+  white-space: normal;
+}
+
+.journal-warn td {
+  background: var(--orange-clair-bg);
+}
+
+.journal-error td {
+  background: var(--rouge-bg);
+}
+
+.journal-detail {
+  color: var(--ink-faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.journal-who {
+  color: var(--ink-soft);
+}
+
+.journal-session {
+  color: var(--ink-faint);
+}
+
+.journal-raw {
+  margin-top: 14px;
+}
+
+.journal-text {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 8px;
+}
+
+
+/* -------------------------------------------------------------------------
+   L'espace bénévole. Lu debout, sur un téléphone, parfois à 3h du matin: une
+   carte par créneau, le jour et l'heure en premier, et le numéro du ou de la
+   responsable à portée de pouce. Rien n'y est modifiable.
+   ------------------------------------------------------------------------- */
+
+.benevole {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 14px 12px 40px;
+}
+
+.benevole-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.benevole-head strong {
+  display: block;
+  font-size: 17px;
+}
+
+.benevole-sub {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.benevole-note {
+  color: var(--ink-faint);
+  font-size: 12px;
+  margin: 10px 0 14px;
+}
+
+.benevole-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.benevole-shift {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+}
+
+.benevole-when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.benevole-day {
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.benevole-clock {
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.benevole-length {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.benevole-pole {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.benevole-avec {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.benevole-chefs {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.benevole-chef {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.btn.is-small {
+  padding: 3px 8px;
+  font-size: 12px;
+  text-decoration: none;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn.is-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.text-input.is-code {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le bloc d'export des codes, en tête de l'écran d'impression. Une barre de plus,
+   séparée de celle des options d'impression parce que ce n'est pas la même action. */
+
+.codes-export {
+  align-items: flex-start;
+  background: var(--surface-sunken);
+}
+
+.codes-export .toolbar-note {
+  flex: 1 1 320px;
+  max-width: 560px;
+}
+
+.codes-export .toolbar-note.is-bad {
+  color: var(--rouge);
+  flex-basis: 100%;
+  max-width: none;
+}
+
+.codes-export code {
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* --------------------------------------------------------------------------
+   The load-error card, which is the whole window when it shows
+   --------------------------------------------------------------------------
+   It is the only screen with no navigation around it, so its buttons are the
+   only way out and they get a row of their own rather than the banner rule
+   above, which pushes actions to the right of a line of text. */
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.card .card-note {
+  font-size: 12px;
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Montage and démontage
+   --------------------------------------------------------------------------- */
+
+/* A switch that reads as one thing: the box and its word are one target. */
+.setup-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.setup-phase .panel-sub {
+  max-width: 640px;
+}
+
+/* The phase selector above the grid: three moments of the same event, not three tools. */
+.phase-switch {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.phase-switch button {
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.phase-switch button:last-child {
+  border-right: 0;
+}
+
+/*
+ * The moment on screen, and the one rule about it: it has to be READABLE.
+ *
+ * This said `background: var(--ink); color: var(--paper)` and `--paper` is not a token in this
+ * stylesheet and never was. An undefined custom property is invalid at computed-value time, so
+ * `color` fell back to inherit: the label kept the surrounding ink colour and was painted on a
+ * background of that same ink. In the dark theme `--ink` is nearly white, which is the report
+ * word for word, "un background clair sur écriture claire". Three sibling rules had the same
+ * phantom token for their background and were quietly transparent.
+ *
+ * The accent rather than the ink, because blue is what "selected" means everywhere else in the
+ * tool, and `--accent-ink` is the one token defined to sit on top of it in both themes.
+ */
+.phase-switch button[aria-current='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.phase-switch button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------------
+   The montage and the démontage: the exploit's grid, over several days
+   --------------------------------------------------------------------------
+
+   The lanes, the labels and the tracks are the exploit's own classes, reused: a phase is the
+   same object seen at another moment, and it has to read the same way. What is added here is
+   the day columns, since a phase's axis has holes in it where the nights are, and the bar,
+   since a phase places ONE person per bar rather than N boxes in a créneau.
+   -------------------------------------------------------------------------- */
+
+.phase-ruler {
+  position: relative;
+  height: 46px;
+}
+
+/* The day's name, above its own stretch of the axis. */
+.phase-ruler-day {
+  position: absolute;
+  top: 2px;
+  height: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding-left: 5px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.phase-ruler-hour {
+  position: absolute;
+  top: 20px;
+  bottom: 0;
+  border-left: 1px solid var(--line);
+  padding-left: 4px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The first hour of a day is where the axis restarts, so it carries the stronger line. */
+.phase-ruler-hour.is-day {
+  border-left: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+/* No hour grid over the whole track: the worked stretches carry it, the nights carry nothing. */
+.lane-track.is-phase {
+  background: none;
+}
+
+.phase-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--line) 0 1px,
+      transparent 1px calc(var(--hour-w, 20px))
+    ),
+    var(--surface);
+  border-right: 1px solid var(--line-strong);
+}
+
+/* One person, one window. Solid is a decision; dashed is a presence somebody declared. */
+.phase-bar {
+  position: absolute;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--pole, #8a8a8a);
+  border-radius: 3px;
+  background: var(--surface);
+  font-size: 11px;
+  line-height: 20px;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/*
+ * A box that contradicts what somebody declared.
+ *
+ * THE FILL, and not only the outline, since 2026-09-12: "j'aimerais dans la grille Montage pour
+ * ce genre de problème la même coloration que pour la grille Exploit, donc avec le background de
+ * la case aussi en rouge". A red border on a white bar among fifty white bars is a detail; a red
+ * bar is the thing the eye lands on. Identical to `.box.is-illegal`, which is the point.
+ *
+ * The pole's colour on the left edge goes with it, and that is deliberate rather than an
+ * oversight of the shorthand: the lane the bar sits in already says which pole it is, and a red
+ * box interrupted by a stripe of pole colour reads as two states rather than one.
+ */
+.phase-bar.is-illegal {
+  background: var(--rouge-bg);
+  border-color: var(--rouge);
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+.phase-bar.is-resizing {
+  border-color: var(--accent);
+  z-index: 3;
+}
+
+/*
+ * The two edges, wide enough for a mouse and narrow enough to leave the name readable.
+ *
+ * `max-width` is what stops the two meeting on a short box. At six pixels each they covered a
+ * fifteen-minute bar entirely, so grabbing what looked like the right-hand edge grabbed the left
+ * one, and the box's start moved when the régisseur meant to move its end.
+ */
+.phase-bar-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  max-width: 35%;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.phase-bar-grip.is-start {
+  left: -1px;
+}
+
+.phase-bar-grip.is-end {
+  right: -1px;
+}
+
+.phase-bar:hover .phase-bar-grip {
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+.phase-bar.is-orga {
+  font-weight: 600;
+}
+
+.phase-bar-name {
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Événements: one lane, and a block that reads like a créneau
+   -------------------------------------------------------------------------- */
+
+.lane.is-events .lane-label {
+  border-left-color: var(--accent);
+}
+
+.phase-event-block {
+  position: absolute;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent-soft);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.phase-event-block.is-short {
+  border-color: var(--rouge);
+}
+
+/*
+ * The lid: the name of the job, which is what an événement has and a créneau does not.
+ *
+ * `flex: 0 0 auto` for the same reason the places below it carry a basis: this is an item of a
+ * column flex box, and a lid that shrinks to make room would hide the name rather than say the
+ * block is too small.
+ */
+.phase-event-title {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 17px;
+  height: 17px;
+  padding: 0 5px;
+  /* Ink on paper. It was accent on accent-soft at 10 px, which nobody could read. */
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom: 1px solid var(--accent);
+}
+
+.phase-event-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.phase-event-block.is-short .phase-event-title {
+  color: var(--rouge);
+  border-bottom-color: var(--rouge);
+}
+
+.phase-event-count {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+}
+
+.phase-event-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.phase-event-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  min-width: 0;
+}
+
+/*
+ * A place inside an événement: the exploit box, at the size a phase bar is drawn.
+ *
+ * `flex` AND NOT ONLY `height`, and this is the whole of why the last place of every événement
+ * was drawn with its bottom sliced off until 2026-09-12. `.box` carries `flex: 0 0 24px` for the
+ * exploit grid, where the boxes sit in a ROW and that basis is a width. `.phase-event-slots` is a
+ * COLUMN, so the same basis becomes a height, and `height: 22px` alone never touched it: each
+ * place was laid out at 24 px, rigid, two more than anybody had counted on, and `overflow:
+ * hidden` on the block swallowed the surplus in silence.
+ *
+ * 22 px is the figure the rest of the grid is built on: it is `ROW_H` in `PhaseGrid.tsx`, which
+ * is what `eventBlockHeight` sums to work out how tall the block has to be. See
+ * `phaseGeometry.test.tsx`, which now reads these very declarations back out of this file.
+ */
+.box.is-mini {
+  height: 22px;
+  flex: 0 0 22px;
+  line-height: 20px;
+  font-size: 11px;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Orga or bénévole, on any grid. See PersonMark. An emoji, so it carries its own colours and
+   needs a size of its own: at the 9 px a glyph took, it was a smudge. */
+.person-mark {
+  font-size: 10px;
+  margin-right: 3px;
+  vertical-align: baseline;
+  /* The name is what a box is for: the mark never takes room from it. */
+  flex: 0 0 auto;
+}
+
+/* The box that was clicked, whose panel is open on the right. */
+/*
+ * Every box the selected person holds on this phase, ringed. The exploit's `.box.is-kin`, said
+ * about a bar: one person's whole phase reads at a glance instead of being hunted for lane by
+ * lane. The picked box below is filled as well, so the two are never confused.
+ */
+.phase-bar.is-kin {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.phase-bar.is-picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/*
+ * An orga standing in a créneau: une place tenue, et aucune règle attachée.
+ *
+ * DEUX RÈGLES ET NON UNE, depuis le 2026-09-12, et c'est une correction de bug plutôt qu'un goût.
+ * Elle était écrite en un seul bloc qui posait le fond, la bordure et la couleur du texte, et ce
+ * bloc arrive APRÈS `.box.is-illegal` et `.box.is-picked` dans ce fichier, à spécificité égale
+ * (0,2,0). L'ordre l'emportait donc: une case d'orga en faute gardait son fond blanc, et ne
+ * passait au rouge qu'au survol, parce que `.box.is-illegal:not(.is-picked):hover` compte un
+ * sélecteur de plus. « Le background des cases à soucis n'est toujours pas rouge, seulement rouge
+ * au survol »: c'était exactement ça.
+ *
+ * Ce qui reste inconditionnel est la marque: le bord gauche épais. Ce qui cède à un état qui
+ * porte son propre fond (rouge pour une faute, bleu pour la sélection) sont les couleurs.
+ *
+ * L'italique a disparu: le bord gauche et l'émoji de `PersonMark` disent déjà « orga », et un nom
+ * propre en italique se lit moins bien pour ne rien dire de plus.
+ */
+.box.is-orga-box {
+  border-left-width: 3px;
+}
+
+.box.is-orga-box:not(.is-illegal):not(.is-picked) {
+  background: var(--surface);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* A picker sitting inside a line of text, on an orga's fiche. */
+.select.is-inline {
+  display: inline-block;
+  width: auto;
+  padding: 1px 4px;
+  font-size: 11px;
+}
+
+/* The second list on a volunteer's page: their montage and démontage. */
+.benevole-h2 {
+  font-size: 15px;
+  margin: 18px 0 6px;
+}
+
+/* The montage and démontage sheets: one block per half-day, one line per pole. */
+.print-phase-part {
+  margin-top: 10px;
+  break-inside: avoid;
+}
+
+.print-phase-when {
+  font-size: 12px;
+  margin: 0 0 2px;
+}
+
+/* An orga's fiche, opened from the list in Réglages or from the grid's search box. */
+.orga-fiche {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 4px;
+  width: 100%;
+}
+
+.setup-organiser-fiche {
+  grid-column: 1 / -1;
+  border-top: 1px dashed var(--line);
+  margin-top: 6px;
+}
+
+/* One flagged fiche in the import review: the doubts, the sentence, and the correction. */
+.import-review {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.import-review .issue {
+  display: block;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Le catering: les réglages des repas, et l'écran qui compte les couverts.
+
+   Deux tableaux larges et une case à cocher par personne et par service. La
+   seule règle visuelle qui porte du sens ici: une case cochée à la main ne
+   ressemble pas à une case remplie par l'outil, parce que la première survit à
+   un nouveau calcul et que le régisseur a le droit de voir lesquelles tiennent.
+   --------------------------------------------------------------------------- */
+
+.setup-group-title.is-sub {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* Un champ nombre reste court: personne ne tape « 12 » sur 260 px. */
+.select.is-number {
+  width: 74px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.catering-tier .rule-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/*
+ * Le corps de l'écran: la seule chose qui défile verticalement.
+ *
+ * `.screen-main` est une grille de deux lignes, une barre d'outils et un corps.
+ * Lui donner cinq enfants mettait toutes les lignes à partir de la troisième en
+ * `auto`, donc le bas de l'écran sortait de la fenêtre sans aucune barre de
+ * défilement pour aller le chercher. Un seul enfant qui défile, comme partout
+ * ailleurs dans l'outil.
+ */
+.screen-body {
+  overflow: auto;
+  min-height: 0;
+  padding: 12px 16px 16px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+/*
+ * Une carte du catering, et ce qui la distingue d'un `.setup-group`: elle prend
+ * toute la largeur.
+ *
+ * Les cartes de Réglages sont plafonnées à 900 px parce qu'on y lit des phrases,
+ * et une ligne de texte de 1600 px ne se lit pas. Ici on lit un tableau à une
+ * colonne par service: le plafond laissait un tiers d'écran vide à droite d'un
+ * tableau qui défilait dans sa propre boîte.
+ */
+.screen-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+  /* Jamais `hidden`: c'est ce qui rognait le tableau au lieu de le faire défiler. */
+  overflow: visible;
+}
+
+/* Le texte d'introduction d'une carte pleine largeur, à une mesure lisible. */
+.screen-card-note {
+  margin: 0;
+  padding: 10px 14px;
+  max-width: 90ch;
+  color: var(--ink-soft);
+}
+
+/* Là où le défilement horizontal a le droit d'exister, et nulle part ailleurs. */
+.screen-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Les deux résumés côte à côte tant qu'il y a la place, empilés sinon. */
+.catering-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.catering-table {
+  width: 100%;
+}
+
+.catering-empty {
+  padding: 10px 14px;
+}
+
+.catering-table th {
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.catering-table td {
+  vertical-align: middle;
+}
+
+.catering-count {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.catering-box {
+  text-align: center;
+  padding: 2px 6px;
+}
+
+.catering-box input {
+  cursor: pointer;
+}
+
+/*
+ * Une case décidée par un humain. L'accent, parce que c'est la même couleur que
+ * tout ce qui, dans cet outil, veut dire « quelqu'un a choisi ça »; le contour
+ * parce qu'une case cochée et une case cochée à la main doivent se distinguer
+ * même pour qui ne voit pas la différence de couleur.
+ */
+/* Une case décidée à la main: en vert, la couleur de « quelqu'un a choisi », depuis 2026-09-13. */
+.catering-box input.is-manual {
+  outline: 2px solid var(--ok);
+  outline-offset: 1px;
+  border-radius: 3px;
+  accent-color: var(--ok);
+}
+
+.catering-table .chip {
+  margin-right: 4px;
+}
+
+.catering-diets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  padding: 4px 14px 14px;
+}
+
+.catering-diets .panel-sub {
+  margin: 4px 0 0;
+}
+
+/* Le nom d'une personne ne se coupe pas: c'est la colonne qu'on lit à voix haute. */
+.catering-who {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* La barre d'onglets du filtre se range à droite du titre de la carte. */
+.screen-card .setup-group-head .panel-tabs {
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------------
+ * L'onglet Artistes: une fiche par groupe, repliée sur une ligne, dépliée sur tout.
+ * ------------------------------------------------------------------------- */
+
+.artist-card {
+  padding: 0;
+}
+
+/* La ligne repliée: le nom, le résumé, les actions. Trois colonnes tant qu'il y a la place. */
+.artist-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  align-items: start;
+  padding: 10px 14px;
+}
+
+.artist-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* Wide enough for most names, so the summaries of the folded rows line up down the page. */
+  min-width: 170px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 2px 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.artist-name {
+  font-size: 15px;
+}
+
+.artist-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.artist-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.artist-body {
+  border-top: 1px solid var(--line);
+  display: grid;
+}
+
+/* Une section de la fiche: un titre, puis la grille de champs de Réglages. */
+.artist-section {
+  padding: 8px 14px 4px;
+  border-top: 1px solid var(--line);
+}
+
+.artist-section:first-child {
+  border-top: 0;
+}
+
+.artist-section > .panel-section-title {
+  display: block;
+  padding-top: 4px;
+}
+
+.artist-section .rules-grid {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Un champ qui prend toute la largeur: les besoins techniques, les détails. */
+.artist-wide {
+  grid-column: 1 / -1;
+}
+
+textarea.select,
+.artist-text {
+  min-height: 60px;
+  width: 100%;
+  max-width: 900px;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.4;
+}
+
+/* Une case à cocher avec son libellé sur la même ligne, dans la grille des règles. */
+.rule.is-check {
+  align-content: center;
+}
+
+.rule.is-check .rule-input {
+  gap: 8px;
+}
+
+/* « fait / à faire » à côté d'un nombre de billets, « lieu de l'événement » sous une adresse. */
+.artist-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.artist-trips {
+  padding: 4px 0 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.artist-trip {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+}
+
+.artist-trip .rules-grid {
+  padding: 10px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.artist-trip-remove {
+  align-self: end;
+  justify-self: end;
+}
+
+.artist-add {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0 10px;
+}
+
+/* Le tableau des personnes: des champs de saisie dans chaque cellule, serrés. */
+.artist-members td {
+  vertical-align: middle;
+}
+
+/*
+ * With ten services the row is wider than the screen, and that is what .screen-scroll around
+ * the table is for: the fields keep a width a name or a choice can be read in, and the table
+ * scrolls sideways rather than squeezing "Technicien·ne" into "Technicie".
+ */
+.artist-members .select {
+  min-width: 120px;
+  width: 100%;
+}
+
+.artist-members select[name^='member-link-'] {
+  min-width: 170px;
+}
+
+.artist-members td .select.is-number {
+  width: 64px;
+  min-width: 64px;
+}
+
+.artist-row-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/*
+ * La ligne Artistes d'une phase: les balances de la veille et les changements de plateau,
+ * dessinés en lecture seule, avec les mêmes bandes et les mêmes couleurs que sous la règle de
+ * l'exploit. Rien ne s'y dépose: ces moments se modifient dans l'onglet Artistes.
+ */
+.lane.is-artists .lane-label {
+  border-left-color: var(--balances);
+}
+
+.lane.is-artists .artist-band {
+  cursor: default;
+}
+
+/* Why a row passed the « Pôle demandé » filter of the pool: its choix 1, its choix 2, or the pôle it runs. */
+.chip.is-choice {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chip.is-choice.is-choix2 {
+  background: var(--surface-sunken);
+  color: var(--ink-soft);
+}
+
+/* ---------------------------------------------------------------------------
+ * Deux écrans sur un onglet, l'un sous l'autre. Voir StackedScreen.tsx.
+ *
+ * Chaque écran a été écrit comme un onglet entier: une grille haute comme la fenêtre, un corps
+ * qui défile tout seul. Ici c'est le seul .stack-body qui défile, et à l'intérieur d'une section
+ * ces coquilles redeviennent des blocs.
+ * ------------------------------------------------------------------------- */
+
+.stack-body {
+  overflow: auto;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+}
+
+.stack-section {
+  border-bottom: 1px solid var(--line);
+}
+
+.stack-section:last-child {
+  border-bottom: 0;
+}
+
+.stack-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 6px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--line);
+}
+
+.stack-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stack-section.is-folded .stack-head {
+  border-bottom: 0;
+}
+
+.stack-section .screen,
+.stack-section .screen-main {
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.stack-section .screen-body,
+.stack-section .board,
+.stack-section .import-body,
+.stack-section .print-body,
+.stack-section .journal,
+.stack-section .catering-body {
+  overflow: visible;
+  max-height: none;
+}
+
+/* Une seule des deux parties va sur le papier: celle qui a été écrite pour. */
+@media print {
+  .stack-body,
+  .stack-section,
+  .stack-content {
+    display: block;
+    overflow: visible;
+    height: auto;
+  }
+
+  .stack-head {
+    display: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * La billetterie: la liste de la porte, et sa carte de Réglages.
+ * ------------------------------------------------------------------------- */
+
+.ticketing-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: none;
+}
+
+.ticketing-table td {
+  vertical-align: middle;
+}
+
+.ticketing-table .select {
+  min-width: 120px;
+}
+
+.ticketing-table td .select.is-number {
+  min-width: 64px;
+  width: 64px;
+}
+
+.ticketing-table tr.has-issue td {
+  background: var(--orange-clair-bg);
+}
+
+/* Un ticket ou un bracelet choisi à la main, comme une case cochée à la main au catering. */
+.ticketing-table .select.is-manual {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Un statut sur une ligne. Plusieurs se suivent: une personne peut en avoir deux. */
+.chip.is-status {
+  margin-right: 4px;
+  background: var(--surface-sunken);
+  color: var(--ink-soft);
+}
+
+.chip.is-status.is-artiste,
+.chip.is-status.is-invite-artiste {
+  background: var(--balances-bg);
+  color: var(--balances);
+}
+
+.chip.is-status.is-orga,
+.chip.is-status.is-responsable {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Réglages: une ligne par type de ticket, une par bracelet. */
+.setup-ticket-row,
+.setup-bracelet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+
+.setup-ticket-row .select,
+.setup-bracelet-row .select {
+  width: 220px;
+}
+
+.setup-bracelet-statuses {
+  display: flex;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+
+/* Les invitations d'un groupe, sur sa fiche: un bloc par membre, puis celles du groupe. */
+.artist-guests {
+  display: grid;
+  gap: 10px;
+  padding: 6px 0 10px;
+}
+
+.artist-guest-group {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.artist-guest {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.artist-guest .select {
+  width: 180px;
+}
+
+.people-meta.is-bad {
+  color: var(--rouge);
+}
+
+/* Un chiffre de tickets boisson fixé à la main sur la billetterie: en vert, pas le calcul. */
+.ticketing-table td.is-by-hand .select {
+  color: var(--ok);
+  border-color: var(--ok);
+  font-weight: 600;
+}
+
+.ticketing-table input[name^='note-'] {
+  min-width: 200px;
+}
+
+/*
+ * A trajet carries nine fields since the distance, the cost and « Calculer automatiquement »
+ * joined it; as a grid of 200 px tracks the last ones ran off the card. The row wraps instead,
+ * and the cost with its button takes the room it needs.
+ */
+.artist-trip .rules-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-start;
+}
+
+.artist-trip .rule {
+  flex: 0 1 auto;
+}
+
+.artist-trip .rule-input {
+  flex-wrap: wrap;
+}
+
+.artist-trip .rule-hint {
+  max-width: 420px;
+}
+
+/* A computed figure shown as a placeholder reads lighter than one the régisseur typed. */
+.ticketing-table input.select.is-number::placeholder {
+  color: var(--ink-soft);
+  opacity: 1;
+}
+
+/*
+ * Réglages avancés, 2026-09-13. One row per criterion: what it judges, its threshold when it has
+ * one, the mode, the weight, and a way back to the default. Four tracks on a wide screen; under
+ * 900 px the row stacks, the label on top, because the hints are sentences and cannot be squeezed.
+ */
+.advanced-intro {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px 4px;
+}
+
+.advanced-intro p {
+  margin: 0;
+  max-width: 860px;
+}
+
+.advanced-group {
+  padding: 10px 14px 4px;
+}
+
+.advanced-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) 230px 190px minmax(190px, 1.4fr) 32px;
+  gap: 6px 16px;
+  align-items: start;
+  padding: 8px 6px;
+  border-top: 1px solid var(--line);
+  border-left: 3px solid transparent;
+}
+
+.advanced-row.is-changed {
+  border-left-color: var(--ok);
+}
+
+.advanced-what {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.advanced-param .rule-input {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.advanced-weight .rule-input {
+  flex-wrap: wrap;
+}
+
+.advanced-param .select.is-number {
+  width: 64px;
+}
+
+.advanced-mode-fixed {
+  align-self: center;
+}
+
+.advanced-weight {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.advanced-weight .select.is-number {
+  width: 84px;
+}
+
+.advanced-mode {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  overflow: hidden;
+  align-self: start;
+  justify-self: start;
+}
+
+.mode-choice {
+  border: 0;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.mode-choice + .mode-choice {
+  border-left: 1px solid var(--line-strong);
+}
+
+.mode-choice:hover:not(.is-on) {
+  background: var(--surface-sunken);
+}
+
+.mode-choice.is-on.is-block {
+  background: var(--rouge-bg);
+  color: var(--rouge);
+  font-weight: 600;
+}
+
+.mode-choice.is-on.is-weight {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.mode-choice.is-on.is-off {
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A mode the régisseur chose against the default: the billetterie's green, as an outline. */
+.mode-choice.is-by-hand {
+  box-shadow: inset 0 0 0 2px var(--ok);
+}
+
+.advanced-row .rule-input.is-by-hand .select {
+  color: var(--ok);
+  border-color: var(--ok);
+  font-weight: 600;
+}
+
+.advanced-always {
+  margin: 0;
+  padding-bottom: 10px;
+}
+
+.advanced-reset {
+  padding-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .advanced-row {
+    grid-template-columns: 1fr 32px;
+  }
+
+  .advanced-mode,
+  .advanced-mode-fixed {
+    grid-column: 1 / 2;
+    justify-self: start;
+  }
+
+  .advanced-what,
+  .advanced-param,
+  .advanced-weight {
+    grid-column: 1 / -1;
+  }
+}
+
+/* One pole choice being corrected on a fiche: rank, pole, level, and three small controls. */
+.choice-edit {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto auto auto;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.choice-edit-rank {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.rule .advanced-mode {
+  justify-self: start;
+}
+
+/*
+ * La correspondance du formulaire, 2026-09-14. A field, the column it reads, and what that column
+ * holds; then the choice columns; then every distinct closed answer with its value. A decision
+ * the régisseur took is marked green on the left, the Réglages avancés convention.
+ */
+.mapping-group {
+  padding: 10px 14px 6px;
+}
+
+.mapping-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(220px, 420px) minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: center;
+  padding: 4px 6px;
+  border-left: 3px solid transparent;
+}
+
+.mapping-row.is-changed,
+.mapping-choice.is-changed,
+.mapping-answers tr.is-changed td:first-child {
+  border-left: 3px solid var(--ok);
+}
+
+.mapping-row .rule-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapping-choice {
+  display: grid;
+  grid-template-columns: 20px minmax(200px, 420px) minmax(180px, 320px) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 6px;
+  margin-bottom: 4px;
+}
+
+.mapping-answers td {
+  padding: 3px 8px;
+  vertical-align: middle;
+}
+
+.mapping-answer {
+  max-width: 520px;
+}
+
+@media (max-width: 900px) {
+  .mapping-row,
+  .mapping-choice {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A binôme's chip carries its own remove button, and the add row sits under the chips. */
+.chip-remove {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.chip-remove:hover {
+  opacity: 1;
+}
+
+.buddy-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.buddy-add .select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rule-hint.is-warn {
+  color: var(--orange-fonce);
+}

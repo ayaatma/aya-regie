@@ -1,0 +1,48 @@
+{
+  // Les deux mises à jour de production, séparées, parce qu'elles ne vont pas toujours
+  // ensemble: une migration peut partir sans nouveau bundle, et un bundle part souvent sans
+  // migration. Quand une version a besoin des deux, la base passe EN PREMIER, sinon le front
+  // déployé interroge un schéma qui n'existe pas encore.
+  //
+  // Les deux lisent leurs identifiants dans .env.deploy.local à la racine (gitignoré).
+  //
+  // NI npm NI SHELL ICI, ET C'EST VOULU. Une première version lançait "npm run migrate" en
+  // type node-terminal: dans un terminal PowerShell, "npm" résout npm.ps1 avant npm.cmd, et la
+  // stratégie d'exécution par défaut de Windows refuse de charger ce script
+  // ("running scripts is disabled on this system"). Les cibles appellent donc node.exe
+  // directement sur le CLI, avec tsx chargé par --import, ce qui est exactement ce que fait
+  // "npm run" une fois le wrapper enlevé. node.exe est un exécutable, pas un script: aucun
+  // shell n'a son mot à dire.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Équivaut à: npm run migrate -- --apply
+      // Chaque fichier de db/migrations non encore appliqué, dans l'ordre déclaré par son
+      // en-tête, une transaction par fichier avec sa ligne de registre écrite dedans. Sans
+      // --apply, la commande dit seulement ce qu'elle ferait; le --apply est dans la cible
+      // parce qu'une cible nommée "update" qui ne met rien à jour serait un piège.
+      "name": "BDD update (migrations Supabase)",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/tools/src/migrate-cli.ts",
+      "args": ["--apply"],
+      "cwd": "${workspaceFolder}/tools",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      // Équivaut à: npm run deploy
+      // Build local de app/, puis miroir de app/dist vers le sous-domaine. Ne supprime là-haut
+      // que les fichiers de la forme qu'il produit, et envoie index.html en dernier.
+      "name": "Front update (build + déploiement OVH)",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/tools/src/deploy-cli.ts",
+      "cwd": "${workspaceFolder}/tools",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
