@@ -94,6 +94,7 @@ where its `feature_*.md` is.
   **list of people keen on each activity**.
 
 ### 9. Magasin mode
+- **BUILT 2026-09-15, see [[feature-magasin]].**
 - Equipment a person can bring (form answer) feeds a future "Magasin" mode managing the general
   equipment: available, lent, returned.
 
