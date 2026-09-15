@@ -27,8 +27,10 @@ import {
   makeArtist,
   makeArtistMember,
   solve,
+  ticketingReport,
   validate,
   type Plan,
+  type TicketPersonKind,
 } from '../engine.ts';
 import { setCateringRules } from '../store/cateringEdits.ts';
 import { normalisePlan } from '../persistence/normalise.ts';
@@ -40,7 +42,7 @@ import { ProposalsScreen } from './ProposalsScreen.tsx';
 import { PoleRow, SetupScreen } from './SetupScreen.tsx';
 import { CateringScreen } from './CateringScreen.tsx';
 import { ArtistCard, ArtistsScreen } from './ArtistsScreen.tsx';
-import { TicketingScreen } from './TicketingScreen.tsx';
+import { PeopleScreen } from './PeopleScreen.tsx';
 import { ImportScreen } from './ImportScreen.tsx';
 import { PrintScreen } from './PrintScreen.tsx';
 import { NightView } from './NightView.tsx';
@@ -58,6 +60,8 @@ import { PoolPanel, type Moment, type PanelTab } from '../components/PoolPanel.t
 import { poleMatchOf } from '../components/poolRows.ts';
 import { StackedScreen } from './StackedScreen.tsx';
 import { InfoPanel } from '../components/InfoPanel.tsx';
+import { NavigationContext } from '../components/personNav.ts';
+import { VolunteerEdit } from '../components/VolunteerEdit.tsx';
 import type { Selection } from '../components/selection.ts';
 import { poleColours, rootOf } from '../components/poleColours.ts';
 import { buddiesOf } from '../components/relations.ts';
@@ -2271,16 +2275,23 @@ function planWithTicketing(): Plan {
   };
 }
 
-test('the billetterie lists everybody by name with statuses, tickets, bracelet, and reports the incohérences', () => {
+const peopleOf = (current: Plan, focus: { kind: TicketPersonKind; key: string } | null = null): string =>
+  render(<PeopleScreen focus={focus} onFocus={noop} onGoToSetup={noop} />, current);
+
+test('the Personnes tab lists everybody by name with statuses, tickets, bracelet, and reports the incohérences', () => {
   const current = planWithTicketing();
-  const html = render(<TicketingScreen onGoToSetup={noop} />, current);
-  assert.ok(shows(html, 'sans billet'));
+  const html = peopleOf(current);
+  assert.ok(shows(html, `${ticketingReport(current).rows.length} personnes`), 'the count leads the toolbar');
   assert.ok(html.includes('aria-label="Chercher une personne"'));
   assert.ok(html.includes('aria-label="Filtrer par statut"'));
+  assert.ok(html.includes('aria-label="Colonnes affichées"'));
   // The statuses, as chips: an orga, the act's guests, the extra.
   assert.ok(shows(html, 'Artiste: Nashkø'));
   assert.ok(shows(html, 'Invité de Nashkø'));
-  assert.ok(html.includes('name="extra-first-x1"') && html.includes('value="Pat"'), 'the extra edits in place');
+  // The list stays light: no fiche until somebody is clicked, and the extra's name is typed there.
+  assert.ok(html.includes('class="screen is-wide"'));
+  assert.ok(!html.includes('name="extra-first-x1"'));
+  assert.ok(html.includes('data-person="extra|x1"') && shows(html, 'Lumière'));
   // The default bracelet of a bénévole, and the one chosen by hand for Lou (loto) flagged.
   assert.ok(html.includes('name="bracelet-benevole-'));
   assert.ok(/name="ticket-artiste-nk-m1"[^>]*class="select is-manual"|class="select is-manual"[^>]*name="ticket-artiste-nk-m1"/.test(html));
@@ -2295,6 +2306,82 @@ test('the billetterie lists everybody by name with statuses, tickets, bracelet, 
   // Sorted by name: Aubert... whichever comes first, the first row is not the extra typed last.
   const first = html.indexOf('<tbody>');
   assert.ok(first > 0);
+});
+
+test('the rows carry what the contact and meal columns show, and never a credential', () => {
+  const current = planWithTicketing();
+  const volunteer = current.volunteers[0]!;
+  const orga = current.organisers[0]!;
+  const rows = ticketingReport(current).rows;
+  const row = rows.find((r) => r.kind === 'benevole' && r.key === volunteer.key)!;
+  assert.equal(row.email, volunteer.email);
+  assert.equal(row.diet, volunteer.diet);
+  assert.equal(row.allergies, volunteer.allergies);
+  const orgaRow = rows.find((r) => r.kind === 'orga' && r.key === orga.key)!;
+  assert.equal(orgaRow.email, orga.email);
+  // A whole Organiser is handed to the row builder: nothing past the named fields may come along.
+  assert.ok(!('accessCode' in row) && !('accessCode' in orgaRow));
+});
+
+test('clicking a person opens a fiche beside the list, whatever kind of person it is', () => {
+  const current = planWithTicketing();
+  const volunteer = current.volunteers[0]!;
+
+  const benevole = peopleOf(current, { kind: 'benevole', key: volunteer.key });
+  assert.ok(benevole.includes('class="screen has-person"'));
+  assert.ok(benevole.includes('aria-label="Fiche de la personne"'));
+  assert.ok(benevole.includes(`data-person="benevole|${volunteer.key}"`) && benevole.includes('class="is-selected"'));
+  assert.ok(shows(benevole, 'Modifier la fiche'), "the bénévole's own fiche, not a copy");
+  assert.ok(benevole.includes(`name="fiche-ticket-benevole-${volunteer.key}"`), "the door's fields, a second time");
+  assert.ok(benevole.includes(`name="ticket-benevole-${volunteer.key}"`), 'and still on the row');
+
+  const orga = current.organisers[0]!;
+  const orgaHtml = peopleOf(current, { kind: 'orga', key: orga.key });
+  assert.ok(orgaHtml.includes(`name="orga-firstName-${orga.key}"`), "the orga's fiche, editable");
+
+  const extra = peopleOf(current, { kind: 'extra', key: 'x1' });
+  assert.ok(extra.includes('name="extra-first-x1"') && extra.includes('value="Pat"'), 'the extra is typed in the fiche');
+  assert.ok(shows(extra, 'Retirer de la liste'));
+
+  const member = peopleOf(current, { kind: 'artiste', key: 'nk-m1' });
+  assert.ok(member.includes('name="fiche-member-first-nk-m1"'));
+  assert.ok(shows(member, 'Membre de Nashkø'));
+
+  const guest = peopleOf(current, { kind: 'invite', key: 'nk-m1-g1' });
+  assert.ok(guest.includes('name="fiche-guest-first-nk-m1-g1"') && guest.includes('value="Noa"'));
+
+  const gone = peopleOf(current, { kind: 'benevole', key: 'personne' });
+  assert.ok(shows(gone, "Cette personne n'est plus dans le plan."));
+});
+
+test('the correction form of a bénévole edits the first and last name too', () => {
+  const volunteer = plan.volunteers[0]!;
+  const html = render(
+    <VolunteerEdit index={new PlanIndex(plan)} volunteer={volunteer} onCancel={noop} onSave={noop} />,
+  );
+  assert.ok(shows(html, 'Prénom') && html.includes(`value="${escapeHtml(volunteer.firstName)}"`));
+  assert.ok(shows(html, 'Nom') && html.includes(`value="${escapeHtml(volunteer.lastName)}"`));
+});
+
+test('the info pane of the grids offers the whole fiche only inside the shell', () => {
+  const key = plan.volunteers[0]!.key;
+  assert.ok(!shows(infoOf(plan, { kind: 'benevole', volunteerKey: key }), 'Ouvrir dans Personnes'));
+  const html = renderToStaticMarkup(
+    <PlanContext.Provider value={contextFor(plan)}>
+      <NavigationContext.Provider value={{ openPerson: noop, openArtists: noop }}>
+        <InfoPanel selection={{ kind: 'benevole', volunteerKey: key }} onSelect={noop} />
+      </NavigationContext.Provider>
+    </PlanContext.Provider>,
+  );
+  assert.ok(shows(html, 'Ouvrir dans Personnes'));
+  const readOnly = renderToStaticMarkup(
+    <PlanContext.Provider value={contextFor(plan)}>
+      <NavigationContext.Provider value={{ openPerson: noop, openArtists: noop }}>
+        <InfoPanel selection={{ kind: 'benevole', volunteerKey: key }} onSelect={noop} readOnly />
+      </NavigationContext.Provider>
+    </PlanContext.Provider>,
+  );
+  assert.ok(!shows(readOnly, 'Ouvrir dans Personnes'));
 });
 
 test('the Réglages card edits the ticket types, the bracelets and the invitations per artist', () => {

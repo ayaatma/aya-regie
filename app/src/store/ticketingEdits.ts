@@ -182,13 +182,18 @@ export function deleteBracelet(plan: Plan, key: string): Plan {
 // The people the door alone knows
 // ---------------------------------------------------------------------------
 
-/** One more prestataire or invitation, unnamed: the row is where the name is typed. */
-export function addExtraPerson(plan: Plan, status: ExtraPerson['status']): Plan {
+/** The key the next extra person will get, so the screen can open their fiche as it adds them. */
+export function nextExtraKey(plan: Plan): string {
   const taken = new Set(plan.ticketing.extras.map((x) => x.key));
   let n = plan.ticketing.extras.length + 1;
   while (taken.has(`extra-${n}`)) n++;
+  return `extra-${n}`;
+}
+
+/** One more prestataire or invitation, unnamed: the fiche is where the name is typed. */
+export function addExtraPerson(plan: Plan, status: ExtraPerson['status']): Plan {
   const person: ExtraPerson = {
-    key: `extra-${n}`,
+    key: nextExtraKey(plan),
     firstName: '',
     lastName: '',
     status,

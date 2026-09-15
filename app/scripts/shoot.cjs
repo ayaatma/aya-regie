@@ -207,12 +207,35 @@ async function main() {
         await page.evaluate(() => document.querySelector('.setup-advanced')?.scrollIntoView());
         await tall('72-reglages-avances-tall');
       }
-      if (want('billetterie')) {
-        await tab('Billetterie');
-        await shot('85-billetterie');
-        await page.type('input[name="ticketing-search"]', 'mar');
+      if (want('personnes') || want('billetterie')) {
+        await tab('Personnes');
+        await shot('85-personnes');
+        // A click on a bénévole's row opens the fiche beside the list; the arrow walks to the next.
+        await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
         await sleep(400);
-        await shot('86-billetterie-search');
+        await shot('86-personnes-fiche-benevole');
+        await page.keyboard.press('ArrowDown');
+        await sleep(400);
+        await clickButton(/^Modifier la fiche$/).catch(() => {});
+        await tall('87-personnes-fiche-edition');
+        await page.evaluate(() => document.querySelector('tr[data-person^="orga|"] td:nth-child(2)')?.click());
+        await sleep(400);
+        await tall('88-personnes-fiche-orga');
+        await page.select('select[aria-label="Colonnes affichées"]', 'contact');
+        await sleep(300);
+        await shot('89-personnes-contact');
+        await page.select('select[aria-label="Colonnes affichées"]', 'repas');
+        await page.type('input[name="people-search"]', 'mar');
+        await sleep(400);
+        await shot('90-personnes-repas-search');
+        // The way in from the grid: a bénévole's box, then « Ouvrir dans Personnes ».
+        await tab('Grille');
+        await page.evaluate(() => document.querySelector('.box:not(.is-empty)')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+        await sleep(400);
+        await shot('91-grille-ouvrir-dans-personnes');
+        await clickButton(/^Ouvrir dans Personnes$/);
+        await sleep(400);
+        await shot('92-personnes-depuis-grille');
       }
       if (want('catering')) {
         await tab('Catering');

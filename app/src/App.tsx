@@ -5,7 +5,7 @@
  * with a batch of proposals to read on another screen, and the run must survive that move.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useSession } from './auth/useSession.ts';
 import { useSolver } from './solver/useSolver.ts';
@@ -19,7 +19,8 @@ import { PlanPicker } from './screens/PlanPicker.tsx';
 import { SetupScreen } from './screens/SetupScreen.tsx';
 import { CateringScreen } from './screens/CateringScreen.tsx';
 import { ArtistsScreen } from './screens/ArtistsScreen.tsx';
-import { TicketingScreen } from './screens/TicketingScreen.tsx';
+import { PeopleScreen } from './screens/PeopleScreen.tsx';
+import { NavigationContext, type Navigation, type PersonRef } from './components/personNav.ts';
 import { ImportScreen } from './screens/ImportScreen.tsx';
 import { PrintScreen } from './screens/PrintScreen.tsx';
 import { HistoryScreen } from './screens/HistoryScreen.tsx';
@@ -44,7 +45,7 @@ type Screen =
   | 'tableau'
   | 'artistes'
   | 'catering'
-  | 'billetterie'
+  | 'personnes'
   | 'reglages'
   | 'import'
   | 'historique';
@@ -53,9 +54,11 @@ const TABS: Array<{ id: Screen; label: string }> = [
   { id: 'grille', label: 'Grille' },
   { id: 'propositions', label: 'Propositions' },
   { id: 'tableau', label: 'Tableau de bord' },
+  // Was « Billetterie », after Catering, until 2026-09-15: the central place for a person's
+  // information now, so it comes before the tabs that each hold one part of it.
+  { id: 'personnes', label: 'Personnes' },
   { id: 'artistes', label: 'Artistes' },
   { id: 'catering', label: 'Catering' },
-  { id: 'billetterie', label: 'Billetterie' },
   { id: 'reglages', label: 'Réglages' },
   { id: 'import', label: 'Import/Export' },
   { id: 'historique', label: 'Historique' },
@@ -89,6 +92,18 @@ export function App({
   // Null on the fixtures, so the button below simply does not exist there.
   const { session, signOut } = useSession();
   const [screen, setScreen] = useState<Screen>('grille');
+  /** Whose fiche is open on the Personnes tab. Here, so a trip to another tab keeps it open. */
+  const [personFocus, setPersonFocus] = useState<PersonRef | null>(null);
+  const navigation = useMemo<Navigation>(
+    () => ({
+      openPerson: (person) => {
+        setPersonFocus(person);
+        setScreen('personnes');
+      },
+      openArtists: () => setScreen('artistes'),
+    }),
+    [],
+  );
   /** Set when somebody on a small screen asks for the desktop tool anyway. */
   const [fullOnPhone, setFullOnPhone] = useState(false);
   /** Set while the régisseur is naming the version on screen. */
@@ -345,6 +360,7 @@ export function App({
         it usable. A crash used to unmount the whole tree, nav included, which turned one missing
         field on an old stored plan into a blank page with no way out.
       */}
+      <NavigationContext.Provider value={navigation}>
       <ScreenBoundary resetKey={screen}>
         {screen === 'grille' && (
           <PlanningScreen onSolve={onSolve} solving={solver.running} solveMode={solver.mode} />
@@ -377,7 +393,13 @@ export function App({
         )}
         {screen === 'artistes' && <ArtistsScreen />}
         {screen === 'catering' && <CateringScreen onGoToSetup={() => setScreen('reglages')} />}
-        {screen === 'billetterie' && <TicketingScreen onGoToSetup={() => setScreen('reglages')} />}
+        {screen === 'personnes' && (
+          <PeopleScreen
+            focus={personFocus}
+            onFocus={setPersonFocus}
+            onGoToSetup={() => setScreen('reglages')}
+          />
+        )}
         {screen === 'reglages' && <SetupScreen />}
         {screen === 'import' && (
           <StackedScreen
@@ -396,6 +418,7 @@ export function App({
           />
         )}
       </ScreenBoundary>
+      </NavigationContext.Provider>
     </div>
   );
 }

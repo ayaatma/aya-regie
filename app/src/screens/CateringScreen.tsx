@@ -88,7 +88,7 @@ export function CateringScreen({ onGoToSetup }: { onGoToSetup(): void }) {
           <span className="toolbar-sep" />
           <span className="toolbar-note">
             Rempli sur les services les plus proches des créneaux. Une case changée à la main
-            reste en vert. Les tickets boisson sont dans la Billetterie.
+            reste en vert. Les tickets boisson sont dans l'onglet Personnes.
           </span>
           <span className="toolbar-sep" />
           <button

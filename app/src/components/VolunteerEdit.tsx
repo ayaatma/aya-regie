@@ -79,6 +79,8 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
     compare('choices');
     compare('requestedHours');
     compare('preferredSlotId');
+    compare('firstName');
+    compare('lastName');
     compare('nickname');
     compare('phone');
     compare('email');
@@ -218,7 +220,28 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
       </div>
 
       <div className="panel-section">
-        <p className="panel-section-title">Contact</p>
+        <p className="panel-section-title">Identité et contact</p>
+        {/*
+          The name, since 2026-09-15: a typo in the form was the one thing a régisseur could not
+          fix. Only the label changes; the key stays the identity the import found, so a re-import
+          still recognises the person, and the correction is kept by `manualFields` like any other.
+        */}
+        <label className="field">
+          <span className="field-label">Prénom</span>
+          <input
+            className="select"
+            value={draft.firstName}
+            onChange={(event) => set('firstName', event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Nom</span>
+          <input
+            className="select"
+            value={draft.lastName}
+            onChange={(event) => set('lastName', event.target.value)}
+          />
+        </label>
         <label className="field">
           <span className="field-label">Surnom</span>
           <input

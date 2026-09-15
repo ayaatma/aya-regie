@@ -1155,6 +1155,9 @@ button {
 .fiche-edit .field-label {
   font-size: 12px;
   color: var(--ink-soft);
+  /* Never shrunk: `.panel .select` asks for the whole width, and the pane's `overflow-wrap:
+     anywhere` then broke the label mid-word (« Préno m », « Volum e »). */
+  flex: 0 0 auto;
 }
 
 .fiche-edit .select {
@@ -4721,4 +4724,38 @@ textarea.select,
 
 .rule-hint.is-warn {
   color: var(--orange-fonce);
+}
+
+/* ---------------------------------------------------------------------------
+ * L'onglet Personnes, 2026-09-15: la liste, et la fiche de la personne cliquée à droite.
+ * ------------------------------------------------------------------------- */
+
+/* Wider than the info pane of the grids: this one holds a whole correction form. */
+.screen.has-person {
+  grid-template-columns: 1fr minmax(300px, 400px);
+}
+
+.people-table tbody tr {
+  cursor: pointer;
+}
+
+.people-table tbody tr:hover td {
+  background: var(--surface-sunken);
+}
+
+/* After the hover and after `.has-issue`, so the open fiche's row always reads as the open one. */
+.people-table tbody tr.is-selected td {
+  background: var(--accent-soft);
+}
+
+.people-table tbody tr.is-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.panel.is-person .rules-grid {
+  padding-top: 4px;
+}
+
+.panel.is-person .issue {
+  margin: 6px 0;
 }

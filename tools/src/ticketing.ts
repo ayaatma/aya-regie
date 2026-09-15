@@ -45,6 +45,14 @@ export interface TicketingRow {
   lastName: string;
   firstName: string;
   phone: string;
+  /**
+   * The rest of what the Personnes tab shows beside the door's columns, since 2026-09-15: the
+   * address, the diet and the allergies as the person's own file holds them. Empty for whoever
+   * the tool does not hold them for (a guest, an extra).
+   */
+  email: string;
+  diet: string;
+  allergies: string;
   statuses: StatusTag[];
   drinks: number;
   /** True when the drinks figure is the régisseur's, not the computed one. */
@@ -177,9 +185,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
   const push = (
     kind: TicketPersonKind,
     key: string,
-    firstName: string,
-    lastName: string,
-    phone: string,
+    who: Pick<TicketingRow, 'firstName' | 'lastName' | 'phone' | 'email' | 'diet' | 'allergies'>,
     statuses: StatusTag[],
     given: { drinks: number; meals: number; serviceKeys: readonly string[] },
     extraIssues: string[] = [],
@@ -194,9 +200,14 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     rows.push({
       kind,
       key,
-      firstName,
-      lastName,
-      phone,
+      // Field by field: a whole Organiser or Volunteer is handed in, and spreading it would put
+      // an access code on a row the door's CSV is built from.
+      firstName: who.firstName,
+      lastName: who.lastName,
+      phone: who.phone,
+      email: who.email,
+      diet: who.diet,
+      allergies: who.allergies,
       statuses,
       drinks: choice?.drinkTickets ?? given.drinks,
       computedDrinks: given.drinks,
@@ -233,7 +244,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     const statuses: StatusTag[] = [{ status: 'orga', label: PERSON_STATUS_LABEL.orga }];
     if (leaders.has(o.key)) statuses.push({ status: 'responsable', label: PERSON_STATUS_LABEL.responsable });
     statuses.push(...actTags('orga', o.key));
-    push('orga', o.key, o.firstName, o.lastName, o.phone, statuses, fed('orga', o.key));
+    push('orga', o.key, o, statuses, fed('orga', o.key));
   }
 
   for (const v of plan.volunteers) {
@@ -241,7 +252,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       { status: 'benevole', label: PERSON_STATUS_LABEL.benevole },
       ...actTags('benevole', v.key),
     ];
-    push('benevole', v.key, v.firstName, v.lastName, v.phone, statuses, fed('benevole', v.key));
+    push('benevole', v.key, v, statuses, fed('benevole', v.key));
   }
 
   const acts = [...plan.artists].sort((a, b) => a.start - b.start);
@@ -258,9 +269,14 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       push(
         'artiste',
         member.key,
-        member.firstName,
-        member.lastName || (member.firstName === '' ? artistMemberName(artist, member) : ''),
-        '',
+        {
+          firstName: member.firstName,
+          lastName: member.lastName || (member.firstName === '' ? artistMemberName(artist, member) : ''),
+          phone: '',
+          email: '',
+          diet: member.diet,
+          allergies: member.allergies,
+        },
         [{ status: 'artiste', label: `Artiste: ${artist.name}` }],
         fed('artiste', member.key),
         issues,
@@ -270,9 +286,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       push(
         'invite',
         guest.key,
-        guest.firstName,
-        guest.lastName,
-        '',
+        { firstName: guest.firstName, lastName: guest.lastName, phone: '', email: '', diet: '', allergies: '' },
         [{ status: 'invite-artiste', label: `Invité de ${artist.name}` }],
         { drinks: 0, meals: 0, serviceKeys: [] },
       );
@@ -283,9 +297,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     push(
       'extra',
       extra.key,
-      extra.firstName,
-      extra.lastName,
-      extra.phone,
+      { firstName: extra.firstName, lastName: extra.lastName, phone: extra.phone, email: '', diet: '', allergies: '' },
       [{ status: extra.status, label: PERSON_STATUS_LABEL[extra.status] }],
       { drinks: Math.max(0, extra.drinkTickets), meals: Math.max(0, extra.mealTickets), serviceKeys: [] },
     );

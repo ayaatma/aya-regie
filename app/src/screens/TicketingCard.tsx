@@ -3,7 +3,7 @@
  *
  * WHAT BELONGS HERE. What the association decided about the door: "un ticket Loto seulement
  * ouvre jusqu'à 20h", "les artistes et leurs invités ont le bracelet backstage", "chaque
- * artiste peut inviter deux personnes". Nobody's name. Who gets which is the Billetterie tab,
+ * artiste peut inviter deux personnes". Nobody's name. Who gets which is the Personnes tab,
  * worked out from these every time it is drawn, and changed there one person at a time.
  *
  * A TICKET TYPE IS A WINDOW OF THE EVENT, typed as two clock fields like a créneau, because the
@@ -52,7 +52,7 @@ export function TicketingCard() {
       meta={`${ticketing.ticketTypes.length} type(s) de ticket · ${ticketing.bracelets.length} bracelet(s) · ${ticketing.guestsPerArtist} invitation(s) par artiste`}
     >
       <p className="people-meta setup-orgas-note">
-        Ce que la billetterie remet à chaque personne se lit dans l'onglet Billetterie: les
+        Ce que la billetterie remet à chaque personne se lit dans l'onglet Personnes: les
         tickets boisson et repas viennent du catering, le type de ticket et le bracelet viennent
         d'ici. Rien n'est refusé: un repas servi hors du ticket est signalé, pas retiré.
       </p>
@@ -71,7 +71,7 @@ export function TicketingCard() {
           </span>
           <span className="rule-hint">
             Chaque invitation est un nom et un prénom, saisis sur la fiche du groupe. Un membre
-            qui en nomme davantage est signalé dans la Billetterie, jamais refusé.
+            qui en nomme davantage est signalé dans l'onglet Personnes, jamais refusé.
           </span>
         </label>
       </div>
@@ -80,7 +80,7 @@ export function TicketingCard() {
         <span className="panel-section-title">Types de ticket ({ticketing.ticketTypes.length})</span>
         <p className="panel-sub">
           Un nom et la plage de l'événement qu'il ouvre. Celui qui couvre le plus de l'événement
-          est le ticket de tout le monde, sauf choix contraire dans la Billetterie.
+          est le ticket de tout le monde, sauf choix contraire dans l'onglet Personnes.
         </p>
         {ticketing.ticketTypes.map((type) => (
           <div key={type.key} className="setup-ticket-row">

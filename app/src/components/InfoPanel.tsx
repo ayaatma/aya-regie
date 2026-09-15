@@ -42,6 +42,7 @@ import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from './labels.ts';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
 import { PersonMark } from './PersonMark.tsx';
+import { useNavigation } from './personNav.ts';
 import type { Selection } from './selection.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
 
@@ -159,8 +160,29 @@ function BenevoleBody({ volunteerKey, readOnly }: { volunteerKey: string; readOn
   return (
     <>
       <Head what="Bénévole" name={index.volunteerName(volunteerKey)} kind="benevole" />
+      {!readOnly && <OpenInPeople kind="benevole" personKey={volunteerKey} />}
       <VolunteerFiche volunteerKey={volunteerKey} readOnly={readOnly} />
     </>
+  );
+}
+
+/**
+ * The way to the whole fiche, on the Personnes tab: the door's fields, the change of status. Only
+ * inside the shell, which provides the navigation; the read-only orga view has no such tab.
+ */
+function OpenInPeople({ kind, personKey }: { kind: PersonKind; personKey: string }) {
+  const nav = useNavigation();
+  if (!nav) return null;
+  return (
+    <p>
+      <button
+        className="btn is-small"
+        title="La fiche entière, avec la billetterie et le changement de statut"
+        onClick={() => nav.openPerson({ kind, key: personKey })}
+      >
+        Ouvrir dans Personnes
+      </button>
+    </p>
   );
 }
 
@@ -190,6 +212,7 @@ function OrgaBody({
   return (
     <>
       <Head what="Orga" name={organiserName(person)} kind="orga" />
+      {!readOnly && <OpenInPeople kind="orga" personKey={organiserKey} />}
       <p className="panel-sub">
         Un orga n'est soumis à aucune règle d'heures et le solveur ne le place jamais. Tout ce qui
         est ici se corrige: ce que le formulaire a dit n'est qu'un point de départ.

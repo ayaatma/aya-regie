@@ -246,7 +246,7 @@ function VolunteerDetail({
       {(volunteer.phone || volunteer.email) && (
         <p className="panel-contact">
           {volunteer.phone && (
-            <a className="chip" href={`tel:${volunteer.phone.replace(/s+/g, '')}`}>
+            <a className="chip" href={`tel:${volunteer.phone.replace(/\s+/g, '')}`}>
               {volunteer.phone}
             </a>
           )}
