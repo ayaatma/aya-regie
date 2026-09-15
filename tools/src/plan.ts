@@ -123,8 +123,10 @@ import {
  * 19: 2026-09-15, competences: `Plan.skills`, `Volunteer.skills` and `skillsNote`,
  *    `Organiser.skills`, `Pole.requiredSkills`, `PhasePole.requiredSkills`. A build that predates
  *    this writes every tag and every requirement away.
+ * 20: 2026-09-15, field data: `emergencyContact` and `healthNote` on bénévoles and orgas, `minor`
+ *    and `nicknameMatters` on bénévoles. A build that predates this erases them on its next save.
  */
-export const PLAN_FORMAT = 19;
+export const PLAN_FORMAT = 20;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';

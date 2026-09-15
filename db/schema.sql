@@ -245,6 +245,9 @@ create table organiser (
   demontage_until numeric(6,2),
   -- The competence keys this orga holds (event.skills), set by hand. Since 2026-09-15.
   skills      text[] not null default '{}',
+  -- Field data, since 2026-09-15, as for a benevole.
+  emergency_contact text not null default '',
+  health_note text not null default '',
   sort_order  int not null default 0,
   unique (event_id, key)
 );
@@ -488,6 +491,13 @@ create table volunteer (
   -- and the form's answer as typed. Since 2026-09-15.
   skills          text[] not null default '{}',
   skills_note     text not null default '',
+  -- Field data, since 2026-09-15: who to call, health or specific needs, under 18 at the event (the
+  -- birth date is read at import and never stored), whether the nickname matters. The first two
+  -- are stripped from what an orga holding no pole reads, see get_organiser_planning.
+  emergency_contact text not null default '',
+  health_note     text not null default '',
+  minor           boolean,
+  nickname_matters boolean,
   -- The pole choices live in volunteer_choice since 2026-09-14: a form may ask for any number.
   -- Answers the regisseur corrected by hand, by field name, and the reason the fiche is in
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
@@ -1048,7 +1058,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 19,
+values ('min_plan_format', 20,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1301,6 +1311,8 @@ as $fn$
              'montageFrom',    l.montage_from,
              'demontageUntil', l.demontage_until,
              'skills',         to_jsonb(l.skills),
+             'emergencyContact', l.emergency_contact,
+             'healthNote',     l.health_note,
              'montagePoleKeys', coalesce((
                                   select jsonb_agg(pp.key order by opp.sort_order, pp.key)
                                   from organiser_phase_pole opp
@@ -1356,6 +1368,10 @@ as $fn$
              'unavailable',     v.unavailable,
              'skills',          to_jsonb(v.skills),
              'skillsNote',      v.skills_note,
+             'emergencyContact', v.emergency_contact,
+             'healthNote',      v.health_note,
+             'minor',           v.minor,
+             'nicknameMatters', v.nickname_matters,
              -- A list since 2026-09-08, ordered by the pole's own sort order so the same
              -- database always produces the same JSON. That is what makes the round trip
              -- checkable at all.
@@ -1875,7 +1891,8 @@ begin
   join pole p on p.event_id = p_event_id and p.key = x->>'poleKey';
 
   insert into organiser (event_id, key, first_name, last_name, email, phone, access_code,
-                         diet, allergies, note, montage_from, demontage_until, skills, sort_order)
+                         diet, allergies, note, montage_from, demontage_until, skills,
+                         emergency_contact, health_note, sort_order)
   select p_event_id, x->>'key',
          coalesce(x->>'firstName', ''), coalesce(x->>'lastName', ''),
          coalesce(x->>'email', ''), coalesce(x->>'phone', ''),
@@ -1886,6 +1903,7 @@ begin
                    from jsonb_array_elements(case when jsonb_typeof(x->'skills') = 'array'
                                                   then x->'skills' else '[]'::jsonb end) as os(k)),
                   '{}'::text[]),
+         coalesce(x->>'emergencyContact', ''), coalesce(x->>'healthNote', ''),
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'organisers', '[]'::jsonb)) with ordinality as t(x, ord);
 
@@ -1901,7 +1919,7 @@ begin
   insert into volunteer (event_id, key, first_name, last_name, nickname, display_name,
                          email, phone, access_code, diet, allergies,
                          requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
-                         skills, skills_note,
+                         skills, skills_note, emergency_contact, health_note, minor, nickname_matters,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
@@ -1932,6 +1950,10 @@ begin
                                                   then x->'skills' else '[]'::jsonb end) as vs(k)),
                   '{}'::text[]),
          coalesce(x->>'skillsNote', ''),
+         coalesce(x->>'emergencyContact', ''),
+         coalesce(x->>'healthNote', ''),
+         (x->>'minor')::boolean,
+         (x->>'nicknameMatters')::boolean,
          coalesce((select array_agg(raw #>> '{}')
                    from jsonb_array_elements(coalesce(x->'buddyRawNames', '[]'::jsonb))
                         as bn(raw)),
@@ -2894,7 +2916,21 @@ as $fn$
     -- The same envelope the régisseur loads, reused whole rather than rebuilt. One source for
     -- the plan's shape means a field added to the plan reaches this view for free, and cannot
     -- be forgotten here.
-    'plan',    loaded.envelope->'plan',
+    --
+    -- EXCEPT THE FIELD DATA, since 2026-09-15: an emergency contact and a health note are for the
+    -- regie and the responsables. An orga holding no pole reads every person without them.
+    'plan',    case when exists (select 1 from leader_role r where r.organiser_id = me.id)
+                 then loaded.envelope->'plan'
+                 else jsonb_set(jsonb_set(loaded.envelope->'plan',
+                   '{volunteers}', coalesce((
+                     select jsonb_agg(v - 'emergencyContact' - 'healthNote' order by ord)
+                     from jsonb_array_elements(loaded.envelope#>'{plan,volunteers}') with ordinality as t(v, ord)
+                   ), '[]'::jsonb)),
+                   '{organisers}', coalesce((
+                     select jsonb_agg(o - 'emergencyContact' - 'healthNote' order by ord)
+                     from jsonb_array_elements(loaded.envelope#>'{plan,organisers}') with ordinality as t(o, ord)
+                   ), '[]'::jsonb))
+               end,
     'version', loaded.envelope->'version'
   )
   from organiser me

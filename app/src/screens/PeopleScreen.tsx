@@ -377,6 +377,7 @@ function PeopleTable({
               <>
                 <th>Téléphone</th>
                 <th>E-mail</th>
+                <th>En cas d'urgence</th>
               </>
             )}
             {view === 'candidature' && (
@@ -539,6 +540,13 @@ function PersonLine({
         <>
           <td>{row.phone}</td>
           <td>{row.email}</td>
+          <td>
+            {row.kind === 'benevole'
+              ? plan.volunteers.find((v) => v.key === row.key)?.emergencyContact
+              : row.kind === 'orga'
+                ? plan.organisers.find((o) => o.key === row.key)?.emergencyContact
+                : ''}
+          </td>
         </>
       )}
 

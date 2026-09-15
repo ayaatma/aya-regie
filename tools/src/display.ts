@@ -30,6 +30,8 @@ export interface DisplayPerson {
   lastName: string;
   /** The form's "Surnom". Absent on organisers, whose own form does not ask. */
   nickname?: string;
+  /** False when the person said the nickname does not matter to them: the first name is used. */
+  nicknameMatters?: boolean | null;
   email?: string;
 }
 
@@ -47,7 +49,7 @@ const fold = (value: string): string =>
 /** What replaces the first name when it is answered. */
 const given = (person: DisplayPerson): string => {
   const nickname = (person.nickname ?? '').trim();
-  return nickname !== '' ? nickname : person.firstName.trim();
+  return nickname !== '' && person.nicknameMatters !== false ? nickname : person.firstName.trim();
 };
 
 /**

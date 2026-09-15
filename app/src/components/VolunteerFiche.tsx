@@ -274,6 +274,26 @@ function VolunteerDetail({
         </p>
       )}
 
+      {/* Field data: shown whenever there is any, since this is what is needed in a hurry. */}
+      {((volunteer.emergencyContact ?? '').trim() !== '' || (volunteer.healthNote ?? '').trim() !== '' || volunteer.minor === true) && (
+        <div className="panel-section fiche-field-data">
+          <p className="panel-section-title">Sur le terrain</p>
+          {volunteer.minor === true && <span className="chip is-warn">Mineur·e</span>}
+          {(volunteer.emergencyContact ?? '').trim() !== '' && (
+            <p className="fiche-raw-answer">
+              <span className="fiche-raw-label">En cas d'urgence</span>
+              {volunteer.emergencyContact}
+            </p>
+          )}
+          {(volunteer.healthNote ?? '').trim() !== '' && (
+            <p className="fiche-raw-answer">
+              <span className="fiche-raw-label">Santé, besoins</span>
+              {volunteer.healthNote}
+            </p>
+          )}
+        </div>
+      )}
+
       {chips.length > 0 && (
         <p>
           {chips.map((chip) => (

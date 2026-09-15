@@ -477,6 +477,10 @@ export interface Organiser {
   demontagePoleKeys: string[];
   /** The `SkillTag` keys this orga holds, set by hand. Since 2026-09-15; absent means none. */
   skills?: string[];
+  /** Who to call if something happens to them, as typed. See `Volunteer.emergencyContact`. */
+  emergencyContact?: string;
+  /** What they cannot do or need, as typed. See `Volunteer.healthNote`. */
+  healthNote?: string;
 }
 
 /**
@@ -845,6 +849,29 @@ export interface Volunteer {
    */
   skillsNote?: string;
   /**
+   * « Tu veux qu'on appelle qui en cas d'urgence ? », as typed: a name and a number. Since
+   * 2026-09-15. FIELD DATA: shown to the régie and to responsables, stripped from the plan an orga
+   * without a pole reads (`get_organiser_planning`), never in a volunteer's own view or an export.
+   */
+  emergencyContact?: string;
+  /**
+   * Health problems or specific needs, as typed: the tasks they cannot do, what they need. Since
+   * 2026-09-15. Special-category data under the GDPR: the same visibility as `emergencyContact`,
+   * and nothing in the tool reads it but a human.
+   */
+  healthNote?: string;
+  /**
+   * Under 18 on the first day of the event, worked out at import from a birth date that is NOT
+   * kept (data minimisation: the tool needs the fact, not the date). Null when not asked.
+   */
+  minor?: boolean | null;
+  /**
+   * « Est-ce important pour toi qu'on t'appelle par ton surnom ? ». False shows the first name on
+   * the grid and the documents even when a nickname was given; true or absent keeps the nickname,
+   * which is what the tool did before the question existed.
+   */
+  nicknameMatters?: boolean | null;
+  /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *
    * KEPT VERBATIM AND NEVER REWRITTEN. `refusedSlotIds` is a guess about this sentence, and a
@@ -1013,6 +1040,11 @@ export const EDITABLE_FIELDS = [
   'avoidedSlotIds',
   'unavailable',
   'skills',
+  // Field data, 2026-09-15: correctable like any answer, for the day somebody calls to change it.
+  'emergencyContact',
+  'healthNote',
+  'minor',
+  'nicknameMatters',
   'refusedPoleKeys',
   // The whole list, since 2026-09-14: correcting one choice is correcting the reading of the
   // answers, and a list edited entry by entry would let a re-import reorder half of it.

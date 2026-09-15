@@ -154,7 +154,10 @@ test('the decoys that caused the wrong bindings are not taken', () => {
   strictEqual(map.nickname, 4, '"Surnom (si tu préfères...)" est lu comme le surnom');
   strictEqual(map.halfPreference, 26, 'et la préférence garde sa propre colonne');
   ok(!taken.has(32), '"Combien faut-il de personnes pour déplacer un fût" ne prend pas le volume');
-  ok(!taken.has(10), '"qui appeler en cas d\'urgence" ne prend pas le téléphone');
+  // Column 10 stopped being a decoy on 2026-09-15: it is read as the emergency contact. What still
+  // has to hold is that it is not the phone, which is what it used to swallow.
+  strictEqual(map.emergencyContact, 10, '"qui appeler en cas d\'urgence" est lu comme le contact d\'urgence');
+  ok(map.phone !== 10, 'et ne prend pas le téléphone');
 
   // Three columns arrived with the 2026-09-10 form, and two of them are decoys for the two
   // time matchers: 40 says "une précision", 43 says "créneaux". Either would have been taken
@@ -607,4 +610,16 @@ test('competences are read by whole words, and a yes names the competence of its
   deepStrictEqual(parseSkills('permis poids lourd', tags), []);
   deepStrictEqual(parseSkillCheck('Est-ce que tu as des compétences en bricolage ?', 'Oui', tags), ['bricolage']);
   deepStrictEqual(parseSkillCheck('Est-ce que tu as des compétences en bricolage ?', 'Un peu', tags), []);
+});
+
+test('a birth date only ever becomes « minor », and a yes / no reads yes past its explanation', async () => {
+  const { isMinorAt, yesNo } = await import('./import.js');
+  const start = '2027-03-13T12:00:00+01:00';
+  strictEqual(isMinorAt('14/03/2009', start), true, 'dix-huit ans le lendemain');
+  strictEqual(isMinorAt('13/03/2009', start), false, 'dix-huit ans le jour même');
+  strictEqual(isMinorAt('2001-05-02', start), false);
+  strictEqual(isMinorAt('je sais pas', start), null);
+  strictEqual(yesNo('Oui => on fera au mieux pour utiliser ton surnom'), true);
+  strictEqual(yesNo('Non'), false);
+  strictEqual(yesNo('peut-être'), null);
 });

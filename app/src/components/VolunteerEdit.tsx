@@ -87,6 +87,10 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
     compare('email');
     compare('diet');
     compare('allergies');
+    compare('emergencyContact');
+    compare('healthNote');
+    compare('minor');
+    compare('nicknameMatters');
     onSave(patch);
   };
 
@@ -287,6 +291,60 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
             value={draft.email}
             onChange={(event) => set('email', event.target.value)}
           />
+        </label>
+        <label className="field">
+          <span className="field-label">Surnom important</span>
+          <select
+            className="select"
+            name="fiche-nickname-matters"
+            value={draft.nicknameMatters === true ? 'oui' : draft.nicknameMatters === false ? 'non' : ''}
+            onChange={(event) => set('nicknameMatters', event.target.value === '' ? null : event.target.value === 'oui')}
+          >
+            <option value="">Non renseigné (surnom affiché)</option>
+            <option value="oui">Oui, surnom affiché</option>
+            <option value="non">Non, prénom affiché</option>
+          </select>
+        </label>
+      </div>
+
+      {/*
+        Field data, 2026-09-15. Read by the régie and the responsables only: the plan an orga
+        without a pole opens has neither field (see get_organiser_planning).
+      */}
+      <div className="panel-section">
+        <p className="panel-section-title">Sur le terrain</p>
+        <label className="field">
+          <span className="field-label">Contact d'urgence</span>
+          <input
+            className="select"
+            name="fiche-emergency"
+            value={draft.emergencyContact ?? ''}
+            placeholder="nom et téléphone"
+            onChange={(event) => set('emergencyContact', event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Santé, besoins</span>
+          <input
+            className="select"
+            name="fiche-health"
+            value={draft.healthNote ?? ''}
+            placeholder="rien de signalé"
+            onChange={(event) => set('healthNote', event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="field-label">Mineur·e</span>
+          <select
+            className="select"
+            name="fiche-minor"
+            value={draft.minor === true ? 'oui' : draft.minor === false ? 'non' : ''}
+            onChange={(event) => set('minor', event.target.value === '' ? null : event.target.value === 'oui')}
+          >
+            <option value="">Non renseigné</option>
+            <option value="non">Non</option>
+            <option value="oui">Oui</option>
+          </select>
         </label>
       </div>
 

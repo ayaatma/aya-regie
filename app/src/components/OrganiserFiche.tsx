@@ -70,6 +70,9 @@ export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
         {field('Téléphone', 'phone', { type: 'tel', autoComplete: 'tel' })}
         {field('Régime alimentaire', 'diet')}
         {field('Allergies', 'allergies')}
+        {/* Field data, 2026-09-15: the régie and the responsables only read them. */}
+        {field("Contact d'urgence", 'emergencyContact')}
+        {field('Santé, besoins', 'healthNote')}
       </div>
 
       <label className="rule">

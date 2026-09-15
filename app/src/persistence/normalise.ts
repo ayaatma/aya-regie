@@ -122,6 +122,8 @@ const organiser = (value: unknown): Organiser => {
     demontagePoleKeys: keys(loose.demontagePoleKeys),
     // Absent from anything written before 2026-09-15: no competence ticked.
     skills: keys(loose.skills),
+    emergencyContact: text(loose.emergencyContact),
+    healthNote: text(loose.healthNote),
   };
 };
 
@@ -584,6 +586,11 @@ const volunteer = (value: unknown): Volunteer => {
     unavailable: array<unknown>(loose.unavailable).map(window).filter((w): w is Window => w !== null),
     skills: keys(loose.skills),
     skillsNote: text(loose.skillsNote),
+    // Field data, absent before 2026-09-15; also absent from what an orga without a pole reads.
+    emergencyContact: text(loose.emergencyContact),
+    healthNote: text(loose.healthNote),
+    minor: typeof loose.minor === 'boolean' ? loose.minor : null,
+    nicknameMatters: typeof loose.nicknameMatters === 'boolean' ? loose.nicknameMatters : null,
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],

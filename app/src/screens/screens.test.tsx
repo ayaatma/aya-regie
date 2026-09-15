@@ -2487,3 +2487,18 @@ test('a fiche shows the availability of each day, with the day somebody is away'
   assert.ok(shows(html, index.dayLabel(0)));
   assert.ok(html.includes('name="fiche-day-0-from"'), "l'heure d'arrivée se corrige sur le jour");
 });
+
+test('a fiche puts the field data where it is found in a hurry, and hides nothing it holds', () => {
+  const key = plan.volunteers[0]!.key;
+  const withData: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) =>
+      v.key === key ? { ...v, emergencyContact: 'Dominique, 06 00 00 00 00', healthNote: 'Pas de port de charges', minor: true } : v),
+  };
+  const html = infoOf(withData, { kind: 'benevole', volunteerKey: key });
+  assert.ok(shows(html, 'Sur le terrain'));
+  assert.ok(shows(html, 'Dominique, 06 00 00 00 00'));
+  assert.ok(shows(html, 'Pas de port de charges'));
+  assert.ok(shows(html, 'Mineur·e'));
+  assert.ok(!shows(infoOf(plan, { kind: 'benevole', volunteerKey: key }), 'Sur le terrain'), 'rien à montrer, rien de dessiné');
+});

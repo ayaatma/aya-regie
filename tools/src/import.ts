@@ -108,6 +108,9 @@ const FIELDS = [
   // The competences: a free-text question read for the event's tags, and a yes / no question
   // naming one of them (« As-tu des compétences en bricolage ? »). Both optional.
   'skills', 'skillCheck',
+  // Field data: who to call, health and specific needs (a yes / no and its details), the birth
+  // date (read into « minor » and dropped), and whether the nickname matters. All optional.
+  'emergencyContact', 'healthCheck', 'healthNote', 'birthDate', 'nicknameMatters',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -196,6 +199,12 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'slotComfort', test: (h) => /(shifts?|creneaux?|postes?) de nuit|travailler la nuit/.test(h), required: false },
   { field: 'arrival',     test: (h) => /heure (peux|pourras) tu arriver|heure d arrivee|quand arrives tu/.test(h), required: false },
   { field: 'departure',   test: (h) => /heure (dois|peux) tu (re)?partir|heure de depart|quand (re)?pars tu/.test(h), required: false },
+  { field: 'emergencyContact', test: (h) => /urgence/.test(h), required: false },
+  // The details before the yes / no: both say « besoins spécifiques ».
+  { field: 'healthNote',  test: (h) => /(dire plus|preciser).*(taches|besoins)|taches que tu ne peux pas|handicap|contrainte physique/.test(h), required: false },
+  { field: 'healthCheck', test: (h) => /problemes? de sante|besoins specifiques/.test(h), required: false },
+  { field: 'birthDate',   test: (h) => /date de naissance/.test(h), required: false },
+  { field: 'nicknameMatters', test: (h) => /important.*surnom|appelle par ton surnom/.test(h), required: false },
   // The yes / no one first: « est-ce que tu as des compétences en bricolage » also says compétences.
   { field: 'skillCheck',  test: (h) => /(as tu|est ce que tu as) des competences en/.test(h), required: false },
   { field: 'skills',      test: (h) => /competences|permis|caces|ton metier/.test(h), required: false },
@@ -431,6 +440,31 @@ export function parseSkills(text: string, tags: readonly { key: string; label: s
 export function parseSkillCheck(header: string, answer: string, tags: readonly { key: string; label: string }[]): string[] {
   if (!/^oui\b/.test(normalise(answer))) return [];
   return parseSkills(header, tags);
+}
+
+/**
+ * Under 18 on the day the event starts, from a birth date as a French form writes it
+ * (« 14/07/2009 », « 2009-07-14 »). Null when the answer is not a date: nobody is called a minor on
+ * a guess, and nobody is called an adult on one either.
+ */
+export function isMinorAt(birth: string, startISO: string): boolean | null {
+  const v = birth.trim();
+  const fr = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+  const [y, m, d] = fr ? [+fr[3]!, +fr[2]!, +fr[1]!] : iso ? [+iso[1]!, +iso[2]!, +iso[3]!] : [NaN, NaN, NaN];
+  if (!Number.isFinite(y) || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const start = new Date(startISO);
+  if (Number.isNaN(start.getTime())) return null;
+  const adultAt = new Date(y + 18, m - 1, d);
+  return start.getTime() < adultAt.getTime();
+}
+
+/** A yes / no answer: true, false, or null when it is neither. « Oui => on fera au mieux » is yes. */
+export function yesNo(answer: string): boolean | null {
+  const v = normalise(answer);
+  if (/^oui\b/.test(v)) return true;
+  if (/^non\b/.test(v)) return false;
+  return null;
 }
 
 /** What one answer about one tranche says: refused, avoided, or neither. */
@@ -1285,6 +1319,14 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
         ]),
       ],
       skillsNote: cell(row, 'skills'),
+      emergencyContact: cell(row, 'emergencyContact'),
+      // The details when given; a bare « oui » is kept as such, so the fiche still says there is
+      // something to ask about.
+      healthNote: cell(row, 'healthNote') !== ''
+        ? cell(row, 'healthNote')
+        : yesNo(cell(row, 'healthCheck')) === true ? 'Oui, sans précision' : '',
+      minor: map.birthDate === undefined ? null : isMinorAt(cell(row, 'birthDate'), startISO),
+      nicknameMatters: map.nicknameMatters === undefined ? null : yesNo(cell(row, 'nicknameMatters')),
       refusedPoleKeys: refusedPoles.map((pole) => pole.key),
       choices: choiceEntries.map((c): PoleChoice => ({ poleKey: c.pole?.key ?? '', raw: c.raw, level: c.level })),
       artistKeys,

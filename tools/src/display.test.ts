@@ -100,3 +100,13 @@ test('the same person recorded twice does not push their own surname longer', ()
 test('somebody with no surname is shown under what there is', () => {
   strictEqual(shortNames([person('Marie', '')])[0], 'Marie');
 });
+
+test('a nickname the person said does not matter gives way to the first name', () => {
+  deepStrictEqual(
+    shortNames([
+      { firstName: 'Camille', lastName: 'Martin', nickname: 'Cam', nicknameMatters: false },
+      { firstName: 'Léa', lastName: 'Petit', nickname: 'Lili', nicknameMatters: true },
+    ]),
+    ['Camille M.', 'Lili P.'],
+  );
+});
