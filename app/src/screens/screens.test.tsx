@@ -43,6 +43,7 @@ import { PoleRow, SetupScreen } from './SetupScreen.tsx';
 import { CateringScreen } from './CateringScreen.tsx';
 import { ArtistCard, ArtistsScreen } from './ArtistsScreen.tsx';
 import { PeopleScreen } from './PeopleScreen.tsx';
+import { TicketingCard } from './TicketingCard.tsx';
 import { ImportScreen } from './ImportScreen.tsx';
 import { PrintScreen } from './PrintScreen.tsx';
 import { NightView } from './NightView.tsx';
@@ -2260,6 +2261,7 @@ function planWithTicketing(): Plan {
     catering: { ...plan.catering, rules: { ...plan.catering.rules, enabled: true } },
     ticketing: {
       guestsPerArtist: 1,
+      reserveOnDoorList: false,
       ticketTypes: [
         { key: 'loto', label: 'Loto seulement', start: 0, end: 6 },
         { key: 'full', label: 'Pass complet', start: 0, end: 18 },
@@ -2296,6 +2298,13 @@ test('the Personnes tab lists the reserve apart, under everybody else', () => {
   assert.equal(html.split(`data-person="benevole|${held.key}"`).length, 2, 'et une seule fois');
 
   assert.ok(!peopleOf({ ...current, reserve: [] }).includes('people-reserve'), 'pas de carte sans réserve');
+
+  // The card says whether the door's export carries them, which is the Réglages setting.
+  assert.ok(shows(html, "Elles ne sont pas dans la liste d'entrée exportée."));
+  const onList = peopleOf({ ...withReserve, ticketing: { ...withReserve.ticketing, reserveOnDoorList: true } });
+  assert.ok(shows(onList, "Elles sont dans la liste d'entrée exportée."));
+  const settings = render(<TicketingCard />, withReserve);
+  assert.ok(settings.includes('name="reserve-on-door-list"'), 'la case est dans la carte Billetterie');
 });
 
 const peopleOf = (current: Plan, focus: { kind: TicketPersonKind; key: string } | null = null): string =>

@@ -26,6 +26,7 @@ import {
   setBracelet,
   setBraceletDefault,
   setGuestsPerArtist,
+  setReserveOnDoorList,
   setTicketType,
   setTravelRate,
   ticketTypeHolders,
@@ -72,6 +73,29 @@ export function TicketingCard() {
           <span className="rule-hint">
             Chaque invitation est un nom et un prénom, saisis sur la fiche du groupe. Un membre
             qui en nomme davantage est signalé dans l'onglet Personnes, jamais refusé.
+          </span>
+        </label>
+        <label className="rule">
+          <span className="rule-label">Réserve</span>
+          <span className="rule-input">
+            <input
+              type="checkbox"
+              name="reserve-on-door-list"
+              checked={ticketing.reserveOnDoorList}
+              onChange={(event) =>
+                edit(
+                  (p) => setReserveOnDoorList(p, event.target.checked),
+                  event.target.checked ? "réserve ajoutée à la liste d'entrée" : "réserve retirée de la liste d'entrée",
+                )
+              }
+            />
+            <span>Les bénévoles en réserve sont dans la liste d'entrée</span>
+          </span>
+          <span className="rule-hint">
+            Une personne en réserve ne fait aucune heure et n'est normalement pas sur place:
+            décoché, elle n'est pas dans le fichier exporté pour la porte. Cochez si elle peut
+            tout de même venir, au montage par exemple. L'onglet Personnes la liste à part dans
+            les deux cas.
           </span>
         </label>
       </div>

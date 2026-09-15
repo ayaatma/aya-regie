@@ -731,6 +731,7 @@ const ticketing = (value: unknown): TicketingSettings => {
   const loose = (value ?? {}) as Record<string, unknown>;
   return {
     guestsPerArtist: count(loose.guestsPerArtist, DEFAULT_TICKETING.guestsPerArtist),
+    reserveOnDoorList: loose.reserveOnDoorList === true,
     ticketTypes: array<unknown>(loose.ticketTypes)
       .map((v) => {
         const t = (v ?? {}) as Record<string, unknown>;

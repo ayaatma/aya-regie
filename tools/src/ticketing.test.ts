@@ -195,6 +195,17 @@ test('a drink figure and a note are decisions too: kept while they differ from t
   assert.deepEqual(choices, [], 'the computed figure typed back is no decision');
 });
 
+test('the reserve is on the door CSV only when the event says so, and in the report either way', () => {
+  const off: Plan = { ...makePlan(), reserve: ['v2'] };
+  assert.ok(ticketingReport(off, new PlanIndex(off)).rows.some((r) => r.key === 'v2'), 'still a row of the report');
+  const without = ticketingCsv(off, new PlanIndex(off));
+  assert.ok(!without.includes('Aubert,Bob'), 'off by default: not on the door list');
+  assert.ok(without.includes('Zed'), 'a bénévole not in reserve stays');
+
+  const on: Plan = { ...makePlan({ reserveOnDoorList: true }), reserve: ['v2'] };
+  assert.ok(ticketingCsv(on, new PlanIndex(on)).includes('Aubert,Bob'));
+});
+
 test('an extra person is a line with what was typed for them, and the CSV carries phones only when asked', () => {
   const plan = makePlan({
     extras: [{ key: 'x1', firstName: 'Pat', lastName: 'Lumière', status: 'prestataire', phone: '06 99', drinkTickets: 4, mealTickets: 2 }],

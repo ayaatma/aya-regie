@@ -109,8 +109,10 @@ import {
  * 14: 2026-09-15, `Volunteer.enteredByHand`: a bénévole the régisseur made out of an orga on the
  *    Personnes tab. A build that predates this writes them back as if they came from the form,
  *    and the next import ticks them for removal like somebody who withdrew.
+ * 15: 2026-09-15, `TicketingSettings.reserveOnDoorList`: whether the bénévoles in reserve are on
+ *    the door's export. A build that predates this writes the setting back as off.
  */
-export const PLAN_FORMAT = 14;
+export const PLAN_FORMAT = 15;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';

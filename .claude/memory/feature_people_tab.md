@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-**State 2026-09-15: V1 AND V2 BUILT, green (326 engine, 412 app tests, both typechecks, build,
+**State 2026-09-15: V1 AND V2 BUILT (migration 22 since applied; see the reserve section for migration 23), green (326 engine, 412 app tests, both typechecks, build,
 `sql-check` 791, `schema-check` 235), checked in headless Chrome, committed. V1 had no schema.
 V2: PLAN_FORMAT 14, MIGRATION 22 (`2026-09-15_entered_by_hand.sql`) WRITTEN AND NOT APPLIED; it
 must ship with its deploy (min_plan_format 14).**
@@ -46,8 +46,16 @@ Asked the same day: reserve people are normally not on site, so they left the gr
 and sit in a « Réserve (n) » card under the main list (`.people-reserve`, `PeopleTable` drawn
 twice). Split in the screen only (`plan.reserve`, bénévoles); search and statut filter apply to
 both, the arrow keys walk the main list then the reserve, the toolbar counts « N personnes + n en
-réserve ». **`ticketingCsv` (the door's export) still includes them**: an open question put to the
-régisseur, not decided. Shot `95-personnes-reserve`.
+réserve ». Shot `95-personnes-reserve`.
+
+**Whether the door's CSV carries them is a per-event setting**, decided by the régisseur the same
+day: `TicketingSettings.reserveOnDoorList`, OFF by default (reserve = normally not on site), a
+checkbox « Réserve » in Réglages > Billetterie, the Réserve card's head says which. `ticketingCsv`
+filters; `ticketingReport` does not (the list still shows them). **PLAN_FORMAT 15, MIGRATION 23
+(`2026-09-15_reserve_on_door_list.sql`, `event.reserve_on_door_list`, load_plan and
+write_plan_body replaced whole, byte-diffed against 22: only the two lines) WRITTEN AND NOT
+APPLIED; min_plan_format 15, so it ships with its deploy.** Migration 22 is applied (hook state
+2026-09-15 13:38).
 
 ## V2: conversion bénévole ↔ orga
 

@@ -67,6 +67,10 @@ export function setGuestsPerArtist(plan: Plan, count: number): Plan {
     : plan;
 }
 
+export function setReserveOnDoorList(plan: Plan, on: boolean): Plan {
+  return withTicketing(plan, { reserveOnDoorList: on });
+}
+
 // ---------------------------------------------------------------------------
 // Ticket types
 // ---------------------------------------------------------------------------

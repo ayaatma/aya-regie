@@ -455,6 +455,7 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
     // for the night, and one ticket chosen by hand so the incohérence has something to say.
     ticketing: {
       guestsPerArtist: 1,
+      reserveOnDoorList: false,
       ticketTypes: [
         { key: 'loto', label: 'Loto seulement', start: 0, end: 8 },
         { key: 'soiree', label: 'Soirée seulement', start: 8, end: plan.lengthHours },

@@ -92,7 +92,8 @@ export function PeopleScreen({
    * pool pane the same day: a bénévole in reserve does zero hours and is normally not on site, so
    * mixing them into the list of people the door expects read as the opposite. They are still
    * people the tool holds, with a fiche, a phone to call when somebody does not turn up, and the
-   * same filters. The door's CSV is `ticketingCsv` and is not narrowed here.
+   * same filters. Whether they are in the door's CSV is `ticketing.reserveOnDoorList`, set in
+   * Réglages, and the card's head says which.
    */
   const reserveKeys = new Set(plan.reserve);
   const inReserve = (row: TicketingRow): boolean => row.kind === 'benevole' && reserveKeys.has(row.key);
@@ -272,8 +273,14 @@ export function PeopleScreen({
                 <span className="setup-group-title">Réserve ({reserveTotal})</span>
                 <span className="people-meta">
                   zéro heure sur l'exploit, volontairement: ces personnes ne sont normalement pas
-                  sur place, on les appelle si quelqu'un manque
+                  sur place, on les appelle si quelqu'un manque.{' '}
+                  {plan.ticketing.reserveOnDoorList
+                    ? "Elles sont dans la liste d'entrée exportée."
+                    : "Elles ne sont pas dans la liste d'entrée exportée."}
                 </span>
+                <button className="btn is-small" onClick={onGoToSetup}>
+                  Réglages
+                </button>
               </div>
               {reserveRows.length > 0 ? (
                 <PeopleTable

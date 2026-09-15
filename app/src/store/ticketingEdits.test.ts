@@ -38,7 +38,7 @@ const plan: Plan = normalisePlan(
 );
 
 test('a plan from before the billetterie opens with an empty one, and a stored one comes back whole', () => {
-  assert.deepEqual(plan.ticketing, { guestsPerArtist: 1, ticketTypes: [], bracelets: [], extras: [], choices: [] });
+  assert.deepEqual(plan.ticketing, { guestsPerArtist: 1, reserveOnDoorList: false, ticketTypes: [], bracelets: [], extras: [], choices: [] });
   const read = normalisePlan({
     ...plan,
     ticketing: {

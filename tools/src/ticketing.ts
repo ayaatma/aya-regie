@@ -395,7 +395,12 @@ export function ticketingCsv(
     ...(withPhones ? ['Téléphone'] : []),
     'Remarques',
   ];
-  const rows = report.rows.map((row) => [
+  // The reserve is on the door's list only when the event says so. See `reserveOnDoorList`.
+  const reserve = new Set(plan.reserve);
+  const onList = plan.ticketing.reserveOnDoorList
+    ? report.rows
+    : report.rows.filter((row) => !(row.kind === 'benevole' && reserve.has(row.key)));
+  const rows = onList.map((row) => [
     row.lastName,
     row.firstName,
     row.statuses.map((s) => s.label).join(' / '),

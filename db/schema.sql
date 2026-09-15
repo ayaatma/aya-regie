@@ -95,6 +95,9 @@ create table event (
   artist_drinks_cumulative boolean not null default false,
   -- La billetterie: how many named guests each member of an act may bring. Since 2026-09-13.
   guests_per_artist     int not null default 1 check (guests_per_artist >= 0),
+  -- La billetterie: whether the benevoles in reserve are on the door's list. Since 2026-09-15; off
+  -- by default, because somebody in reserve is normally not on site.
+  reserve_on_door_list  boolean not null default false,
   -- What a car journey is reimbursed at: a fuel price per litre (kWh) by kind, a toll per km.
   fuel_price_essence    numeric(6,3) not null default 1.75,
   fuel_price_diesel     numeric(6,3) not null default 1.70,
@@ -1006,7 +1009,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 14,
+values ('min_plan_format', 15,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1505,6 +1508,7 @@ as $fn$
   ticketing as (
     select jsonb_build_object(
       'guestsPerArtist', e.guests_per_artist,
+      'reserveOnDoorList', e.reserve_on_door_list,
       'ticketTypes', coalesce((
         select jsonb_agg(jsonb_build_object(
                  'key',   t.key,
@@ -1666,6 +1670,7 @@ begin
     artist_drinks         = coalesce((p_plan#>>'{catering,rules,artistDrinks}')::int, 2),
     artist_drinks_cumulative = coalesce((p_plan#>>'{catering,rules,artistDrinksCumulative}')::boolean, false),
     guests_per_artist     = coalesce((p_plan#>>'{ticketing,guestsPerArtist}')::int, 1),
+    reserve_on_door_list  = coalesce((p_plan#>>'{ticketing,reserveOnDoorList}')::boolean, false),
     fuel_price_essence    = coalesce((p_plan#>>'{travel,fuelPrices,essence}')::numeric, 1.75),
     fuel_price_diesel     = coalesce((p_plan#>>'{travel,fuelPrices,diesel}')::numeric, 1.70),
     fuel_price_electrique = coalesce((p_plan#>>'{travel,fuelPrices,electrique}')::numeric, 0.22),

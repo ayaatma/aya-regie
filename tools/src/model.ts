@@ -1086,6 +1086,12 @@ export const DEFAULT_TRAVEL_RATES: TravelRates = {
 export interface TicketingSettings {
   /** How many named guests each member of an act may bring. */
   guestsPerArtist: number;
+  /**
+   * Whether the bénévoles in reserve are on the door's export (`ticketingCsv`). Since 2026-09-15,
+   * off by default: somebody in reserve does zero hours and is normally not on site. The Personnes
+   * tab lists them apart either way.
+   */
+  reserveOnDoorList: boolean;
   ticketTypes: readonly TicketType[];
   bracelets: readonly BraceletType[];
   extras: readonly ExtraPerson[];
@@ -1095,6 +1101,7 @@ export interface TicketingSettings {
 /** Nothing configured: no ticket type, no bracelet, one guest per artist, nobody extra. */
 export const DEFAULT_TICKETING: TicketingSettings = {
   guestsPerArtist: 1,
+  reserveOnDoorList: false,
   ticketTypes: [],
   bracelets: [],
   extras: [],
