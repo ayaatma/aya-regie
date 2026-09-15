@@ -16,7 +16,15 @@
  * readable without signing in, which for a form response sheet means "share with anyone who has
  * the link". Nothing here can authenticate, and it deliberately does not try: a tool that asks
  * for a Google account password is a tool nobody should give one to.
+ *
+ * A PRIVATE SHEET FIRST, SINCE 2026-09-15. A form carrying emergency contacts and health notes must
+ * not be public, so the sheet is shared read-only with the association's Google service account and
+ * read by the Supabase function `sheet-csv` (`supabase/functions/sheet-csv`), which holds the key.
+ * The public endpoint stays as the fallback while that function is not deployed or not configured,
+ * so nothing breaks the day this ships ahead of its setup.
  */
+
+import { getSupabase, supabaseConfigured } from '../persistence/supabaseClient.ts';
 
 /** The document id and tab of a pasted Google Sheets address. */
 export interface SheetRef {
@@ -49,19 +57,70 @@ export function csvUrlFromSheet(input: string): string | null {
 }
 
 /**
- * Fetches the sheet as CSV text.
- *
- * A sheet that is not shared answers with an HTML sign-in page rather than an error, so the
- * content type is checked: "your file arrived and it is a login form" is the one failure that
- * would otherwise be reported as a broken import file.
+ * What the private reader answered: the CSV, a failure to show as is (the function ran and said
+ * why, typically « not shared with the service account »), or `unavailable` when there is no
+ * function to ask (not deployed, not configured, no network), which falls back to the public link.
  */
-export async function fetchSheetCsv(input: string): Promise<string> {
+export type PrivateRead = { csv: string } | { error: string } | { unavailable: true };
+
+export type PrivateReader = (url: string) => Promise<PrivateRead>;
+
+/** The `sheet-csv` Supabase function, with the régisseur's session. */
+export const readThroughFunction: PrivateReader = async (url) => {
+  if (!supabaseConfigured) return { unavailable: true };
+  try {
+    const { data, error } = await getSupabase().functions.invoke<string>('sheet-csv', { body: { url } });
+    if (!error) return { csv: typeof data === 'string' ? data : '' };
+    const response = (error as { context?: unknown }).context;
+    if (!(response instanceof Response)) return { unavailable: true };
+    let body: { error?: string; serviceAccount?: string } = {};
+    try {
+      body = (await response.clone().json()) as typeof body;
+    } catch {
+      // Not our JSON: the gateway answering for a function that does not exist.
+    }
+    // Not deployed (the gateway's 404) or deployed without its key (our 503): use the public link.
+    if (response.status === 503 || body.error === undefined) return { unavailable: true };
+    return { error: body.error };
+  } catch {
+    return { unavailable: true };
+  }
+};
+
+/**
+ * Fetches the sheet as CSV text: privately through the service account when the tool can, through
+ * the public link otherwise.
+ *
+ * A private read that FAILED for a reason (the sheet is not shared with the account) still tries the
+ * public link, because a sheet shared by link is readable that way; if that fails too, the private
+ * reason is the one shown, since it says what to do: share the sheet with the account.
+ */
+export async function fetchSheetCsv(input: string, reader: PrivateReader = readThroughFunction): Promise<string> {
   const url = csvUrlFromSheet(input);
   if (!url) {
     throw new Error(
       "Ce lien n'est pas une feuille Google Sheets. Copiez l'adresse depuis la barre du navigateur.",
     );
   }
+
+  const privately = await reader(input.trim());
+  if ('csv' in privately) return privately.csv;
+  try {
+    return await fetchPublicCsv(url);
+  } catch (cause) {
+    if ('error' in privately) throw new Error(privately.error);
+    throw cause;
+  }
+}
+
+/**
+ * The public « anyone with the link » endpoint.
+ *
+ * A sheet that is not shared answers with an HTML sign-in page rather than an error, so the
+ * content type is checked: "your file arrived and it is a login form" is the one failure that
+ * would otherwise be reported as a broken import file.
+ */
+async function fetchPublicCsv(url: string): Promise<string> {
 
   let response: Response;
   try {
