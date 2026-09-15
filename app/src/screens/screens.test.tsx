@@ -2502,3 +2502,11 @@ test('a fiche puts the field data where it is found in a hurry, and hides nothin
   assert.ok(shows(html, 'Mineur·e'));
   assert.ok(!shows(infoOf(plan, { kind: 'benevole', volunteerKey: key }), 'Sur le terrain'), 'rien à montrer, rien de dessiné');
 });
+
+test('a fiche names the pole a responsable imposed, and lets the régisseur change it', () => {
+  const key = plan.volunteers[0]!.key;
+  const pole = plan.poles[0]!;
+  const imposed: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, imposedPoleKey: pole.key } : v)) };
+  assert.ok(infoOf(imposed, { kind: 'benevole', volunteerKey: key }).includes('name="fiche-imposed-pole"'));
+  assert.ok(shows(infoOf(imposed, { kind: 'benevole', volunteerKey: key }, true), `Pôle imposé: ${pole.path}`));
+});

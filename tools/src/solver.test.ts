@@ -937,3 +937,13 @@ test('between two equal créneaux, the solver keeps somebody out of the tranche 
   const result = solve(plan, { seed: 3, iterations: 300 });
   deepStrictEqual(result.plan.assignments.map((a) => a.shiftKey), ['jour']);
 });
+
+test('somebody a responsable sent to a pole is placed there, even outside their choices', () => {
+  const plan = makePlan({
+    shifts: [shift('a1', 'alpha', 0, 4), shift('g1', 'gamma', 0, 4)],
+    volunteers: [volunteer('v1', { requestedHours: 4, imposedPoleKey: 'gamma' })],
+  });
+  const result = solve(plan, { seed: 5, iterations: 300 });
+  deepStrictEqual(result.plan.assignments.map((a) => a.shiftKey), ['g1']);
+  strictEqual(validate(result.plan).issues.filter((i) => i.code === 'hors-choix' || i.code === 'hors-pole-impose').length, 0);
+});

@@ -192,6 +192,8 @@ export interface SolverWeights {
   avoided: number;
   /** Per hour on a pole needing a competence the volunteer lacks, for an event that weighs it. */
   missingSkill: number;
+  /** Per hour outside the pole a responsable sent the volunteer to. */
+  imposedPole: number;
   /** Per hour in a refused pole, for an event that weighs the refusal rather than blocking it. */
   refusedPole: number;
   /** Per hour in a refused tranche or past the event's end, same condition. */
@@ -235,6 +237,7 @@ export function weightsFor(c: ResolvedConstraints): SolverWeights {
     againstPreference: priceOf(c.preference),
     avoided: priceOf(c.avoidedSlot),
     missingSkill: priceOf(c.missingSkill),
+    imposedPole: priceOf(c.imposedPole),
     stability: priceOf(c.stability),
     refusedPole: priceOf(c.refusedPole),
     availability: priceOf(c.availability),
@@ -330,7 +333,7 @@ export function weightsFor(c: ResolvedConstraints): SolverWeights {
 // blockSplit 1200, allDebutants 600, minExperienced 600, outsideChoice 700 (plus one rank step
 // of 100: the 800 measured above), volume 60, artist 50,
 // buddy 5000, choice2 100, debutantStacking 8, overflow 6, againstPreference 1500, avoided 1000
-// (2026-09-15), missingSkill 4000 (2026-09-15), stability 200,
+// (2026-09-15), missingSkill 4000 and imposedPole 10000 (2026-09-15), stability 200,
 // and zero for the six rules that block by default. `solver.test.ts` holds them to it.
 export const DEFAULT_WEIGHTS: SolverWeights = weightsFor(resolveConstraints(DEFAULT_CONSTRAINTS));
 
@@ -362,6 +365,8 @@ interface Placement {
   avoidedHours: number;
   /** The shift's hours when its pole needs a competence the volunteer lacks, else 0. */
   missingSkillHours: number;
+  /** The shift's hours when it is outside the pole a responsable sent the volunteer to, else 0. */
+  outsideImposedHours: number;
   /** The shift's hours when it sits under a pole the volunteer refused, else 0. */
   refusedPoleHours: number;
   /** Hours of this shift in a tranche the volunteer refused or past the event's end. */
@@ -379,6 +384,7 @@ interface VolunteerState {
   againstPreference: number;
   avoidedHours: number;
   missingSkillHours: number;
+  outsideImposedHours: number;
   refusedPoleHours: number;
   unavailableHours: number;
   anchor: ReadonlySet<string>;
@@ -507,6 +513,7 @@ export class SolverState implements LegalityContext {
         againstPreference: 0,
         avoidedHours: 0,
         missingSkillHours: 0,
+        outsideImposedHours: 0,
         refusedPoleHours: 0,
         unavailableHours: 0,
         anchor: anchorSet,
@@ -594,6 +601,8 @@ export class SolverState implements LegalityContext {
       againstPreference: misfit.against,
       avoidedHours,
       missingSkillHours: this.base.missingSkillsOf(volunteer, shift.poleKey).length > 0 ? duration : 0,
+      outsideImposedHours:
+        volunteer.imposedPoleKey && !this.base.isUnder(shift.poleKey, volunteer.imposedPoleKey) ? duration : 0,
       refusedPoleHours: refused ? duration : 0,
       unavailableHours: Math.max(0, duration - inside),
     };
@@ -813,6 +822,7 @@ export class SolverState implements LegalityContext {
     penalty += w.againstPreference * state.againstPreference;
     penalty += w.avoided * state.avoidedHours;
     penalty += w.missingSkill * state.missingSkillHours;
+    penalty += w.imposedPole * state.outsideImposedHours;
     penalty += w.refusedPole * state.refusedPoleHours;
     penalty += w.availability * state.unavailableHours;
 
@@ -866,6 +876,7 @@ export class SolverState implements LegalityContext {
     vs.againstPreference += sign * placement.againstPreference;
     vs.avoidedHours += sign * placement.avoidedHours;
     vs.missingSkillHours += sign * placement.missingSkillHours;
+    vs.outsideImposedHours += sign * placement.outsideImposedHours;
     vs.refusedPoleHours += sign * placement.refusedPoleHours;
     vs.unavailableHours += sign * placement.unavailableHours;
     vs.changed += (vs.anchor.has(shift.key) ? -sign : sign);

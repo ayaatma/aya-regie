@@ -46,6 +46,7 @@ export type CriterionId =
   | 'preference'
   | 'avoidedSlot'
   | 'missingSkill'
+  | 'imposedPole'
   | 'preferenceOverflow'
   | 'artist'
   | 'volumeOver'
@@ -193,6 +194,19 @@ export const CRITERIA: readonly CriterionDefinition[] = [
     modes: WO,
     defaultMode: 'weight',
     defaultWeight: 1000,
+    unit: 'par heure',
+  },
+  {
+    // 2026-09-15. Far above `staffing`: somebody a responsable sent to a pole is placed there, and
+    // elsewhere only when nothing else can work. Blocking makes it a rule; the régisseur's own drag
+    // stays allowed in weight mode and is reported.
+    id: 'imposedPole',
+    group: 'poles',
+    label: "En dehors du pôle imposé par un·e responsable",
+    hint: "Le pôle fixé sur la fiche (« envoyé·e par un·e responsable »). Il compte comme premier choix.",
+    modes: BWO,
+    defaultMode: 'weight',
+    defaultWeight: 10000,
     unit: 'par heure',
   },
   {

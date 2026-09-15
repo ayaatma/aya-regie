@@ -135,6 +135,7 @@ function VolunteerDetail({
   onReviewed,
   readOnly = false,
 }: VolunteerDetailProps) {
+  const { edit } = useLoadedPlan();
   // Above every early return, on purpose: a hook called after one is a hook the next render may
   // not call at all, which is the rule React breaks loudly and at a distance.
   const [editing, setEditing] = useState(false);
@@ -359,6 +360,33 @@ function VolunteerDetail({
 
       <div className="panel-section">
         <p className="panel-section-title">Ses choix</p>
+        {/*
+          The pole a responsable sent them to, 2026-09-15: counts as their first choice, and the
+          solver keeps them there. The régisseur can still drag them anywhere.
+        */}
+        {readOnly ? (
+          volunteer.imposedPoleKey && (
+            <p><span className="chip is-ok">Pôle imposé: {index.polePath(volunteer.imposedPoleKey)}</span></p>
+          )
+        ) : (
+          <label className="people-meta imposed-pole">
+            Pôle imposé par un·e responsable{' '}
+            <select
+              className="select is-inline"
+              name="fiche-imposed-pole"
+              value={volunteer.imposedPoleKey ?? ''}
+              onChange={(event) => {
+                const imposedPoleKey = event.target.value === '' ? null : event.target.value;
+                edit((p) => correctVolunteer(p, volunteer.key, { imposedPoleKey }), `pôle imposé de ${index.volunteerName(volunteer.key)}`);
+              }}
+            >
+              <option value="">aucun</option>
+              {index.plan.poles.map((p) => (
+                <option key={p.key} value={p.key}>{p.path}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {volunteer.choices.length === 0 ? (
           <p className="pool-item-meta">Aucun choix de pôle.</p>
         ) : (

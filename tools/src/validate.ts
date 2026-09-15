@@ -96,6 +96,8 @@ export const TIER1 = {
   candidatureAnnulee: 'candidature-annulee',
   /** A pole needing a competence the person lacks. Tier 1 only while `missingSkill` blocks. */
   competenceManquante: 'competence-manquante',
+  /** Placed outside the pole a responsable sent them to. Tier 1 only while `imposedPole` blocks. */
+  horsPoleImpose: 'hors-pole-impose',
 } as const;
 
 /** Tier 2: a real problem, shown in red, that never stops the solver from returning a plan. */
@@ -307,6 +309,11 @@ function violationsFor(
     }
   }
 
+  if (c.imposedPole.mode === level && volunteer.imposedPoleKey && !ctx.isUnder(shift.poleKey, volunteer.imposedPoleKey)) {
+    found.push({ code: TIER1.horsPoleImpose, pole: volunteer.imposedPoleKey });
+    if (stopEarly) return found;
+  }
+
   if (c.missingSkill.mode === level) {
     const missing = ctx.missingSkillsOf(volunteer, shift.poleKey);
     if (missing.length > 0) {
@@ -482,6 +489,8 @@ function describe(
       return 'Ce bénévole occupe déjà ce créneau.';
     case TIER1.candidatureAnnulee:
       return 'Candidature annulée: cette personne ne vient plus.';
+    case TIER1.horsPoleImpose:
+      return `Envoyé·e sur "${ctx.polePath(violation.pole!)}" par un·e responsable.`;
     case TIER1.competenceManquante:
       return `"${ctx.polePath(shift!.poleKey)}" demande ${(violation.skills ?? []).map((k) => `« ${ctx.skillLabel(k)} »`).join(', ')}.`;
     case TIER1.sureffectif:
@@ -847,6 +856,13 @@ export function validate(plan: Plan): ValidationResult {
         add(tierOf(c.refusedPole)!, TIER1.poleRefuse,
           `${name} : placement dans "${index.polePath(shift.poleKey)}", qui dépend du pôle ` +
           `refusé ("${index.polePath(refusedRoot)}").`,
+          { volunteers: [volunteer.key], shifts: [shift.key], pole: shift.poleKey });
+      }
+
+      if (tierOf(c.imposedPole) !== null && volunteer.imposedPoleKey && !index.isUnder(shift.poleKey, volunteer.imposedPoleKey)) {
+        add(tierOf(c.imposedPole)!, TIER1.horsPoleImpose,
+          `${name} : placement dans "${index.polePath(shift.poleKey)}", hors du pôle ` +
+          `"${index.polePath(volunteer.imposedPoleKey)}" fixé par un·e responsable.`,
           { volunteers: [volunteer.key], shifts: [shift.key], pole: shift.poleKey });
       }
 

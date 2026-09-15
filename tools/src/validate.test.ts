@@ -1075,3 +1075,12 @@ test('a pole needing a competence: a weighted signalement by default, a block wh
   ok(blockersFor(new PlanIndex(empty), without, s1).some((b) => b.code === TIER1.competenceManquante));
   deepStrictEqual(blockersFor(new PlanIndex(empty), holder, s1), []);
 });
+
+test('outside the imposed pole is reported, and refused only when the event blocks it', () => {
+  const v1 = volunteer('v1', { imposedPoleKey: 'secu' });
+  const s1 = shift('s1', 'bar-service', 0, 4);
+  const plan = makePlan({ shifts: [s1], volunteers: [v1], assignments: [assign('v1', 's1')] });
+  strictEqual(validate(plan).issues.find((i) => i.code === TIER1.horsPoleImpose)!.tier, 2);
+  const blocking = { ...plan, assignments: [], constraints: { ...plan.constraints, criteria: { imposedPole: { mode: 'block' as const } } } };
+  ok(blockersFor(new PlanIndex(blocking), v1, s1).some((b) => b.code === TIER1.horsPoleImpose));
+});

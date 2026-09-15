@@ -97,7 +97,7 @@ test('the defaults are the weights measured before the card existed, and nothing
     floorBelow: 30000, floorPerHour: 2000, reserve: 20000, staffing: 3000,
     poleFragmentation: 2500, blockSplit: 1200, allDebutants: 600, minExperienced: 600,
     outsideChoice: 700, volume: 60, artist: 50, buddy: 5000, choice2: 100, debutantStacking: 8,
-    overflow: 6, againstPreference: 1500, avoided: 1000, missingSkill: 4000, stability: 200,
+    overflow: 6, againstPreference: 1500, avoided: 1000, missingSkill: 4000, imposedPole: 10000, stability: 200,
     refusedPole: 0, availability: 0, volumeOver: 0, maxConsecutive: 0, maxBlocks: 0, minBreak: 0,
   });
   const blocking = CRITERIA.filter((c) => c.defaultMode === 'block').map((c) => c.id).sort();

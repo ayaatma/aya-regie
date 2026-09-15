@@ -872,6 +872,13 @@ export interface Volunteer {
    */
   nicknameMatters?: boolean | null;
   /**
+   * The pole a responsable sent this person to (« envoyé·e par un·e respo sur un poste précis »),
+   * set by the régisseur. Since 2026-09-15. It counts as their first choice wherever they are
+   * placed in it, and anywhere else costs the criterion `imposedPole` (or is refused, when the
+   * event blocks it). The régisseur can still place them anywhere by hand. Null means none.
+   */
+  imposedPoleKey?: string | null;
+  /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *
    * KEPT VERBATIM AND NEVER REWRITTEN. `refusedSlotIds` is a guess about this sentence, and a
@@ -1045,6 +1052,7 @@ export const EDITABLE_FIELDS = [
   'healthNote',
   'minor',
   'nicknameMatters',
+  'imposedPoleKey',
   'refusedPoleKeys',
   // The whole list, since 2026-09-14: correcting one choice is correcting the reading of the
   // answers, and a list edited entry by entry would let a re-import reorder half of it.

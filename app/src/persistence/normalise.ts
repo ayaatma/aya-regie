@@ -591,6 +591,8 @@ const volunteer = (value: unknown): Volunteer => {
     healthNote: text(loose.healthNote),
     minor: typeof loose.minor === 'boolean' ? loose.minor : null,
     nicknameMatters: typeof loose.nicknameMatters === 'boolean' ? loose.nicknameMatters : null,
+    // Absent from anything written before 2026-09-15: nobody was sent anywhere.
+    imposedPoleKey: typeof loose.imposedPoleKey === 'string' && loose.imposedPoleKey !== '' ? loose.imposedPoleKey : null,
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],

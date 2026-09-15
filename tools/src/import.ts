@@ -111,6 +111,9 @@ const FIELDS = [
   // Field data: who to call, health and specific needs (a yes / no and its details), the birth
   // date (read into « minor » and dropped), and whether the nickname matters. All optional.
   'emergencyContact', 'healthCheck', 'healthNote', 'birthDate', 'nicknameMatters',
+  // « Si tu es déjà affecté à une équipe »: sent by a responsable, or a responsable themselves,
+  // and which team they run. Read into a doubt on the fiche, never into a silent change.
+  'assignedBy', 'leadsTeam',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -200,6 +203,8 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'arrival',     test: (h) => /heure (peux|pourras) tu arriver|heure d arrivee|quand arrives tu/.test(h), required: false },
   { field: 'departure',   test: (h) => /heure (dois|peux) tu (re)?partir|heure de depart|quand (re)?pars tu/.test(h), required: false },
   { field: 'emergencyContact', test: (h) => /urgence/.test(h), required: false },
+  { field: 'leadsTeam',   test: (h) => /en tant que respo|equipe es tu (affecte|responsable)/.test(h), required: false },
+  { field: 'assignedBy',  test: (h) => /deja affecte|envoye par un respo/.test(h), required: false },
   // The details before the yes / no: both say « besoins spécifiques ».
   { field: 'healthNote',  test: (h) => /(dire plus|preciser).*(taches|besoins)|taches que tu ne peux pas|handicap|contrainte physique/.test(h), required: false },
   { field: 'healthCheck', test: (h) => /problemes? de sante|besoins specifiques/.test(h), required: false },
@@ -1202,6 +1207,18 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
           message: `Pôle du ${label} non reconnu: "${raw}". À trancher sur la fiche.`,
         });
       }
+    }
+
+    // Sent by a responsable, or one themselves: the fiche says it and the régisseur decides. A
+    // responsable is converted to an orga by hand (« Passer en orga »), never by an import.
+    const assignedBy = normalise(cell(row, 'assignedBy'));
+    if (/je suis respo|responsable d une equipe|respo d une equipe/.test(assignedBy)) {
+      const team = cell(row, 'leadsTeam');
+      reviewReasons.push(
+        `Se déclare responsable${team === '' ? '' : ` de « ${team} »`}: à passer en orga depuis la fiche si c'est le cas.`,
+      );
+    } else if (/envoye/.test(assignedBy)) {
+      reviewReasons.push("Envoyé·e par un·e responsable sur un poste précis: fixer le pôle imposé sur la fiche.");
     }
 
     const preferredSlotId = preferred === 'inconnu' ? null : preferred;

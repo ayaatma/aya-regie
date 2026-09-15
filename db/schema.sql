@@ -498,6 +498,9 @@ create table volunteer (
   health_note     text not null default '',
   minor           boolean,
   nickname_matters boolean,
+  -- The pole a responsable sent this person to, by key, or null. Since 2026-09-15. Not a foreign
+  -- key, for the reason volunteer_refused_slot gives: a removed pole must not delete the decision.
+  imposed_pole_key text,
   -- The pole choices live in volunteer_choice since 2026-09-14: a form may ask for any number.
   -- Answers the regisseur corrected by hand, by field name, and the reason the fiche is in
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
@@ -1058,7 +1061,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 20,
+values ('min_plan_format', 21,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1372,6 +1375,7 @@ as $fn$
              'healthNote',      v.health_note,
              'minor',           v.minor,
              'nicknameMatters', v.nickname_matters,
+             'imposedPoleKey',  v.imposed_pole_key,
              -- A list since 2026-09-08, ordered by the pole's own sort order so the same
              -- database always produces the same JSON. That is what makes the round trip
              -- checkable at all.
@@ -1920,6 +1924,7 @@ begin
                          email, phone, access_code, diet, allergies,
                          requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
                          skills, skills_note, emergency_contact, health_note, minor, nickname_matters,
+                         imposed_pole_key,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
@@ -1954,6 +1959,7 @@ begin
          coalesce(x->>'healthNote', ''),
          (x->>'minor')::boolean,
          (x->>'nicknameMatters')::boolean,
+         nullif(x->>'imposedPoleKey', ''),
          coalesce((select array_agg(raw #>> '{}')
                    from jsonb_array_elements(coalesce(x->'buddyRawNames', '[]'::jsonb))
                         as bn(raw)),

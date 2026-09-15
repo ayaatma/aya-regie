@@ -128,6 +128,7 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
     emergencyContact: { label: "Contact d'urgence", show: (v) => ((v ?? '').trim() === '' ? 'aucun' : (v ?? '').trim()) },
     healthNote: { label: 'Santé, besoins', show: (v) => ((v ?? '').trim() === '' ? 'rien' : (v ?? '').trim()) },
     minor: { label: 'Mineur·e', show: (v) => (v === true ? 'oui' : v === false ? 'non' : 'non renseigné') },
+    imposedPoleKey: { label: 'Pôle imposé', show: (v) => (v ? poleName(v) : 'aucun') },
     nicknameMatters: { label: 'Surnom important', show: (v) => (v === true ? 'oui' : v === false ? 'non' : 'non renseigné') },
     unavailable: {
       label: 'Indisponible',
@@ -259,6 +260,7 @@ export const FIELD_LABEL: Record<EditableField, string> = {
   healthNote: 'Santé, besoins',
   minor: 'Mineur·e',
   nicknameMatters: 'Surnom important',
+  imposedPoleKey: 'Pôle imposé',
   choices: 'Choix de pôles',
   montage: 'Montage',
   demontage: 'Démontage',

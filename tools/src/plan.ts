@@ -125,8 +125,10 @@ import {
  *    this writes every tag and every requirement away.
  * 20: 2026-09-15, field data: `emergencyContact` and `healthNote` on bénévoles and orgas, `minor`
  *    and `nicknameMatters` on bénévoles. A build that predates this erases them on its next save.
+ * 21: 2026-09-15, `Volunteer.imposedPoleKey`, the pole a responsable sent somebody to. A build
+ *    that predates this frees everybody from it on its next save.
  */
-export const PLAN_FORMAT = 20;
+export const PLAN_FORMAT = 21;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -726,6 +728,8 @@ export class PlanIndex {
    * list, 0 for every choice in an unranked one, null outside all of them.
    */
   rankOf(volunteer: Volunteer, poleKey: string): number | null {
+    // The pole a responsable sent them to is their first choice, whatever the form said.
+    if (volunteer.imposedPoleKey && this.isUnder(poleKey, volunteer.imposedPoleKey)) return 0;
     const at = this.choiceIndexOf(volunteer, poleKey);
     return at === null ? null : this.plan.poleChoicesRanked === false ? 0 : at;
   }
