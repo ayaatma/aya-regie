@@ -27,9 +27,9 @@ import {
 } from '../store/edits.ts';
 import {
   fmtHours,
+  phaseDayTicks,
   isNoAllergy,
   isStandardDiet,
-  phaseDayParts,
   type EditableField,
   type PlanIndex,
   type ValidationResult,
@@ -42,6 +42,7 @@ import { preferenceLabel, slotLabel } from './labels.ts';
 import { choiceRankLabel, levelLabel, volumeText } from './layout.ts';
 import { VolunteerEdit } from './VolunteerEdit.tsx';
 import { ApplicationSection } from './ApplicationSection.tsx';
+import { AvailabilityDays } from './AvailabilityDays.tsx';
 
 /**
  * The chips at the top of somebody's panel, and what each one is allowed to claim.
@@ -387,6 +388,8 @@ function VolunteerDetail({
         ))}
       </div>
 
+      <AvailabilityDays volunteer={volunteer} readOnly={readOnly} />
+
       <BuddiesSection volunteer={volunteer} buddies={detail.buddies} readOnly={readOnly} />
 
       <PhaseAnswers volunteer={volunteer} />
@@ -594,9 +597,20 @@ function PhaseAnswers({ volunteer }: { volunteer: Volunteer }) {
       {phases.map((id) => {
         const phase = id === 'montage' ? plan.montage : plan.demontage;
         const answer = id === 'montage' ? volunteer.montage : volunteer.demontage;
-        const parts = phaseDayParts(phase);
-        const window = answer.windows[0] ?? null;
         const label = phase.label || (id === 'montage' ? 'Montage' : 'Démontage');
+        // The days the bénévoles may come, ticked from the answer's windows (none = all of them).
+        const opening = { start: phase.volunteersFrom, end: phase.volunteersUntil };
+        const ticks = phaseDayTicks(phase, answer.windows).filter((t) =>
+          t.segments.some((s) => s.end > opening.start && s.start < opening.end),
+        );
+        const toggleDay = (index: number) => {
+          const next = ticks.map((t) => (t.index === index ? { ...t, ticked: !t.ticked } : t));
+          const windows = next.every((t) => t.ticked) ? [] : next.filter((t) => t.ticked).flatMap((t) => t.segments);
+          edit(
+            (p) => setVolunteerPhase(p, volunteer.key, id, { present: windows.length > 0 || next.every((t) => t.ticked), windows }),
+            `${label.toLowerCase()} de ${volunteer.firstName}`,
+          );
+        };
         const corrected = volunteer.manualFields.includes(id);
 
         return (
@@ -621,35 +635,20 @@ function PhaseAnswers({ volunteer }: { volunteer: Volunteer }) {
               <option value="oui">présent·e</option>
             </select>
 
-            {answer.present && (
-              <>
-                {' '}
-                <select
-                  className="select is-inline"
-                  value={window === null ? '' : String(window.start)}
-                  aria-label={`${label}: à partir de`}
-                  onChange={(event) => {
-                    const start = event.target.value === '' ? null : Number(event.target.value);
-                    edit(
-                      (p) =>
-                        setVolunteerPhase(p, volunteer.key, id, {
-                          windows:
-                            start === null
-                              ? []
-                              : [{ start, end: Math.max(window?.end ?? 0, phase.volunteersUntil) }],
-                        }),
-                      `${label.toLowerCase()} de ${volunteer.firstName}`,
-                    );
-                  }}
-                >
-                  <option value="">toute la période ouverte</option>
-                  {parts.map((part) => (
-                    <option key={part.key} value={String(part.start)}>
-                      à partir de {part.label}
-                    </option>
-                  ))}
-                </select>
-              </>
+            {answer.present && ticks.length > 0 && (
+              <span className="phase-day-ticks">
+                {ticks.map((t) => (
+                  <label key={t.index} className="checkline">
+                    <input
+                      type="checkbox"
+                      name={`fiche-${id}-day-${t.index}`}
+                      checked={t.ticked}
+                      onChange={() => toggleDay(t.index)}
+                    />
+                    {t.label}
+                  </label>
+                ))}
+              </span>
             )}
             {corrected && ' · corrigé à la main'}
           </p>

@@ -4866,6 +4866,27 @@ textarea.select,
   min-height: 44px;
 }
 
+/* Les disponibilités jour par jour d'une fiche (2026-09-15). */
+.availability-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.availability-day-label {
+  min-width: 72px;
+  font-weight: 600;
+}
+
+.phase-day-ticks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+
 /* Une étape de candidature pas encore cochée, dans la vue Candidature de Personnes. */
 .chip.is-muted {
   opacity: 0.55;

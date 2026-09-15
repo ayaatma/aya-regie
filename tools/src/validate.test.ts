@@ -1047,3 +1047,10 @@ test('an avoided tranche costs and is reported, never refused', () => {
   strictEqual(count(result, TIER2.trancheEvitee), 1);
   strictEqual(result.issues.find((i) => i.code === TIER2.trancheEvitee)!.tier, 2);
 });
+
+test('an hour somebody is not there, arrival or departure, is outside their availability', () => {
+  const v1 = volunteer('v1', { unavailable: [{ start: 0, end: 4 }] });
+  const plan = makePlan({ shifts: [shift('s1', 'bar-service', 2, 6)], volunteers: [v1], assignments: [assign('v1', 's1')] });
+  ok(has(validate(plan), TIER1.horsDisponibilite));
+  ok(blockersFor(new PlanIndex({ ...plan, assignments: [] }), v1, shift('s2', 'bar-service', 4, 8)).length === 0);
+});

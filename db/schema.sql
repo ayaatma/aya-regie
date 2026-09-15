@@ -473,6 +473,10 @@ create table volunteer (
   -- préfère ne pas »), by slot key. Since 2026-09-15. A cost, never a rule; not a foreign key for
   -- the reason volunteer_refused_slot gives.
   avoided_slot_keys text[] not null default '{}',
+  -- Windows of the event this person is not there, [{start, end}] in event hours: an arrival, a
+  -- departure, a day off. Since 2026-09-15, on top of the refused tranches. A document: never
+  -- queried inside, read and written whole with the plan.
+  unavailable     jsonb not null default '[]'::jsonb,
   -- The pole choices live in volunteer_choice since 2026-09-14: a form may ask for any number.
   -- Answers the regisseur corrected by hand, by field name, and the reason the fiche is in
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
@@ -1031,7 +1035,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 17,
+values ('min_plan_format', 18,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1334,6 +1338,7 @@ as $fn$
                                   where vrs.volunteer_id = v.id), '[]'::jsonb),
              'availabilityNote', v.availability_note,
              'avoidedSlotIds',  to_jsonb(v.avoided_slot_keys),
+             'unavailable',     v.unavailable,
              -- A list since 2026-09-08, ordered by the pole's own sort order so the same
              -- database always produces the same JSON. That is what makes the round trip
              -- checkable at all.
@@ -1866,7 +1871,7 @@ begin
 
   insert into volunteer (event_id, key, first_name, last_name, nickname, display_name,
                          email, phone, access_code, diet, allergies,
-                         requested_hours, preferred_slot_key, availability_note, avoided_slot_keys,
+                         requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
@@ -1891,6 +1896,7 @@ begin
                                                   then x->'avoidedSlotIds' else '[]'::jsonb end)
                         as av(slot)),
                   '{}'::text[]),
+         case when jsonb_typeof(x->'unavailable') = 'array' then x->'unavailable' else '[]'::jsonb end,
          coalesce((select array_agg(raw #>> '{}')
                    from jsonb_array_elements(coalesce(x->'buddyRawNames', '[]'::jsonb))
                         as bn(raw)),

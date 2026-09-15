@@ -577,6 +577,8 @@ const volunteer = (value: unknown): Volunteer => {
     availabilityNote: text(loose.availabilityNote),
     // Absent from anything written before 2026-09-15: nobody avoided anything.
     avoidedSlotIds: keys(loose.avoidedSlotIds),
+    // Absent from anything written before 2026-09-15: there for the whole event.
+    unavailable: array<unknown>(loose.unavailable).map(window).filter((w): w is Window => w !== null),
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],

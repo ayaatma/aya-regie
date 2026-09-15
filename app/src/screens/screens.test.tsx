@@ -2474,3 +2474,16 @@ test('a fiche names the tranches somebody would rather avoid, apart from the ref
   const html = infoOf(avoiding, { kind: 'benevole', volunteerKey: key });
   assert.ok(shows(html, 'Préfère éviter'));
 });
+
+test('a fiche shows the availability of each day, with the day somebody is away', () => {
+  const key = plan.volunteers[0]!.key;
+  const index = new PlanIndex(plan);
+  const away: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, unavailable: [{ start: 0, end: 4 }] } : v)),
+  };
+  const html = infoOf(away, { kind: 'benevole', volunteerKey: key });
+  assert.ok(shows(html, 'Disponibilités par jour'));
+  assert.ok(shows(html, index.dayLabel(0)));
+  assert.ok(html.includes('name="fiche-day-0-from"'), "l'heure d'arrivée se corrige sur le jour");
+});

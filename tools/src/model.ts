@@ -813,6 +813,13 @@ export interface Volunteer {
    */
   avoidedSlotIds?: SlotId[];
   /**
+   * Windows of the event this person is not there, on top of the refused tranches: an arrival, a
+   * departure, a day off. Since 2026-09-15, edited day by day on the fiche and read from the
+   * arrival and departure questions of a form. Subtracted by `PlanIndex.windowsOf`, so a
+   * placement inside one is `hors-disponibilite`. Absent means none. See `presence-days.ts`.
+   */
+  unavailable?: Window[];
+  /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *
    * KEPT VERBATIM AND NEVER REWRITTEN. `refusedSlotIds` is a guess about this sentence, and a
@@ -979,6 +986,7 @@ export const EDITABLE_FIELDS = [
   'preferredSlotId',
   'refusedSlotIds',
   'avoidedSlotIds',
+  'unavailable',
   'refusedPoleKeys',
   // The whole list, since 2026-09-14: correcting one choice is correcting the reading of the
   // answers, and a list edited entry by entry would let a re-import reorder half of it.

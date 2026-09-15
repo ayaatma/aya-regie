@@ -116,6 +116,10 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
       label: 'Tranches refusées',
       show: (v) => (v.length > 0 ? v.join(', ') : 'aucune'),
     },
+    unavailable: {
+      label: 'Indisponible',
+      show: (v) => ((v ?? []).length > 0 ? (v ?? []).map((w) => `${w.start} h → ${w.end} h`).join(', ') : 'jamais'),
+    },
     avoidedSlotIds: {
       label: 'Tranches à éviter',
       show: (v) => ((v ?? []).length > 0 ? (v ?? []).join(', ') : 'aucune'),
@@ -210,6 +214,7 @@ const RAW_ANSWERS: ReadonlyArray<(v: Volunteer) => unknown> = [
 /** The raw answer each interpreted field is a reading of, as the text the doubt quotes. */
 const BACKED_BY: Partial<Record<EditableField, (v: Volunteer) => string>> = {
   refusedSlotIds: (v) => v.availabilityNote,
+  unavailable: (v) => v.availabilityNote,
   choices: (v) => v.choices.map((c) => c.raw.trim()).filter((raw) => raw !== '').join(' / '),
 };
 
@@ -233,6 +238,7 @@ export const FIELD_LABEL: Record<EditableField, string> = {
   preferredSlotId: 'Préférence',
   refusedSlotIds: 'Tranches refusées',
   avoidedSlotIds: 'Tranches à éviter',
+  unavailable: 'Disponibilités par jour',
   refusedPoleKeys: 'Pôles refusés',
   choices: 'Choix de pôles',
   montage: 'Montage',

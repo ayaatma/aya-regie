@@ -332,6 +332,13 @@ export {
 export type { StatusTag, TicketingReport, TicketingRow } from '@engine/ticketing.ts';
 export { artistGuests } from '@engine/artists.ts';
 
+// Availability day by day, 2026-09-15.
+export {
+  dayAvailability,
+  phaseDayTicks,
+  withDayAvailability,
+} from '@engine/presence-days.ts';
+
 // Application tracking, 2026-09-15: status, steps, Réserve and stamina.
 export {
   APPLICATION_STATUSES,

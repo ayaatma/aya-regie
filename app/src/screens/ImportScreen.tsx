@@ -150,6 +150,8 @@ export function ImportScreen() {
     mapping: withMapping,
     volume: plan.volume,
     constraints: plan.constraints,
+    // The days a form ticks for the montage and the démontage become windows of them.
+    phases: { montage: plan.montage, demontage: plan.demontage },
   });
 
   const survey = useMemo(

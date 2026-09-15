@@ -117,8 +117,10 @@ import {
  *    that predates this writes every bénévole back as a fresh candidature with nothing ticked.
  * 17: 2026-09-15, `Volunteer.avoidedSlotIds`, the tranches somebody would rather avoid. A build
  *    that predates this writes every bénévole back as avoiding nothing.
+ * 18: 2026-09-15, `Volunteer.unavailable`, availability day by day. A build that predates this
+ *    writes every bénévole back as present from the first hour to the last.
  */
-export const PLAN_FORMAT = 17;
+export const PLAN_FORMAT = 18;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -455,7 +457,8 @@ export class PlanIndex {
     for (const v of plan.volunteers) {
       this.windows.set(
         v.key,
-        usableWindows(refusedWindows(plan.slots, v.refusedSlotIds), plan.lengthHours),
+        // The refused tranches and, since 2026-09-15, the hours they are not there at all.
+        usableWindows([...refusedWindows(plan.slots, v.refusedSlotIds), ...(v.unavailable ?? [])], plan.lengthHours),
       );
     }
   }

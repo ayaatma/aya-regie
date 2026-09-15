@@ -276,6 +276,10 @@ async function main() {
         await shot('97-personnes-fiche-annulee');
         await clickButton(/^↶$/);
         await sleep(400);
+        // Availability day by day, and the montage days ticked, lower on the same fiche.
+        await page.evaluate(() => document.querySelector('.availability-day')?.scrollIntoView({ block: 'start' }));
+        await sleep(300);
+        await shot('99-personnes-fiche-jours');
         await tab('Réglages');
         await page.evaluate(() => {
           const card = document.querySelector('.setup-application');

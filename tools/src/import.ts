@@ -33,6 +33,8 @@ import {
   usableWindows,
 } from './availability.js';
 import { parseAvailabilityNote, parsePhaseAnswer, parsePoleAnswer, type AnswerReading } from './answers.js';
+import { parseArrival, parseDeparture, parsePhaseDays, unavailableFrom } from './presence-days.js';
+import type { Phase } from './phase.js';
 import { resolveConstraints, type ConstraintSettings } from './constraints.js';
 import { DEFAULT_VOLUME, eventDays, type VolumeSettings } from './days.js';
 import {
@@ -101,6 +103,8 @@ const FIELDS = [
   // One closed question about one tranche, read two ways: « Non » refuses it, « oui mais je
   // préfère ne pas » avoids it. Optional.
   'slotComfort',
+  // « À quelle heure peux-tu arriver vendredi ? » / « ... dois-tu repartir dimanche ? ». Optional.
+  'arrival', 'departure',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -187,6 +191,8 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   // « Peux-tu faire des shifts de nuit ? ». Anchored on a shift or créneau question naming a
   // moment, never on « nuit » alone, which a quiz or a camping question may carry.
   { field: 'slotComfort', test: (h) => /(shifts?|creneaux?|postes?) de nuit|travailler la nuit/.test(h), required: false },
+  { field: 'arrival',     test: (h) => /heure (peux|pourras) tu arriver|heure d arrivee|quand arrives tu/.test(h), required: false },
+  { field: 'departure',   test: (h) => /heure (dois|peux) tu (re)?partir|heure de depart|quand (re)?pars tu/.test(h), required: false },
 ];
 
 export type ColumnMap = Partial<Record<FormField, number>>;
@@ -768,6 +774,11 @@ export interface ImportOptions {
   existingCodes?: ReadonlyMap<string, string>;
   /** The régisseur's column and answer decisions for this event. See `form-mapping.ts`. */
   mapping?: FormMapping;
+  /**
+   * The montage and the démontage, so the days a form ticks for them become windows. Without them
+   * a phase answer is read as present or not, as before 2026-09-15.
+   */
+  phases?: { montage: Phase; demontage: Phase };
   /** The event's volume settings: per day or not, and the options. Defaults to the Loto Tekno's. */
   volume?: VolumeSettings;
   /** Which rhythm rules block, for the volume ceiling. Defaults to all of them. */
@@ -977,6 +988,23 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const availability = parseAvailabilityNote(availabilityNote, slots, startISO, lengthHours);
     if (availability.reason) reviewReasons.push(availability.reason);
 
+    // Arrival and departure: windows of the event before and after, day by day in the tool.
+    const header = (field: FormField): string => (map[field] === undefined ? '' : rows[0]![map[field]!] ?? '');
+    const arrivalCell = cell(row, 'arrival');
+    const departureCell = cell(row, 'departure');
+    const arrival = parseArrival(header('arrival'), arrivalCell, startISO, lengthHours);
+    const departure = parseDeparture(header('departure'), departureCell, startISO, lengthHours);
+    for (const reading of [arrival, departure]) if (reading.reason) reviewReasons.push(reading.reason);
+    readable.saw('arrival', arrivalCell === '' || arrival.value !== null || arrival.confident);
+    readable.saw('departure', departureCell === '' || departure.value !== null || departure.confident);
+    const unavailable = unavailableFrom(arrival.value, departure.value, lengthHours);
+    // Kept word for word with the other time answers: this is what a correction is checked against.
+    const timeNote = [
+      availabilityNote,
+      arrivalCell === '' ? '' : `Arrivée: ${arrivalCell}`,
+      departureCell === '' ? '' : `Départ: ${departureCell}`,
+    ].filter((part) => part !== '').join('\n');
+
     // Merged, and deduplicated: naming the same tranche in both columns is one refusal.
     const comfortCell = cell(row, 'slotComfort');
     const decidedComfort = comfortCell === '' ? undefined : decidedAnswer('slotComfort', comfortCell);
@@ -1037,9 +1065,18 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     readable.saw('phaseHelp', bothCell.trim() === '' || parsePhaseAnswer(bothCell, 'montage').confident);
     readable.saw('montage', cell(row, 'montage').trim() === '' || montageReading.confident);
     readable.saw('demontage', cell(row, 'demontage').trim() === '' || demontageReading.confident);
+    // The days ticked, when the form asks the phase on its own and the plan's phases are known.
+    const daysOf = (id: 'montage' | 'demontage', present: boolean) => {
+      const own = cell(row, id);
+      const phase = options.phases?.[id];
+      if (!present || own === '' || !phase) return [];
+      const reading = parsePhaseDays(own, phase);
+      if (reading.reason) reviewReasons.push(reading.reason);
+      return reading.value;
+    };
     const phasePresence = {
-      montage: { present: montageReading.value, note: montageCell.trim(), windows: [] },
-      demontage: { present: demontageReading.value, note: demontageCell.trim(), windows: [] },
+      montage: { present: montageReading.value, note: montageCell.trim(), windows: daysOf('montage', montageReading.value) },
+      demontage: { present: demontageReading.value, note: demontageCell.trim(), windows: daysOf('demontage', demontageReading.value) },
     };
 
     /*
@@ -1115,7 +1152,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     // The span arithmetic. This is the check the form's conditional sections should make
     // impossible, and the one that catches it when they do not. Only the rhythm rules that block
     // on this event narrow it, and on an event counted per day it is the best day that counts.
-    const usable = usableWindows(refusedWindows(slots, refusedSlotIds), lengthHours);
+    const usable = usableWindows([...refusedWindows(slots, refusedSlotIds), ...unavailable], lengthHours);
     const ceiling = volumeSettings.scope === 'day'
       ? Math.max(0, ...days.map((day) => maxAchievableHours(
           usable
@@ -1214,8 +1251,9 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       preferredSlotId,
       refusedSlotIds,
       // Kept word for word beside the reading of it. This is the answer; the slots above are
-      // only what the tool made of it.
-      availabilityNote,
+      // only what the tool made of it. The arrival and the departure are appended, as typed.
+      availabilityNote: timeNote,
+      unavailable,
       refusedPoleKeys: refusedPoles.map((pole) => pole.key),
       choices: choiceEntries.map((c): PoleChoice => ({ poleKey: c.pole?.key ?? '', raw: c.raw, level: c.level })),
       artistKeys,
