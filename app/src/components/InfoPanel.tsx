@@ -649,7 +649,7 @@ function CaseBody({
         })()
       : index.volunteerShortName(box.personKey);
 
-  const issues = phaseIssues(phase, plan.organisers, plan.volunteers).filter(
+  const issues = phaseIssues(phase, plan.organisers, plan.volunteers, plan.skills).filter(
     (issue) => issue.assignmentKey === assignmentKey,
   );
   const where =

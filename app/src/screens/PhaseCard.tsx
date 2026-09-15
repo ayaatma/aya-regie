@@ -23,6 +23,8 @@
 
 import { useState } from 'react';
 
+import { SkillPicker } from '../components/SkillPicker.tsx';
+
 import {
   fmtHours,
   phaseDayParts,
@@ -606,6 +608,17 @@ function PhasePoleRow({
           ? 'personne de placé'
           : `${removal.placements} affectation${removal.placements > 1 ? 's' : ''}`}
       </span>
+
+      {plan.skills.length > 0 && (
+        <SkillPicker
+          skills={plan.skills}
+          value={pole.requiredSkills ?? []}
+          name={`phase-${id}-pole-skill-${pole.key}`}
+          onChange={(requiredSkills) =>
+            edit((p) => setPhasePole(p, id, pole.key, { requiredSkills }), `compétences demandées sur ${pole.name}`)
+          }
+        />
+      )}
 
       <div className="setup-group-actions">
         <button

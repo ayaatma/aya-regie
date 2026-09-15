@@ -94,6 +94,7 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     volume: DEFAULT_VOLUME,
     formMapping: { columns: {}, answers: {} },
     applicationSteps: DEFAULT_APPLICATION_STEPS,
+    skills: [],
     dismissedBuddies: [],
     slots: DEFAULT_SLOTS,
     preferenceSlots: DEFAULT_PREFERENCE_SLOTS,

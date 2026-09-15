@@ -51,6 +51,8 @@ export interface PhasePole {
   name: string;
   /** `#rrggbb`, presentation only. Absent means the screen picks one from its palette. */
   colour?: string;
+  /** The `SkillTag` keys needed here, since 2026-09-15. Signalled on a box, never refused. */
+  requiredSkills?: string[];
 }
 
 /**
@@ -661,7 +663,7 @@ export function declaredPole(
  *
  * Nothing here removes or moves anything, ever.
  */
-export type PhaseIssueCode = 'hors-presence' | 'autre-pole' | 'chevauchement';
+export type PhaseIssueCode = 'hors-presence' | 'autre-pole' | 'chevauchement' | 'competence-manquante';
 
 export interface PhaseIssue {
   code: PhaseIssueCode;
@@ -676,12 +678,37 @@ export function phaseIssues(
   phase: Phase,
   organisers: readonly Organiser[],
   volunteers: readonly Volunteer[],
+  /** The event's competences, for the sentence. Without them no competence is checked. */
+  skills: readonly { key: string; label: string }[] = [],
 ): PhaseIssue[] {
   const issues: PhaseIssue[] = [];
   const declared = declaredWindows(phase, organisers, volunteers);
 
   for (const a of phase.assignments) {
     const id = `${a.personKind}|${a.personKey}`;
+
+    // A pole asking for a competence the person does not hold. Said on the box, never refused: a
+    // montage is placed by hand, and the régisseur may know better than the fiche.
+    const needed = skills.length === 0 || a.eventKey !== ''
+      ? []
+      : (phase.poles.find((p) => p.key === a.poleKey)?.requiredSkills ?? []);
+    if (needed.length > 0) {
+      const held = new Set(
+        (a.personKind === 'orga'
+          ? organisers.find((o) => o.key === a.personKey)?.skills
+          : volunteers.find((v) => v.key === a.personKey)?.skills) ?? [],
+      );
+      const missing = needed.filter((k) => !held.has(k));
+      if (missing.length > 0) {
+        issues.push({
+          code: 'competence-manquante',
+          assignmentKey: a.key,
+          personKind: a.personKind,
+          personKey: a.personKey,
+          message: `Ce pôle demande ${missing.map((k) => `« ${skills.find((s) => s.key === k)?.label ?? k} »`).join(', ')}.`,
+        });
+      }
+    }
     const presence = declared.get(id) ?? [];
     const outside = subtractWindows([{ start: a.start, end: a.end }], presence);
 

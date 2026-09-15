@@ -492,3 +492,21 @@ test('aligning a phase already in place hands back the same object', () => {
   const montageInPlace = alignPhase(defaultPhase('montage', '2027-03-11T12:00:00+01:00'), EVENT_START, 18);
   assert.equal(alignPhase(montageInPlace, EVENT_START, 18), montageInPlace);
 });
+
+test('a phase pole asking for a competence says so on the box of whoever lacks it', async () => {
+  const { phaseIssues, defaultPhase } = await import('./phase.js');
+  const base = defaultPhase('montage', '2027-03-11T08:00:00+01:00');
+  const phase = {
+    ...base,
+    enabled: true,
+    poles: [...base.poles, { key: 'engins', name: 'Engins', requiredSkills: ['caces'] }],
+    assignments: [{ key: 'a1', personKind: 'orga' as const, personKey: 'o1', poleKey: 'engins', eventKey: '', start: 1, end: 3 }],
+  };
+  const orga = (skills: string[]) => [{
+    key: 'o1', firstName: 'O', lastName: 'Un', email: '', phone: '', accessCode: '', diet: '', allergies: '', note: '',
+    montageFrom: 0, demontageUntil: null, montagePoleKeys: [], demontagePoleKeys: [], skills,
+  }];
+  const tags = [{ key: 'caces', label: 'CACES' }];
+  assert.ok(phaseIssues(phase, orga([]), [], tags).some((i) => i.code === 'competence-manquante' && i.message.includes('CACES')));
+  assert.ok(!phaseIssues(phase, orga(['caces']), [], tags).some((i) => i.code === 'competence-manquante'));
+});

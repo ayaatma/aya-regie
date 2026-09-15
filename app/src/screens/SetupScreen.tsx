@@ -58,6 +58,9 @@ import { PhaseCard } from './PhaseCard.tsx';
 import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
+import { SkillsCard } from './SkillsCard.tsx';
+import { SkillPicker } from '../components/SkillPicker.tsx';
+import { setPoleSkills } from '../store/skillEdits.ts';
 import { AdvancedSettingsCard } from './AdvancedSettingsCard.tsx';
 
 /** What to say under a organiser's two hour fields, including while only one is filled. */
@@ -173,6 +176,8 @@ export function SetupScreen() {
           <OrganisersCard />
 
           <ApplicationStepsCard />
+
+          <SkillsCard />
 
           {/*
             The two phases, between the people and the poles of the exploit. They are settings of
@@ -501,6 +506,19 @@ export function PoleRow({
               />
               Le responsable reste en support, sans créneau sur ce pôle
             </label>
+
+            {plan.skills.length > 0 && (
+              <div className="rule">
+                <span className="rule-label">Compétences demandées</span>
+                <SkillPicker
+                  skills={plan.skills}
+                  value={pole.requiredSkills ?? []}
+                  name={`pole-skill-${pole.key}`}
+                  onChange={(skills) => edit((p) => setPoleSkills(p, pole.key, skills), `compétences demandées sur ${pole.name}`)}
+                />
+                <span className="rule-hint">Valent aussi pour ses sous-pôles.</span>
+              </div>
+            )}
           </div>
 
           <Regenerate pole={pole} shifts={shifts} eventHours={eventHours} />

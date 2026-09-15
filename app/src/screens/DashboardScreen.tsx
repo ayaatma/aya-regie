@@ -299,7 +299,7 @@ function PhaseCards() {
           const people = phasePeople(phase, plan.organisers, plan.volunteers);
           const orgas = people.filter((p) => p.kind === 'orga').length;
           const short = eventFills(phase).filter((fill) => fill.missing > 0);
-          const wrong = phaseIssues(phase, plan.organisers, plan.volunteers);
+          const wrong = phaseIssues(phase, plan.organisers, plan.volunteers, plan.skills);
 
           return (
             <section key={id} className="board-card">

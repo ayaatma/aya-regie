@@ -317,9 +317,25 @@ export const DEFAULT_CATERING: CateringSettings = {
   choices: [],
 };
 
+/**
+ * A competence the event cares about: « Permis B », « CACES », « Conduite d'engins », « Secourisme ».
+ * Since 2026-09-15. The event's own list (`Plan.skills`), so a festival and a loto each name what
+ * matters to them; a stable key so renaming a tag never untags anybody.
+ */
+export interface SkillTag {
+  key: string;
+  label: string;
+}
+
 export interface Pole {
   key: string;
   name: string;
+  /**
+   * The `SkillTag` keys a person needs to work here, since 2026-09-15. A sub-pole also needs its
+   * parents' (`PlanIndex.requiredSkillsOf`). Scored or blocking as the criterion `missingSkill`
+   * says. Absent means none.
+   */
+  requiredSkills?: string[];
   parentKey: string | null;
   /** Full display name, "Bar / Service" for a sub-pole. */
   path: string;
@@ -459,6 +475,8 @@ export interface Organiser {
    */
   montagePoleKeys: string[];
   demontagePoleKeys: string[];
+  /** The `SkillTag` keys this orga holds, set by hand. Since 2026-09-15; absent means none. */
+  skills?: string[];
 }
 
 /**
@@ -819,6 +837,13 @@ export interface Volunteer {
    * placement inside one is `hors-disponibilite`. Absent means none. See `presence-days.ts`.
    */
   unavailable?: Window[];
+  /** The `SkillTag` keys this person holds. An answer read from `skillsNote`, correctable. */
+  skills?: string[];
+  /**
+   * « Quelles sont tes compétences / permis / CACES / ton métier ? », as typed. Since 2026-09-15.
+   * The tags above are what the importer recognised in it; this is what the person said.
+   */
+  skillsNote?: string;
   /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *
@@ -987,6 +1012,7 @@ export const EDITABLE_FIELDS = [
   'refusedSlotIds',
   'avoidedSlotIds',
   'unavailable',
+  'skills',
   'refusedPoleKeys',
   // The whole list, since 2026-09-14: correcting one choice is correcting the reading of the
   // answers, and a list edited entry by entry would let a re-import reorder half of it.

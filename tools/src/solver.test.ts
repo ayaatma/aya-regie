@@ -71,6 +71,7 @@ function makePlan(parts: {
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
+    skills: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,

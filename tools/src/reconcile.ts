@@ -116,6 +116,15 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
       label: 'Tranches refusées',
       show: (v) => (v.length > 0 ? v.join(', ') : 'aucune'),
     },
+    skills: {
+      label: 'Compétences',
+      show: (v) => ((v ?? []).length > 0 ? [...(v ?? [])].sort().join(', ') : 'aucune'),
+    },
+    // The sentence the tags are read from, compared like the time constraint.
+    skillsNote: {
+      label: 'Compétences (réponse)',
+      show: (v) => ((v ?? '').trim() === '' ? 'aucune' : (v ?? '').trim()),
+    },
     unavailable: {
       label: 'Indisponible',
       show: (v) => ((v ?? []).length > 0 ? (v ?? []).map((w) => `${w.start} h → ${w.end} h`).join(', ') : 'jamais'),
@@ -215,6 +224,7 @@ const RAW_ANSWERS: ReadonlyArray<(v: Volunteer) => unknown> = [
 const BACKED_BY: Partial<Record<EditableField, (v: Volunteer) => string>> = {
   refusedSlotIds: (v) => v.availabilityNote,
   unavailable: (v) => v.availabilityNote,
+  skills: (v) => v.skillsNote ?? '',
   choices: (v) => v.choices.map((c) => c.raw.trim()).filter((raw) => raw !== '').join(' / '),
 };
 
@@ -239,6 +249,7 @@ export const FIELD_LABEL: Record<EditableField, string> = {
   refusedSlotIds: 'Tranches refusées',
   avoidedSlotIds: 'Tranches à éviter',
   unavailable: 'Disponibilités par jour',
+  skills: 'Compétences',
   refusedPoleKeys: 'Pôles refusés',
   choices: 'Choix de pôles',
   montage: 'Montage',

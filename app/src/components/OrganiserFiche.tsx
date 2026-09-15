@@ -23,6 +23,8 @@ import {
   type PhaseId,
 } from '../engine.ts';
 import { updateOrganiser } from '../store/setupEdits.ts';
+import { setOrganiserSkills } from '../store/skillEdits.ts';
+import { SkillPicker } from './SkillPicker.tsx';
 import { setOrganiserPhase } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from './labels.ts';
@@ -86,6 +88,20 @@ export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
           Ce que le formulaire a répondu sur le montage et les pôles atterrit ici, mot pour mot.
         </span>
       </label>
+
+      {plan.skills.length > 0 && (
+        <div className="rule">
+          <span className="rule-label">Compétences</span>
+          <SkillPicker
+            skills={plan.skills}
+            value={person.skills ?? []}
+            name={`orga-skill-${person.key}`}
+            onChange={(skills, changed, on) =>
+              edit((p) => setOrganiserSkills(p, person.key, skills), `${changed.label} ${on ? 'ajouté' : 'retiré'}: ${who}`)
+            }
+          />
+        </div>
+      )}
 
       <PhasePresenceRow organiserKey={person.key} id="montage" />
       <PhasePresenceRow organiserKey={person.key} id="demontage" />

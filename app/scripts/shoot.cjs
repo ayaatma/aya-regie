@@ -288,6 +288,23 @@ async function main() {
         });
         await sleep(400);
         await shot('98-reglages-suivi');
+        // Competences: declare one, then see it on a fiche.
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-skills');
+          card?.querySelector('button')?.click();
+          card?.scrollIntoView();
+        });
+        await sleep(300);
+        await page.type('input[name="new-skill"]', 'Permis B');
+        await page.keyboard.press('Enter');
+        await sleep(400);
+        await shot('100-reglages-competences');
+        await tab('Personnes');
+        await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
+        await sleep(400);
+        await page.evaluate(() => document.querySelector('.skill-picker')?.scrollIntoView({ block: 'center' }));
+        await sleep(300);
+        await shot('101-personnes-fiche-competences');
       }
       if (want('catering')) {
         await tab('Catering');

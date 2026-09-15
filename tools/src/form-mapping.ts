@@ -54,7 +54,9 @@ export type MappedField =
   | 'energy'
   | 'slotComfort'
   | 'arrival'
-  | 'departure';
+  | 'departure'
+  | 'skills'
+  | 'skillCheck';
 
 /** One pole choice as columns: the pole answer, and the level answer when the form asks one. */
 export interface ChoiceColumns {
@@ -113,13 +115,15 @@ export const MAPPED_FIELD_LABEL: Record<MappedField, string> = {
   slotComfort: 'Tranche refusée ou à éviter (une question)',
   arrival: "Heure d'arrivée",
   departure: 'Heure de départ',
+  skills: 'Compétences (texte libre)',
+  skillCheck: 'Compétence (question oui / non)',
 };
 
 /** The order the screen lists the fields in: who, then what they can do, then the rest. */
 export const MAPPED_FIELDS: readonly MappedField[] = [
   'firstName', 'lastName', 'nickname', 'email', 'phone',
   'volume', 'halfPreference', 'refusedSlotChoice', 'availabilityNote', 'refusedPoles',
-  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'slotComfort', 'arrival', 'departure', 'submittedAt',
+  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'slotComfort', 'arrival', 'departure', 'skills', 'skillCheck', 'submittedAt',
 ];
 
 /** Which answer map a field's answers go through, for the fields that have one. */

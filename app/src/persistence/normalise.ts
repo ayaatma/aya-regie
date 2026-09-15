@@ -120,6 +120,8 @@ const organiser = (value: unknown): Organiser => {
     demontageUntil: hours(loose.demontageUntil),
     montagePoleKeys: keys(loose.montagePoleKeys),
     demontagePoleKeys: keys(loose.demontagePoleKeys),
+    // Absent from anything written before 2026-09-15: no competence ticked.
+    skills: keys(loose.skills),
   };
 };
 
@@ -164,6 +166,7 @@ const phasePole = (value: unknown): PhasePole => {
     key: text(loose.key),
     name: text(loose.name),
     ...(colour === '' ? {} : { colour }),
+    requiredSkills: keys(loose.requiredSkills),
   };
 };
 
@@ -579,6 +582,8 @@ const volunteer = (value: unknown): Volunteer => {
     avoidedSlotIds: keys(loose.avoidedSlotIds),
     // Absent from anything written before 2026-09-15: there for the whole event.
     unavailable: array<unknown>(loose.unavailable).map(window).filter((w): w is Window => w !== null),
+    skills: keys(loose.skills),
+    skillsNote: text(loose.skillsNote),
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],
@@ -966,5 +971,10 @@ export function normalisePlan(raw: unknown): Plan {
     // Absent from anything written before 2026-09-14: nothing decided, everything detected.
     formMapping: formMapping(loose.formMapping),
     applicationSteps: applicationSteps((loose as Record<string, unknown>).applicationSteps),
+    // Absent from anything written before 2026-09-15: an event naming no competence.
+    skills: array<Record<string, unknown>>((loose as Record<string, unknown>).skills)
+      .filter((s) => s !== null && typeof s === 'object')
+      .map((s) => ({ key: text(s.key), label: text(s.label) }))
+      .filter((s) => s.key !== ''),
   });
 }

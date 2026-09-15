@@ -94,6 +94,8 @@ export const TIER1 = {
    * event wants somebody who is not coming to hold a place.
    */
   candidatureAnnulee: 'candidature-annulee',
+  /** A pole needing a competence the person lacks. Tier 1 only while `missingSkill` blocks. */
+  competenceManquante: 'competence-manquante',
 } as const;
 
 /** Tier 2: a real problem, shown in red, that never stops the solver from returning a plan. */
@@ -194,6 +196,9 @@ export interface LegalityContext {
   headcountOf(shift: Shift): number;
   windowsOf(volunteerKey: string): readonly Window[];
   isUnder(poleKey: string, rootKey: string): boolean;
+  /** The competences a pole needs that this person lacks. See `Pole.requiredSkills`. */
+  missingSkillsOf(volunteer: Volunteer, poleKey: string): readonly string[];
+  skillLabel(key: string): string;
   polePath(poleKey: string): string;
   shiftLabel(shift: Shift): string;
   label(hours: number): string;
@@ -245,6 +250,8 @@ interface Violation {
   pole?: string;
   /** The refused slot the shift lands in, so the sentence names the right one of several. */
   slot?: SlotId;
+  /** The competences missing, by key. */
+  skills?: readonly string[];
   clash?: Shift;
   hours?: number;
   span?: number;
@@ -296,6 +303,14 @@ function violationsFor(
     const refusedRoot = refusedRootOf(ctx, volunteer, shift.poleKey);
     if (refusedRoot) {
       found.push({ code: TIER1.poleRefuse, pole: refusedRoot });
+      if (stopEarly) return found;
+    }
+  }
+
+  if (c.missingSkill.mode === level) {
+    const missing = ctx.missingSkillsOf(volunteer, shift.poleKey);
+    if (missing.length > 0) {
+      found.push({ code: TIER1.competenceManquante, skills: missing });
       if (stopEarly) return found;
     }
   }
@@ -467,6 +482,8 @@ function describe(
       return 'Ce bénévole occupe déjà ce créneau.';
     case TIER1.candidatureAnnulee:
       return 'Candidature annulée: cette personne ne vient plus.';
+    case TIER1.competenceManquante:
+      return `"${ctx.polePath(shift!.poleKey)}" demande ${(violation.skills ?? []).map((k) => `« ${ctx.skillLabel(k)} »`).join(', ')}.`;
     case TIER1.sureffectif:
       return `Le créneau est déjà complet (${shift ? ctx.headcountOf(shift) : 0} place(s) pour les bénévoles).`;
     case TIER1.poleRefuse:
@@ -830,6 +847,14 @@ export function validate(plan: Plan): ValidationResult {
         add(tierOf(c.refusedPole)!, TIER1.poleRefuse,
           `${name} : placement dans "${index.polePath(shift.poleKey)}", qui dépend du pôle ` +
           `refusé ("${index.polePath(refusedRoot)}").`,
+          { volunteers: [volunteer.key], shifts: [shift.key], pole: shift.poleKey });
+      }
+
+      const missing = tierOf(c.missingSkill) === null ? [] : index.missingSkillsOf(volunteer, shift.poleKey);
+      if (missing.length > 0) {
+        add(tierOf(c.missingSkill)!, TIER1.competenceManquante,
+          `${name} : placement dans "${index.polePath(shift.poleKey)}", qui demande ` +
+          `${missing.map((k) => `« ${index.skillLabel(k)} »`).join(', ')}.`,
           { volunteers: [volunteer.key], shifts: [shift.key], pole: shift.poleKey });
       }
 

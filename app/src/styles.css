@@ -4866,6 +4866,24 @@ textarea.select,
   min-height: 44px;
 }
 
+/* Les compétences, cochées comme des pastilles (2026-09-15). */
+.skill-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip.skill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.chip.skill-toggle input {
+  margin: 0;
+}
+
 /* Les disponibilités jour par jour d'une fiche (2026-09-15). */
 .availability-day {
   display: flex;

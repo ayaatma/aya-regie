@@ -105,6 +105,9 @@ const FIELDS = [
   'slotComfort',
   // « À quelle heure peux-tu arriver vendredi ? » / « ... dois-tu repartir dimanche ? ». Optional.
   'arrival', 'departure',
+  // The competences: a free-text question read for the event's tags, and a yes / no question
+  // naming one of them (« As-tu des compétences en bricolage ? »). Both optional.
+  'skills', 'skillCheck',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -193,6 +196,9 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'slotComfort', test: (h) => /(shifts?|creneaux?|postes?) de nuit|travailler la nuit/.test(h), required: false },
   { field: 'arrival',     test: (h) => /heure (peux|pourras) tu arriver|heure d arrivee|quand arrives tu/.test(h), required: false },
   { field: 'departure',   test: (h) => /heure (dois|peux) tu (re)?partir|heure de depart|quand (re)?pars tu/.test(h), required: false },
+  // The yes / no one first: « est-ce que tu as des compétences en bricolage » also says compétences.
+  { field: 'skillCheck',  test: (h) => /(as tu|est ce que tu as) des competences en/.test(h), required: false },
+  { field: 'skills',      test: (h) => /competences|permis|caces|ton metier/.test(h), required: false },
 ];
 
 export type ColumnMap = Partial<Record<FormField, number>>;
@@ -409,6 +415,22 @@ function matchSlot<T extends { id: SlotId; label: string }>(v: string, slots: re
       normalise(s.label).includes(v) ||
       v.includes(normalise(s.label)),
   );
+}
+
+/**
+ * The event's competences a free-text answer names, by whole words: « Permis B, CACES 3 » holds
+ * « Permis B » and « CACES », not « Permis poids lourd ». Never a doubt: the sentence is kept on the
+ * fiche beside the tags, and a tag the parser missed is one tick away.
+ */
+export function parseSkills(text: string, tags: readonly { key: string; label: string }[]): string[] {
+  const v = ` ${normalise(text)} `;
+  return tags.filter((t) => normalise(t.label) !== '' && v.includes(` ${normalise(t.label)} `)).map((t) => t.key);
+}
+
+/** A yes / no question naming a competence in its header: « oui » holds it. */
+export function parseSkillCheck(header: string, answer: string, tags: readonly { key: string; label: string }[]): string[] {
+  if (!/^oui\b/.test(normalise(answer))) return [];
+  return parseSkills(header, tags);
 }
 
 /** What one answer about one tranche says: refused, avoided, or neither. */
@@ -774,6 +796,8 @@ export interface ImportOptions {
   existingCodes?: ReadonlyMap<string, string>;
   /** The régisseur's column and answer decisions for this event. See `form-mapping.ts`. */
   mapping?: FormMapping;
+  /** The event's competences, which the free-text and yes / no answers are read against. */
+  skills?: readonly { key: string; label: string }[];
   /**
    * The montage and the démontage, so the days a form ticks for them become windows. Without them
    * a phase answer is read as present or not, as before 2026-09-15.
@@ -1254,6 +1278,13 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       // only what the tool made of it. The arrival and the departure are appended, as typed.
       availabilityNote: timeNote,
       unavailable,
+      skills: [
+        ...new Set([
+          ...parseSkills(cell(row, 'skills'), options.skills ?? []),
+          ...parseSkillCheck(header('skillCheck'), cell(row, 'skillCheck'), options.skills ?? []),
+        ]),
+      ],
+      skillsNote: cell(row, 'skills'),
       refusedPoleKeys: refusedPoles.map((pole) => pole.key),
       choices: choiceEntries.map((c): PoleChoice => ({ poleKey: c.pole?.key ?? '', raw: c.raw, level: c.level })),
       artistKeys,

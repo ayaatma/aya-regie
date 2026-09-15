@@ -282,8 +282,8 @@ export function PhaseGrid({
   const artistRows = useMemo(() => packRows(artistMoments), [artistMoments]);
 
   const issues = useMemo(
-    () => phaseIssues(phase, plan.organisers, plan.volunteers),
-    [phase, plan.organisers, plan.volunteers],
+    () => phaseIssues(phase, plan.organisers, plan.volunteers, plan.skills),
+    [phase, plan.organisers, plan.volunteers, plan.skills],
   );
   const issuesByBox = useMemo(() => {
     const map = new Map<string, PhaseIssue[]>();

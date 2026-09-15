@@ -43,6 +43,7 @@ import { choiceRankLabel, levelLabel, volumeText } from './layout.ts';
 import { VolunteerEdit } from './VolunteerEdit.tsx';
 import { ApplicationSection } from './ApplicationSection.tsx';
 import { AvailabilityDays } from './AvailabilityDays.tsx';
+import { SkillPicker } from './SkillPicker.tsx';
 
 /**
  * The chips at the top of somebody's panel, and what each one is allowed to claim.
@@ -388,6 +389,8 @@ function VolunteerDetail({
         ))}
       </div>
 
+      <SkillsSection volunteer={volunteer} readOnly={readOnly} />
+
       <AvailabilityDays volunteer={volunteer} readOnly={readOnly} />
 
       <BuddiesSection volunteer={volunteer} buddies={detail.buddies} readOnly={readOnly} />
@@ -447,6 +450,36 @@ function VolunteerDetail({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Compétences: the tags held, ticked here as a correction of the form's answer (so a re-import
+ * keeps them), with the sentence they were read from underneath.
+ */
+function SkillsSection({ volunteer, readOnly }: { volunteer: Volunteer; readOnly: boolean }) {
+  const { plan, index, edit } = useLoadedPlan();
+  if (plan.skills.length === 0 && (volunteer.skillsNote ?? '').trim() === '') return null;
+  const name = index.volunteerName(volunteer.key);
+  return (
+    <div className="panel-section">
+      <p className="panel-section-title">Compétences</p>
+      <SkillPicker
+        skills={plan.skills}
+        value={volunteer.skills ?? []}
+        readOnly={readOnly}
+        name={`fiche-skill-${volunteer.key}`}
+        onChange={(skills, changed, on) =>
+          edit((p) => correctVolunteer(p, volunteer.key, { skills }), `${changed.label} ${on ? 'ajouté' : 'retiré'}: ${name}`)
+        }
+      />
+      {(volunteer.skillsNote ?? '').trim() !== '' && (
+        <p className="fiche-raw-answer">
+          <span className="fiche-raw-label">Réponse</span>
+          {volunteer.skillsNote}
+        </p>
+      )}
+    </div>
   );
 }
 

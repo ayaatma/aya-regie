@@ -599,3 +599,12 @@ test('the night question of a festival form refuses, avoids or accepts one tranc
   strictEqual(parseSlotComfort(q, '', slots), null);
   strictEqual(parseSlotComfort('Peux-tu venir tôt ?', 'Non je ne peux pas', slots), 'inconnu');
 });
+
+test('competences are read by whole words, and a yes names the competence of its question', async () => {
+  const { parseSkills, parseSkillCheck } = await import('./import.js');
+  const tags = [{ key: 'permis-b', label: 'Permis B' }, { key: 'caces', label: 'CACES' }, { key: 'bricolage', label: 'Bricolage' }];
+  deepStrictEqual(parseSkills('Permis B, CACES 3 et électricien', tags), ['permis-b', 'caces']);
+  deepStrictEqual(parseSkills('permis poids lourd', tags), []);
+  deepStrictEqual(parseSkillCheck('Est-ce que tu as des compétences en bricolage ?', 'Oui', tags), ['bricolage']);
+  deepStrictEqual(parseSkillCheck('Est-ce que tu as des compétences en bricolage ?', 'Un peu', tags), []);
+});

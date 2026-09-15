@@ -27,6 +27,7 @@ import {
   type Volunteer,
   type Window,
   type ApplicationStep,
+  type SkillTag,
 } from './model.js';
 import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
 import { type Phase, alignPhase, defaultPhase, defaultPhaseStart } from './phase.js';
@@ -119,8 +120,11 @@ import {
  *    that predates this writes every bénévole back as avoiding nothing.
  * 18: 2026-09-15, `Volunteer.unavailable`, availability day by day. A build that predates this
  *    writes every bénévole back as present from the first hour to the last.
+ * 19: 2026-09-15, competences: `Plan.skills`, `Volunteer.skills` and `skillsNote`,
+ *    `Organiser.skills`, `Pole.requiredSkills`, `PhasePole.requiredSkills`. A build that predates
+ *    this writes every tag and every requirement away.
  */
-export const PLAN_FORMAT = 18;
+export const PLAN_FORMAT = 19;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -257,6 +261,8 @@ export interface Plan {
    * The event's own sequence; see `ApplicationStep`.
    */
   applicationSteps: readonly ApplicationStep[];
+  /** The competences this event names, in order. See `SkillTag`. Since 2026-09-15. */
+  skills: readonly SkillTag[];
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *
@@ -607,6 +613,29 @@ export class PlanIndex {
     return this.leafKeys.has(poleKey);
   }
 
+  /** The competences a pole needs, its own and every parent's, in first-seen order. */
+  requiredSkillsOf(poleKey: string): readonly string[] {
+    const out: string[] = [];
+    let current = this.poleByKey.get(poleKey);
+    while (current) {
+      for (const k of current.requiredSkills ?? []) if (!out.includes(k)) out.push(k);
+      current = current.parentKey ? this.poleByKey.get(current.parentKey) : undefined;
+    }
+    return out;
+  }
+
+  /** The competences this pole needs that this person does not hold. Empty when none. */
+  missingSkillsOf(volunteer: Volunteer, poleKey: string): readonly string[] {
+    const needed = this.requiredSkillsOf(poleKey);
+    if (needed.length === 0) return needed;
+    const held = volunteer.skills ?? [];
+    return needed.filter((k) => !held.includes(k));
+  }
+
+  skillLabel(key: string): string {
+    return this.plan.skills?.find((s) => s.key === key)?.label ?? key;
+  }
+
   /** True when `poleKey` is `rootKey` or sits anywhere under it. A veto covers the subtree. */
   isUnder(poleKey: string, rootKey: string): boolean {
     let current = this.poleByKey.get(poleKey);
@@ -826,6 +855,7 @@ export function emptyPlan(
     | 'formMapping'
     | 'dismissedBuddies'
     | 'applicationSteps'
+    | 'skills'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -857,5 +887,6 @@ export function emptyPlan(
     volume: DEFAULT_VOLUME,
     formMapping: EMPTY_FORM_MAPPING,
     applicationSteps: DEFAULT_APPLICATION_STEPS,
+    skills: [],
   };
 }

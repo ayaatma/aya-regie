@@ -332,6 +332,9 @@ export {
 export type { StatusTag, TicketingReport, TicketingRow } from '@engine/ticketing.ts';
 export { artistGuests } from '@engine/artists.ts';
 
+// Competences, 2026-09-15.
+export type { SkillTag } from '@engine/model.ts';
+
 // Availability day by day, 2026-09-15.
 export {
   dayAvailability,

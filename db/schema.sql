@@ -130,6 +130,9 @@ create table event (
     check (jsonb_typeof(form_mapping) = 'object'),
   -- The messages and checks ticked per benevole (« Mail de confirmation envoyé »...), in order,
   -- as [{key, label}]. Since 2026-09-15. A document for the reason form_mapping is one.
+  -- The competences this event names, [{key, label}] in order. Since 2026-09-15.
+  skills                jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(skills) = 'array'),
   application_steps     jsonb not null default
     '[{"key":"confirmation","label":"Mail de confirmation envoyé"},{"key":"reconfirmee","label":"Présence reconfirmée"},{"key":"infos","label":"Infos pratiques envoyées"}]'::jsonb
     check (jsonb_typeof(application_steps) = 'array'),
@@ -197,6 +200,8 @@ create table pole (
   -- on some poles the two fit into one pair of hands, on others they do not. Reported when
   -- contradicted, never refused; nothing in the engine's rules reads it.
   leader_support_only  boolean not null default false,
+  -- The competence keys a person needs here (event.skills), since 2026-09-15. Sub-poles inherit.
+  required_skills      text[] not null default '{}',
   -- Starting values for a new shift of this pole, not rules. They are copied into the shift at
   -- creation and never read again, so raising one later cannot silently rewrite the shifts the
   -- regisseur has already tuned by hand.
@@ -238,6 +243,8 @@ create table organiser (
   -- matters: being drawn on a montage is always something somebody said.
   montage_from    numeric(6,2),
   demontage_until numeric(6,2),
+  -- The competence keys this orga holds (event.skills), set by hand. Since 2026-09-15.
+  skills      text[] not null default '{}',
   sort_order  int not null default 0,
   unique (event_id, key)
 );
@@ -477,6 +484,10 @@ create table volunteer (
   -- departure, a day off. Since 2026-09-15, on top of the refused tranches. A document: never
   -- queried inside, read and written whole with the plan.
   unavailable     jsonb not null default '[]'::jsonb,
+  -- The competence keys this person holds (event.skills), read from skills_note or ticked by hand,
+  -- and the form's answer as typed. Since 2026-09-15.
+  skills          text[] not null default '{}',
+  skills_note     text not null default '',
   -- The pole choices live in volunteer_choice since 2026-09-14: a form may ask for any number.
   -- Answers the regisseur corrected by hand, by field name, and the reason the fiche is in
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
@@ -677,6 +688,8 @@ create table phase_pole (
   key        text not null,
   name       text not null,
   colour     text,
+  -- The competence keys needed here, since 2026-09-15. Signalled on a box, never refused.
+  required_skills text[] not null default '{}',
   sort_order int not null default 0,
   unique (phase_id, key)
 );
@@ -1035,7 +1048,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 18,
+values ('min_plan_format', 19,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1175,6 +1188,7 @@ as $fn$
                'minExperienced',    p.min_experienced,
                'locked',            p.locked,
                'leaderSupportOnly', p.leader_support_only,
+               'requiredSkills',    to_jsonb(p.required_skills),
                'defaultHeadcount',  p.default_headcount)
              -- Optional in the engine's type, so absent rather than null when unset.
              || case when p.colour is null then '{}'::jsonb
@@ -1286,6 +1300,7 @@ as $fn$
              -- Null travels as null, and means "not on that phase at all".
              'montageFrom',    l.montage_from,
              'demontageUntil', l.demontage_until,
+             'skills',         to_jsonb(l.skills),
              'montagePoleKeys', coalesce((
                                   select jsonb_agg(pp.key order by opp.sort_order, pp.key)
                                   from organiser_phase_pole opp
@@ -1339,6 +1354,8 @@ as $fn$
              'availabilityNote', v.availability_note,
              'avoidedSlotIds',  to_jsonb(v.avoided_slot_keys),
              'unavailable',     v.unavailable,
+             'skills',          to_jsonb(v.skills),
+             'skillsNote',      v.skills_note,
              -- A list since 2026-09-08, ordered by the pole's own sort order so the same
              -- database always produces the same JSON. That is what makes the round trip
              -- checkable at all.
@@ -1462,7 +1479,8 @@ as $fn$
              'volunteersUntil',   ph.volunteers_until,
              'poles', coalesce((
                select jsonb_agg(
-                        jsonb_build_object('key', pp.key, 'name', pp.name)
+                        jsonb_build_object('key', pp.key, 'name', pp.name,
+                                           'requiredSkills', to_jsonb(pp.required_skills))
                         || case when pp.colour is null then '{}'::jsonb
                                 else jsonb_build_object('colour', pp.colour) end
                         order by pp.sort_order, pp.key)
@@ -1642,6 +1660,7 @@ as $fn$
         'options',      to_jsonb(e.volume_options)),
       'formMapping', e.form_mapping,
       'applicationSteps', e.application_steps,
+      'skills', e.skills,
       'dismissedBuddies', dismissed_buddies.j))
   from event e, slots, preference_slots, poles, shifts, artists, organisers, leader_roles, volunteers, buddies,
        dismissed_buddies, assignments, reserve, organiser_shifts, catering, ticketing, travel
@@ -1728,7 +1747,9 @@ begin
                                  then p_plan->'formMapping' else '{}'::jsonb end,
     -- Absent from anything written before PLAN_FORMAT 16: the column keeps what it holds.
     application_steps     = case when jsonb_typeof(p_plan->'applicationSteps') = 'array'
-                                 then p_plan->'applicationSteps' else application_steps end
+                                 then p_plan->'applicationSteps' else application_steps end,
+    skills                = case when jsonb_typeof(p_plan->'skills') = 'array'
+                                 then p_plan->'skills' else '[]'::jsonb end
   where id = p_event_id;
 
   insert into ticket_type (event_id, key, label, start_hours, end_hours, sort_order)
@@ -1800,14 +1821,18 @@ begin
   -- sub-pole before its parent.
   insert into pole (event_id, key, name, colour, sort_order, allow_all_debutants,
                     min_experienced, locked, leader_support_only, default_headcount,
-                    default_shift_hours)
+                    default_shift_hours, required_skills)
   select p_event_id, x->>'key', x->>'name', x->>'colour', (ord - 1)::int,
          coalesce((x->>'allowAllDebutants')::boolean, false),
          coalesce((x->>'minExperienced')::int, 0),
          coalesce((x->>'locked')::boolean, false),
          coalesce((x->>'leaderSupportOnly')::boolean, false),
          coalesce((x->>'defaultHeadcount')::int, 1),
-         (x->>'defaultShiftHours')::numeric
+         (x->>'defaultShiftHours')::numeric,
+         coalesce((select array_agg(k #>> '{}')
+                   from jsonb_array_elements(case when jsonb_typeof(x->'requiredSkills') = 'array'
+                                                  then x->'requiredSkills' else '[]'::jsonb end) as rs(k)),
+                  '{}'::text[])
   from jsonb_array_elements(coalesce(p_plan->'poles', '[]'::jsonb)) with ordinality as t(x, ord);
 
   update pole child set parent_id = parent.id
@@ -1850,13 +1875,17 @@ begin
   join pole p on p.event_id = p_event_id and p.key = x->>'poleKey';
 
   insert into organiser (event_id, key, first_name, last_name, email, phone, access_code,
-                         diet, allergies, note, montage_from, demontage_until, sort_order)
+                         diet, allergies, note, montage_from, demontage_until, skills, sort_order)
   select p_event_id, x->>'key',
          coalesce(x->>'firstName', ''), coalesce(x->>'lastName', ''),
          coalesce(x->>'email', ''), coalesce(x->>'phone', ''),
          coalesce(x->>'accessCode', ''),
          coalesce(x->>'diet', ''), coalesce(x->>'allergies', ''), coalesce(x->>'note', ''),
          (x->>'montageFrom')::numeric, (x->>'demontageUntil')::numeric,
+         coalesce((select array_agg(k #>> '{}')
+                   from jsonb_array_elements(case when jsonb_typeof(x->'skills') = 'array'
+                                                  then x->'skills' else '[]'::jsonb end) as os(k)),
+                  '{}'::text[]),
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'organisers', '[]'::jsonb)) with ordinality as t(x, ord);
 
@@ -1872,6 +1901,7 @@ begin
   insert into volunteer (event_id, key, first_name, last_name, nickname, display_name,
                          email, phone, access_code, diet, allergies,
                          requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
+                         skills, skills_note,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
@@ -1897,6 +1927,11 @@ begin
                         as av(slot)),
                   '{}'::text[]),
          case when jsonb_typeof(x->'unavailable') = 'array' then x->'unavailable' else '[]'::jsonb end,
+         coalesce((select array_agg(k #>> '{}')
+                   from jsonb_array_elements(case when jsonb_typeof(x->'skills') = 'array'
+                                                  then x->'skills' else '[]'::jsonb end) as vs(k)),
+                  '{}'::text[]),
+         coalesce(x->>'skillsNote', ''),
          coalesce((select array_agg(raw #>> '{}')
                    from jsonb_array_elements(coalesce(x->'buddyRawNames', '[]'::jsonb))
                         as bn(raw)),
@@ -2088,8 +2123,12 @@ begin
   from (values ('montage'), ('demontage')) as k(phase_key)
   cross join lateral (select coalesce(p_plan->k.phase_key, '{}'::jsonb) as x) j;
 
-  insert into phase_pole (phase_id, key, name, colour, sort_order)
-  select ph.id, x->>'key', coalesce(x->>'name', ''), x->>'colour', (ord - 1)::int
+  insert into phase_pole (phase_id, key, name, colour, sort_order, required_skills)
+  select ph.id, x->>'key', coalesce(x->>'name', ''), x->>'colour', (ord - 1)::int,
+         coalesce((select array_agg(k #>> '{}')
+                   from jsonb_array_elements(case when jsonb_typeof(x->'requiredSkills') = 'array'
+                                                  then x->'requiredSkills' else '[]'::jsonb end) as rs(k)),
+                  '{}'::text[])
   from phase ph
   cross join lateral jsonb_array_elements(
     coalesce(p_plan->ph.phase_key->'poles', '[]'::jsonb)) with ordinality as t(x, ord)

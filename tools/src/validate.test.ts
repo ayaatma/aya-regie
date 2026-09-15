@@ -116,6 +116,7 @@ function makePlan(parts: {
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
+    skills: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,
@@ -1053,4 +1054,24 @@ test('an hour somebody is not there, arrival or departure, is outside their avai
   const plan = makePlan({ shifts: [shift('s1', 'bar-service', 2, 6)], volunteers: [v1], assignments: [assign('v1', 's1')] });
   ok(has(validate(plan), TIER1.horsDisponibilite));
   ok(blockersFor(new PlanIndex({ ...plan, assignments: [] }), v1, shift('s2', 'bar-service', 4, 8)).length === 0);
+});
+
+test('a pole needing a competence: a weighted signalement by default, a block when the event says so', () => {
+  const poles = [pole('engins', { requiredSkills: ['caces'] }), pole('engins-nacelle', { parentKey: 'engins', path: 'engins / nacelle' })];
+  const s1 = shift('s1', 'engins-nacelle', 0, 2);
+  const without = volunteer('v1');
+  const holder = volunteer('v2', { skills: ['caces'] });
+  const base = { poles, shifts: [s1], volunteers: [without, holder] };
+  const plan = { ...makePlan({ ...base, assignments: [assign('v1', 's1')] }), skills: [{ key: 'caces', label: 'CACES' }] };
+
+  const weighted = validate(plan).issues.filter((i) => i.code === TIER1.competenceManquante);
+  strictEqual(weighted.length, 1, 'le sous-pôle hérite de la compétence demandée');
+  strictEqual(weighted[0]!.tier, 2);
+  ok(weighted[0]!.message.includes('CACES'));
+
+  const blocking = { ...plan, constraints: { ...plan.constraints, criteria: { missingSkill: { mode: 'block' as const } } } };
+  strictEqual(validate(blocking).issues.find((i) => i.code === TIER1.competenceManquante)!.tier, 1);
+  const empty = { ...blocking, assignments: [] };
+  ok(blockersFor(new PlanIndex(empty), without, s1).some((b) => b.code === TIER1.competenceManquante));
+  deepStrictEqual(blockersFor(new PlanIndex(empty), holder, s1), []);
 });

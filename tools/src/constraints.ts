@@ -45,6 +45,7 @@ export type CriterionId =
   | 'refusedPole'
   | 'preference'
   | 'avoidedSlot'
+  | 'missingSkill'
   | 'preferenceOverflow'
   | 'artist'
   | 'volumeOver'
@@ -192,6 +193,19 @@ export const CRITERIA: readonly CriterionDefinition[] = [
     modes: WO,
     defaultMode: 'weight',
     defaultWeight: 1000,
+    unit: 'par heure',
+  },
+  {
+    // 2026-09-15. Above `staffing` (3000) by default: a créneau left short is preferred to one held
+    // by somebody without the permis it asks for. Blocking is one click away for an event where a
+    // CACES is a legal matter rather than a preference.
+    id: 'missingSkill',
+    group: 'poles',
+    label: 'Sur un pôle qui demande une compétence que la personne n’a pas',
+    hint: 'Les compétences se déclarent dans Réglages, se cochent sur la fiche et sont demandées par un pôle.',
+    modes: BWO,
+    defaultMode: 'weight',
+    defaultWeight: 4000,
     unit: 'par heure',
   },
   {
