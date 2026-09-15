@@ -12,3 +12,5 @@ phase-preview.html
 
 # Local snapshot of the database's migration state, rewritten by every npm run migrate.
 db/.migration-state.json
+
+.claude/settings.local.json
