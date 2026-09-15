@@ -17,6 +17,7 @@ import { loadScenario, greedyFill } from './plan-fixtures.js';
 import {
   applyReconciliation,
   existingCodes,
+  keptByDefault,
   mergeWithManual,
   reconcileVolunteers,
   summariseReconciliation,
@@ -430,4 +431,39 @@ test('a binôme added by hand survives the next export, and one removed by hand 
   const after = applyReconciliation(edited, again, reconcileVolunteers(edited, again));
   ok(!after.buddies.some((b) => b.fromKey === alice.key && b.toKey === bruno.key), 'le binôme retiré reste retiré');
   ok(after.buddies.some((b) => b.fromKey === chloe.key && b.toKey === alice.key), 'le binôme ajouté reste');
+});
+
+// ---------------------------------------------------------------------------
+// Bénévole ↔ orga, 2026-09-15
+// ---------------------------------------------------------------------------
+
+test('a row naming somebody the plan holds as an orga is listed, never added as a second person', () => {
+  const plan = planWith(BASE.slice(1));
+  const withOrga: Plan = {
+    ...plan,
+    organisers: [
+      ...plan.organisers,
+      { key: 'resp-alice', firstName: 'Alice', lastName: 'Martin', email: 'ALICE@example.org', phone: '', accessCode: '', diet: '', allergies: '', note: '', montageFrom: null, demontageUntil: null, montagePoleKeys: [], demontagePoleKeys: [] },
+    ],
+  };
+  const imported = importOf(BASE, withOrga);
+  const r = reconcileVolunteers(withOrga, imported);
+  strictEqual(r.added.length, 0);
+  deepStrictEqual(r.alreadyOrga.map((v) => v.firstName), ['Alice']);
+  ok(summariseReconciliation(r).includes('1 déjà orga, non ajouté'));
+  const next = applyReconciliation(withOrga, imported, r);
+  ok(!next.volunteers.some((v) => v.firstName === 'Alice'), 'still one fiche for Alice: the orga');
+  strictEqual(next.volunteers.length, 2);
+});
+
+test('an absent bénévole entered by hand is kept by default, an absent one from the form is not', () => {
+  const plan = planWith(BASE);
+  const byHand: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) => (v.firstName === 'Bruno' ? { ...v, enteredByHand: true } : v)),
+  };
+  const r = reconcileVolunteers(byHand, importOf([BASE[0]!]));
+  strictEqual(r.removed.length, 2);
+  const kept = keptByDefault(r);
+  deepStrictEqual([...kept].map((key) => byHand.volunteers.find((v) => v.key === key)!.firstName), ['Bruno']);
 });

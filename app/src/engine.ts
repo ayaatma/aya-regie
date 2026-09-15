@@ -162,10 +162,15 @@ export {
   FIELD_LABEL,
   applyReconciliation,
   existingCodes,
+  keptByDefault,
   mergeWithManual,
   reconcileVolunteers,
   summariseReconciliation,
 } from '@engine/reconcile.ts';
+
+/** Bénévole ↔ orga, as one pure function with its consequences listed. See `@engine/convert.ts`. */
+export { convertPerson } from '@engine/convert.ts';
+export type { Conversion } from '@engine/convert.ts';
 export type {
   FieldChange,
   Reconciliation,

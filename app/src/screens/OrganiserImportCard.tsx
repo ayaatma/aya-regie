@@ -38,6 +38,8 @@ export function OrganiserImportCard() {
       setRead({
         result: importOrganisers(csv, {
           existing: plan.organisers,
+          // So somebody turned into a bénévole on the Personnes tab is not created again as an orga.
+          volunteers: plan.volunteers,
           // The phases, so that « à partir du 10/03 8h » becomes an arrival rather than a note.
           phases: { montage: plan.montage, demontage: plan.demontage },
         }),

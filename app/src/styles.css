@@ -4759,3 +4759,30 @@ textarea.select,
 .panel.is-person .issue {
   margin: 6px 0;
 }
+
+/* Bénévole ↔ orga: the proposal, read before it is confirmed. */
+.convert-box {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+}
+
+.convert-heading {
+  font-weight: 650;
+  margin: 8px 0 2px;
+}
+
+.convert-heading.is-warn {
+  color: var(--orange-fonce);
+}
+
+.convert-list {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.convert-list li + li {
+  margin-top: 3px;
+}

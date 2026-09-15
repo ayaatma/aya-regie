@@ -106,8 +106,11 @@ import {
  *    `Plan.volume` says whether a volume is per day and where a day begins, and
  *    `Plan.formMapping` remembers the import's columns and answers. A build that predates this
  *    writes every volunteer back with no choice at all.
+ * 14: 2026-09-15, `Volunteer.enteredByHand`: a bénévole the régisseur made out of an orga on the
+ *    Personnes tab. A build that predates this writes them back as if they came from the form,
+ *    and the next import ticks them for removal like somebody who withdrew.
  */
-export const PLAN_FORMAT = 13;
+export const PLAN_FORMAT = 14;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';

@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import {
   existingCodes,
   fmtHours,
+  keptByDefault,
   importVolunteers,
   surveyForm,
   reconcileVolunteers,
@@ -60,8 +61,11 @@ export function ImportScreen() {
    * the import it was made for (`onApply`), so abandoning an import abandons it too.
    */
   const [mapping, setMapping] = useState<FormMapping>(plan.formMapping);
-  /** Removals the régisseur has refused. Their answers and placements stay untouched. */
-  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * The absent people whose box the régisseur flipped from its default. The default is removal,
+   * except for somebody entered by hand (`keptByDefault`), who never had a row in the export to lose.
+   */
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
   /** Whose reading is being corrected, before any of it is applied. */
   const [correcting, setCorrecting] = useState<string | null>(null);
 
@@ -122,6 +126,16 @@ export function ImportScreen() {
     [plan, imported],
   );
 
+  /** Removals the régisseur has refused. Their answers and placements stay untouched. */
+  const kept = useMemo<ReadonlySet<string>>(() => {
+    const keep = reconciliation ? keptByDefault(reconciliation) : new Set<string>();
+    for (const key of flipped) {
+      if (keep.has(key)) keep.delete(key);
+      else keep.add(key);
+    }
+    return keep;
+  }, [reconciliation, flipped]);
+
   const importOptions = (withMapping: FormMapping): ImportOptions => ({
     poles: plan.poles,
     artists: plan.artists,
@@ -153,7 +167,7 @@ export function ImportScreen() {
     try {
       const result = importVolunteers(csv, importOptions(withMapping));
       setImported({ result, source, csv });
-      setKept(new Set());
+      setFlipped(new Set());
       setError(null);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -189,7 +203,7 @@ export function ImportScreen() {
       `import: ${summariseReconciliation(reconciliation)}`,
     );
     setImported(null);
-    setKept(new Set());
+    setFlipped(new Set());
   };
 
   /** True when the field holds exactly the link this plan already imported from. */
@@ -341,7 +355,7 @@ export function ImportScreen() {
                       className="btn"
                       onClick={() => {
                         setImported(null);
-                        setKept(new Set());
+                        setFlipped(new Set());
                       }}
                     >
                       Abandonner
@@ -378,11 +392,11 @@ export function ImportScreen() {
                         <input
                           type="checkbox"
                           checked={!keep}
-                          onChange={(event) => {
-                            const next = new Set(kept);
-                            if (event.target.checked) next.delete(entry.volunteer.key);
+                          onChange={() => {
+                            const next = new Set(flipped);
+                            if (next.has(entry.volunteer.key)) next.delete(entry.volunteer.key);
                             else next.add(entry.volunteer.key);
-                            setKept(next);
+                            setFlipped(next);
                           }}
                         />
                         <span className="import-removal-name">{entry.name}</span>
@@ -392,10 +406,42 @@ export function ImportScreen() {
                             : 'aucune affectation'}
                         </span>
                         {entry.onReserve && <span className="chip">en réserve</span>}
+                        {entry.volunteer.enteredByHand && (
+                          <span
+                            className="chip"
+                            title="Ajouté·e à la main, jamais inscrit·e par le formulaire: son absence de l'export n'est pas un désistement"
+                          >
+                            saisi·e à la main
+                          </span>
+                        )}
                         {keep && <span className="chip is-warn">conservé</span>}
                       </label>
                     );
                   })}
+                </section>
+              )}
+
+              {reconciliation.alreadyOrga.length > 0 && (
+                <section className="setup-group">
+                  <div className="setup-group-head">
+                    <span className="setup-group-title">
+                      Déjà orgas dans le planning ({reconciliation.alreadyOrga.length})
+                    </span>
+                    <span className="people-meta">Non ajoutés comme bénévoles</span>
+                  </div>
+                  <p className="panel-sub import-note">
+                    Ces lignes nomment une personne qui est orga dans le planning, souvent un·e
+                    bénévole passé·e orga depuis l'onglet Personnes. Une personne n'a qu'une fiche:
+                    pour la refaire bénévole, utiliser sa fiche.
+                  </p>
+                  {reconciliation.alreadyOrga.map((volunteer) => (
+                    <div key={volunteer.key} className="import-removal">
+                      <span className="import-removal-name">
+                        {`${volunteer.firstName} ${volunteer.lastName}`.trim()}
+                      </span>
+                      {volunteer.email !== '' && <span className="chip">{volunteer.email}</span>}
+                    </div>
+                  ))}
                 </section>
               )}
 

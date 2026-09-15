@@ -476,6 +476,10 @@ create table volunteer (
   -- it has hours to offer. Zero hours is the point, since it is what makes "we did not need you
   -- in the end" a sentence someone can actually say. Never an error, unlike an unexplained 0h.
   on_reserve      boolean not null default false,
+  -- Written by the regisseur rather than read from the form, since 2026-09-15: an orga turned into
+  -- a benevole on the Personnes tab. The import screen keeps such a person by default when the
+  -- export has no row for them, since they never had one to lose.
+  entered_by_hand boolean not null default false,
   sort_order      int not null default 0,
   unique (event_id, key),
   unique (event_id, access_code)
@@ -1002,7 +1006,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 13,
+values ('min_plan_format', 14,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1330,6 +1334,7 @@ as $fn$
              'manualFields',    to_jsonb(v.manual_fields),
              'needsReview',     v.needs_review,
              'reviewReasons',   to_jsonb(v.review_reasons),
+             'enteredByHand',   v.entered_by_hand,
              -- The two phase answers. The windows are the régisseur's reading of the sentence,
              -- ordered so the same database always produces the same JSON.
              'montage', jsonb_build_object(
@@ -1826,7 +1831,7 @@ begin
                          requested_hours, preferred_slot_key, availability_note,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
-                         on_reserve, sort_order)
+                         on_reserve, entered_by_hand, sort_order)
   select p_event_id, x->>'key', x->>'firstName', x->>'lastName',
          coalesce(x->>'nickname', ''),
          -- The short label, computed over the whole roster by the browser that is saving. The
@@ -1859,6 +1864,7 @@ begin
          coalesce((x#>>'{demontage,present}')::boolean, false),
          coalesce(x#>>'{demontage,note}', ''),
          held.k is not null,
+         coalesce((x->>'enteredByHand')::boolean, false),
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'volunteers', '[]'::jsonb))
        with ordinality as t(x, ord)

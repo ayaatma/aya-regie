@@ -5,8 +5,10 @@ metadata:
   type: project
 ---
 
-**State 2026-09-15: V1 BUILT, green, checked in headless Chrome (both schemes), committed. No
-schema, no PLAN_FORMAT change.** V2 (conversion bénévole ↔ orga) in progress, see below.
+**State 2026-09-15: V1 AND V2 BUILT, green (326 engine, 412 app tests, both typechecks, build,
+`sql-check` 791, `schema-check` 235), checked in headless Chrome, committed. V1 had no schema.
+V2: PLAN_FORMAT 14, MIGRATION 22 (`2026-09-15_entered_by_hand.sql`) WRITTEN AND NOT APPLIED; it
+must ship with its deploy (min_plan_format 14).**
 
 ## The brief
 
@@ -40,7 +42,24 @@ Rename it.
 
 ## V2: conversion bénévole ↔ orga
 
-See the section appended when built. Planned rules: a proposal listing every consequence, the
-régisseur confirms; placements carried over (exploit assignments ↔ `organiserShifts`, phase boxes
-rekeyed), meal and ticketing choices and artist links rekeyed; buddies, reserve, leader roles and
-the old access code dropped and listed; an import must not recreate the person in the old list.
+`tools/src/convert.ts`, `convertPerson(plan, kind, key)`: pure, returns `{toKind, newKey, carried,
+lost, blocked, plan}`. The fiche's « Statut » section (`StatusSection` in `PersonPanel`) shows the
+two lists, then applies `plan` as ONE edit (one Ctrl+Z) and moves the focus to the new key.
+
+- **Carried**: exploit places (assignment → `OrganiserShift`; back as a LOCKED manual assignment),
+  phase boxes, catering and ticketing choices, act member links, all rekeyed (`rekey`).
+- **Dropped and listed**: binômes and reserve (bénévole side), leader roles and the orga note
+  (orga side), the old access code both ways (orga gets '' and a code from Réglages; a new
+  bénévole gets a fresh 8-char code). A bénévole's form answers go into the orga's note as text.
+  The catering figures before/after are computed with `cateringReport` and listed when they differ
+  (an orga with a floor can drop to 0 meals as a bénévole with no hours).
+- **Keys**: orga `resp-<slug>`; bénévole = `volunteerIdentity` (with `#n`), so a later form row
+  matches them. **Blocked** when the other list already holds the same identity.
+- **New bénévole**: `needsReview` with a reason (volume is a placeholder: smallest option covering
+  the hours held), and `enteredByHand: true`.
+- **Imports**: `reconcileVolunteers` puts a new row whose identity is an orga in `alreadyOrga` (not
+  added, listed on the import screen, counted in the summary); `keptByDefault` makes absent
+  `enteredByHand` people ticked to KEEP (ImportScreen stores `flipped`, not `kept`);
+  `importOrganisers({volunteers})` skips a row naming a bénévole with warning `deja-benevole`.
+- Migration 22 was generated from `db/schema.sql`'s two functions after checking they were
+  byte-identical to migration 21's (scratch script, not kept).

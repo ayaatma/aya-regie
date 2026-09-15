@@ -2350,6 +2350,11 @@ test('clicking a person opens a fiche beside the list, whatever kind of person i
   const guest = peopleOf(current, { kind: 'invite', key: 'nk-m1-g1' });
   assert.ok(guest.includes('name="fiche-guest-first-nk-m1-g1"') && guest.includes('value="Noa"'));
 
+  // The change of status is offered on the two kinds that have one, and on nobody else.
+  assert.ok(shows(benevole, 'Passer en orga…'));
+  assert.ok(shows(orgaHtml, 'Passer en bénévole…'));
+  assert.ok(!shows(extra, 'Passer en') && !shows(member, 'Passer en'));
+
   const gone = peopleOf(current, { kind: 'benevole', key: 'personne' });
   assert.ok(shows(gone, "Cette personne n'est plus dans le plan."));
 });

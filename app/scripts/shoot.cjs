@@ -221,6 +221,16 @@ async function main() {
         await page.evaluate(() => document.querySelector('tr[data-person^="orga|"] td:nth-child(2)')?.click());
         await sleep(400);
         await tall('88-personnes-fiche-orga');
+        // Bénévole ↔ orga: the proposal, then the fiche it lands on, then back with Ctrl+Z.
+        await clickButton(/^Passer en bénévole…$/);
+        await page.evaluate(() => document.querySelector('.convert-box')?.scrollIntoView());
+        await sleep(300);
+        await shot('93-personnes-passage-proposition');
+        await clickButton(/^Confirmer le passage en bénévole$/);
+        await sleep(500);
+        await shot('94-personnes-passage-fait');
+        await clickButton(/^↶$/);
+        await sleep(500);
         await page.select('select[aria-label="Colonnes affichées"]', 'contact');
         await sleep(300);
         await shot('89-personnes-contact');

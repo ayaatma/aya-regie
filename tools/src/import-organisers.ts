@@ -18,7 +18,7 @@
  * and flagged, because the régisseur's process is to phone the person.
  */
 
-import type { Organiser } from './model.js';
+import type { Organiser, Volunteer } from './model.js';
 import { parsePhaseMoment, type Phase } from './phase.js';
 import {
   ORGANISER_CODE_LENGTH,
@@ -142,6 +142,12 @@ export interface OrganiserImportOptions {
    * touched here: this module knows nothing about poles.
    */
   existing?: readonly Organiser[];
+  /**
+   * The bénévoles the plan holds, since 2026-09-15. A row naming one of them is not created as an
+   * orga: one person is one row of the tool, and the usual way here is an orga the régisseur
+   * turned into a bénévole on the Personnes tab. Reported as a warning, never dropped in silence.
+   */
+  volunteers?: readonly Volunteer[];
 }
 
 export interface OrganiserImportResult {
@@ -215,6 +221,10 @@ export function importOrganisers(
   // drawn a moment ago in this same file.
   const takenCodes = new Set(existing.map((l) => l.accessCode).filter((c) => c !== ''));
   const takenKeys = new Set(existing.map((l) => l.key));
+
+  const volunteerIdentities = new Set(
+    (options.volunteers ?? []).map((v) => organiserIdentity(v.firstName, v.lastName, v.email)),
+  );
 
   const result = new Map<string, Organiser>(byIdentity);
   const seenInFile = new Set<string>();
@@ -314,6 +324,17 @@ export function importOrganisers(
     }
 
     const before = result.get(identity);
+    if (!before && volunteerIdentities.has(identity)) {
+      issues.push({
+        severity: 'warning',
+        code: 'deja-benevole',
+        row: rowNumber,
+        person,
+        message:
+          "Cette personne est bénévole dans le planning: elle n'est pas ajoutée aux orgas. Pour en faire un orga, utiliser sa fiche dans l'onglet Personnes.",
+      });
+      return;
+    }
     if (before) {
       // The key and the code are the two things a re-import must never change: one is what the
       // roles point at, the other is what has already been sent to somebody.

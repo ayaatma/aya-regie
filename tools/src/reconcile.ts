@@ -24,6 +24,7 @@
 import { fmtHours, type Plan } from './plan.js';
 import type { EditableField, Volunteer } from './model.js';
 import type { ImportIssue, ImportResult } from './import.js';
+import { organiserIdentity } from './import-organisers.js';
 
 /** One answer that differs between the plan and the new export. */
 export interface FieldChange {
@@ -52,6 +53,13 @@ export interface VolunteerRemoval {
 
 export interface Reconciliation {
   added: Volunteer[];
+  /**
+   * Rows of the export naming somebody the plan holds as an ORGA, since 2026-09-15. Not added:
+   * one person is one row of the tool, and the usual way here is a bénévole the régisseur turned
+   * into an orga on the Personnes tab while their form answer stays in the sheet. Listed, so the
+   * import says what it left out, never dropped in silence.
+   */
+  alreadyOrga: Volunteer[];
   updated: VolunteerUpdate[];
   removed: VolunteerRemoval[];
   /** People present in both, with every answer identical. */
@@ -146,6 +154,8 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
     // something the régisseur has to know before accepting the import.
     manualFields: null,
     reviewReasons: null,
+    // Bookkeeping too, and it only ever goes from true to false: the person filled the form in.
+    enteredByHand: null,
     needsReview: {
       label: 'Relecture',
       show: (v) => (v ? 'à relire' : 'validée'),
@@ -327,14 +337,17 @@ export function reconcileVolunteers(plan: Plan, imported: ImportResult): Reconci
   const reserved = new Set(plan.reserve);
 
   const added: Volunteer[] = [];
+  const alreadyOrga: Volunteer[] = [];
   const updated: VolunteerUpdate[] = [];
   const removed: VolunteerRemoval[] = [];
   let unchanged = 0;
+  const orgas = new Set(plan.organisers.map((o) => organiserIdentity(o.firstName, o.lastName, o.email)));
 
   for (const [key, fresh] of incoming) {
     const before = current.get(key);
     if (!before) {
-      added.push(fresh);
+      if (orgas.has(organiserIdentity(fresh.firstName, fresh.lastName, fresh.email))) alreadyOrga.push(fresh);
+      else added.push(fresh);
       continue;
     }
     // Diffed against what accepting the import would really produce, corrections included.
@@ -361,7 +374,19 @@ export function reconcileVolunteers(plan: Plan, imported: ImportResult): Reconci
   // Heaviest losses first: the ones the régisseur most needs to think about.
   removed.sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'fr'));
 
-  return { added, updated, removed, unchanged, issues: imported.issues };
+  alreadyOrga.sort((a, b) => name(a).localeCompare(name(b), 'fr'));
+
+  return { added, alreadyOrga, updated, removed, unchanged, issues: imported.issues };
+}
+
+/**
+ * The absent people the import keeps unless told otherwise: those entered by hand, who never had
+ * a row in the export to lose. Everybody else absent is ticked for removal, as before.
+ */
+export function keptByDefault(reconciliation: Reconciliation): Set<string> {
+  return new Set(
+    reconciliation.removed.filter((r) => r.volunteer.enteredByHand === true).map((r) => r.volunteer.key),
+  );
 }
 
 export interface ApplyOptions {
@@ -398,8 +423,10 @@ export function applyReconciliation(
 
   const byKey = new Map(plan.volunteers.map((v) => [v.key, v]));
   const volunteers: Volunteer[] = [];
+  const orgaKeys = new Set(reconciliation.alreadyOrga.map((v) => v.key));
 
   for (const volunteer of imported.volunteers) {
+    if (orgaKeys.has(volunteer.key) && !byKey.has(volunteer.key)) continue;
     const before = byKey.get(volunteer.key);
     // The access code, and every field the régisseur corrected by hand. Both are things a
     // re-import must never undo; `mergeWithManual` is the single place that says so.
@@ -458,6 +485,9 @@ export function summariseReconciliation(r: Reconciliation): string {
       `${r.removed.length} absent${r.removed.length > 1 ? 's' : ''} de l'export` +
         (hours > 0 ? ` (${fmtHours(hours)} affectées)` : ''),
     );
+  }
+  if (r.alreadyOrga.length > 0) {
+    parts.push(`${r.alreadyOrga.length} déjà orga${r.alreadyOrga.length > 1 ? 's' : ''}, non ajouté${r.alreadyOrga.length > 1 ? 's' : ''}`);
   }
   if (parts.length === 0) return 'Rien à changer: le planning correspond déjà à cet export.';
   return parts.join(', ');

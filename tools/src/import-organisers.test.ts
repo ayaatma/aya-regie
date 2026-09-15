@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { Organiser } from './model.js';
+import type { Organiser, Volunteer } from './model.js';
 import { ORGANISER_CODE_LENGTH, VOLUNTEER_CODE_LENGTH } from './import.js';
 import { bindOrganiserColumns, importOrganisers, organiserIdentity } from './import-organisers.js';
 
@@ -246,4 +246,12 @@ test('identity agrees with the rule the rest of the tool uses', () => {
     organiserIdentity('Camille', 'Dubois', ' camille@x.fr '),
     organiserIdentity('camille', 'DUBOIS', 'camille@x.fr'),
   );
+});
+
+test('a row naming a bénévole of the plan is not created as an orga, and says why', () => {
+  const volunteer = { firstName: 'Camille', lastName: 'Dubois', email: 'camille@example.org' } as Volunteer;
+  const result = importOrganisers(csv([ROW.camille, ROW.dominique]), { volunteers: [volunteer] });
+  assert.equal(result.created, 1);
+  assert.deepEqual(result.organisers.map((o) => o.firstName), ['Dominique']);
+  assert.ok(result.issues.some((i) => i.code === 'deja-benevole' && i.person === 'Camille Dubois'));
 });

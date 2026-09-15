@@ -861,6 +861,17 @@ export interface Volunteer {
    */
   montage: PhasePresence;
   demontage: PhasePresence;
+  /**
+   * Written by the régisseur rather than read from the form, since 2026-09-15: an orga turned
+   * into a bénévole on the Personnes tab. See `convert.ts`.
+   *
+   * WHAT IT PROTECTS. The form's export has no row for this person, so the next import would list
+   * them among the « Absents de l'export », ticked for removal like somebody who withdrew. A person
+   * who never filled the form in has not withdrawn from it: the import screen offers them ticked
+   * to keep instead, and still lets the régisseur untick. Optional because every fixture and every
+   * import predates it; absent means false.
+   */
+  enteredByHand?: boolean;
 }
 
 /**

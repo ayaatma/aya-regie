@@ -590,6 +590,8 @@ const volunteer = (value: unknown): Volunteer => {
     // about, which is the same doctrine as the organiser's arrival above.
     montage: loose.montage === undefined ? absentFromPhase() : presence(loose.montage),
     demontage: loose.demontage === undefined ? absentFromPhase() : presence(loose.demontage),
+    // Absent from anything written before 2026-09-15, when nobody was entered by hand.
+    enteredByHand: loose.enteredByHand === true,
   };
 };
 

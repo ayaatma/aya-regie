@@ -289,7 +289,9 @@ export function PeopleScreen({
         </div>
       </div>
 
-      {focus && <PersonPanel person={focus} report={report} onClose={() => onFocus(null)} />}
+      {focus && (
+        <PersonPanel person={focus} report={report} onClose={() => onFocus(null)} onFocus={onFocus} />
+      )}
     </div>
   );
 }

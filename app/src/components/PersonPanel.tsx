@@ -14,9 +14,13 @@
  * extra person.
  */
 
+import { useState } from 'react';
+
 import {
   PERSON_STATUS_LABEL,
   artistGuests,
+  convertPerson,
+  type PersonKind,
   type ArtistMember,
   type ExtraPerson,
   type TicketingReport,
@@ -43,10 +47,13 @@ export function PersonPanel({
   person,
   report,
   onClose,
+  onFocus,
 }: {
   person: PersonRef;
   report: TicketingReport;
   onClose(): void;
+  /** Follows the person to their new key after a change of status. */
+  onFocus(person: PersonRef): void;
 }) {
   const row = report.rows.find((r) => r.kind === person.kind && r.key === person.key);
 
@@ -63,7 +70,7 @@ export function PersonPanel({
 
       <div className="panel-body">
         {row ? (
-          <PersonBody row={row} report={report} onClose={onClose} />
+          <PersonBody key={`${row.kind}|${row.key}`} row={row} report={report} onClose={onClose} onFocus={onFocus} />
         ) : (
           <p className="pool-empty">Cette personne n'est plus dans le plan.</p>
         )}
@@ -76,10 +83,12 @@ function PersonBody({
   row,
   report,
   onClose,
+  onFocus,
 }: {
   row: TicketingRow;
   report: TicketingReport;
   onClose(): void;
+  onFocus(person: PersonRef): void;
 }) {
   const who = personLabel(row);
   const mark = row.kind === 'orga' || row.kind === 'benevole' || row.kind === 'artiste' ? row.kind : null;
@@ -101,7 +110,95 @@ function PersonBody({
       {(row.kind === 'benevole' || row.kind === 'orga') && <ActsOf row={row} />}
 
       <DoorSection row={row} report={report} who={who} />
+
+      {(row.kind === 'benevole' || row.kind === 'orga') && (
+        <StatusSection kind={row.kind} personKey={row.key} who={who} onFocus={onFocus} />
+      )}
     </>
+  );
+}
+
+/**
+ * Bénévole ↔ orga, as a proposal the régisseur reads before it happens.
+ *
+ * TWO CLICKS, AND THE SECOND ONE IS INFORMED. The first computes the conversion and shows what
+ * follows the person and what does not; nothing has changed yet. The second applies it as one edit,
+ * so one Ctrl+Z puts everything back. The lists are `convertPerson`'s own, so what is shown is what
+ * is applied. See `@engine/convert.ts`.
+ */
+function StatusSection({
+  kind,
+  personKey,
+  who,
+  onFocus,
+}: {
+  kind: PersonKind;
+  personKey: string;
+  who: string;
+  onFocus(person: PersonRef): void;
+}) {
+  const { plan, edit } = useLoadedPlan();
+  const [open, setOpen] = useState(false);
+  const target = kind === 'benevole' ? 'orga' : 'bénévole';
+
+  if (!open) {
+    return (
+      <div className="panel-section panel-divider">
+        <p className="panel-section-title">Statut</p>
+        <p className="people-meta">
+          {kind === 'benevole'
+            ? "Bénévole: placé·e sous les règles d'heures, par le solveur ou à la main."
+            : "Orga: aucune règle d'heures, jamais placé·e par le solveur."}
+        </p>
+        <button className="btn" onClick={() => setOpen(true)}>
+          Passer en {target}…
+        </button>
+      </div>
+    );
+  }
+
+  const preview = convertPerson(plan, kind, personKey);
+
+  return (
+    <div className="panel-section panel-divider convert-box" role="group" aria-label={`Passer ${who} en ${target}`}>
+      <p className="panel-section-title">Passer en {target}</p>
+      {preview.blocked !== null ? (
+        <p className="issue">{preview.blocked}</p>
+      ) : (
+        <>
+          <p className="panel-sub">Rien n'est encore modifié. Voici ce que le changement ferait.</p>
+          <p className="convert-heading">Suit la personne</p>
+          <ul className="convert-list">
+            {preview.carried.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="convert-heading is-warn">Change ou se perd</p>
+          <ul className="convert-list is-warn">
+            {preview.lost.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <div className="fiche-actions">
+        {preview.blocked === null && (
+          <button
+            className="btn is-primary"
+            onClick={() => {
+              edit((p) => convertPerson(p, kind, personKey).plan, `${who} passé·e en ${target}`);
+              setOpen(false);
+              onFocus({ kind: preview.toKind, key: preview.newKey });
+            }}
+          >
+            Confirmer le passage en {target}
+          </button>
+        )}
+        <button className="btn" onClick={() => setOpen(false)}>
+          Annuler
+        </button>
+      </div>
+    </div>
   );
 }
 
