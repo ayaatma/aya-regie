@@ -60,6 +60,7 @@ where its `feature_*.md` is.
   Orga import (`import-organisers.ts`) not touched.
 
 ### 3. Skill tags
+- **BUILT 2026-09-15, see [[feature-skills]].**
 - Tags on a person (permis, CACES, conduite d'engins, métier, bricolage...), and a pole or a
   créneau that requires one, on the exploit AND the two phases, and for montage-only events.
   Signalled, never refused (the régisseur decides), in the spirit of [[feature-advanced-settings]].
