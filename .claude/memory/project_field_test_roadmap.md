@@ -72,6 +72,7 @@ where its `feature_*.md` is.
   person is préféré / neutre / à éviter, scored. See [[feature-preference-refactor]].
 
 ### 5. Field data, visible to the régie and pole leaders only
+- **BUILT 2026-09-15, see [[feature-field-data]].**
 - Emergency contact, health / specific needs (special-category data under GDPR), minor or not
   (store the flag, not the birth date), whether the nickname matters to them. Not readable
   through a volunteer code. See [[feature-leader-access]] for the leader read path.
