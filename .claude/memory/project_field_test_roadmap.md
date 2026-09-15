@@ -65,6 +65,7 @@ where its `feature_*.md` is.
   Signalled, never refused (the régisseur decides), in the spirit of [[feature-advanced-settings]].
 
 ### 4. "Préférer éviter" a slot
+- **BUILT 2026-09-15, see [[feature-avoided-slots]].**
 - The night question has three answers: yes, "yes but I'd rather not", no. The engine knows
   refused slots and one preferred slot, not an avoided one. Generic: per preference slot a
   person is préféré / neutre / à éviter, scored. See [[feature-preference-refactor]].

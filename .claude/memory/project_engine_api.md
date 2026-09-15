@@ -116,7 +116,7 @@ Tier 1, illegal, always red: `chevauchement`, `pole-refuse`, `tranche-refusee`,
 
 Tier 2, a real problem, reported not blocked: `sans-affectation`, `plancher-non-atteint`,
 `creneau-vide`, `creneau-incomplet`, `que-des-debutants`, `experience-insuffisante`,
-`artiste-manque`, `creneau-trop-long`, `reserve-injustifiee`, `reserve-affectee`.
+`artiste-manque`, `creneau-trop-long`, `reserve-injustifiee`, `reserve-affectee`, `tranche-evitee` (2026-09-15, see [[feature-avoided-slots]]).
 
 Import codes: `reponse-en-double` (2026-09-15), `colonne-manquante`, `identite-incomplete`, `reponse-illisible`,
 `volume-impossible`, `choix-contradictoire`, `pole-inconnu`, `artiste-inconnu`, `choix-identique`,
