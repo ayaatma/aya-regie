@@ -19,7 +19,7 @@ where its `feature_*.md` is.
 ## Decided, in the developer's words turned into specs
 
 ### 1. Application tracking and automatic sync (top priority)
-- **Tracking BUILT 2026-09-15, see [[feature-application-tracking]]; sync and confirmation form NOT built.**
+- **Tracking BUILT 2026-09-15, see [[feature-application-tracking]]. Private sheet reading BUILT (not deployed), see [[feature-private-sheet]]. Periodic sync and confirmation form NOT built.**
 - The organisers' "Statut" column stacks a decision (validé / annulé / liste d'attente) with a
   checklist of messages sent (confirmation, demande de reconfirmation, présence reconfirmée,
   infos importantes, relance photo). About one registration in five was cancelled.
@@ -32,7 +32,7 @@ where its `feature_*.md` is.
 - Statuses change by hand, or from **another form's import**: a second "je confirme ma venue"
   form, the first one being registration only. The form-mapping (`form-mapping.ts`) will need a
   notion of which form a sheet is (inscription / confirmation / orga).
-- OPEN, raised to the developer: today's import reads the sheet through `gviz` (see
+- SETTLED 2026-09-15 as a service account, see [[feature-private-sheet]]. Was: today's import reads the sheet through `gviz` (see
   `app/src/import/sheet.ts`), which only works when the sheet is readable by anyone with the
   link. With health and emergency-contact fields that exposure is not acceptable. Recommended
   instead: an Apps Script `onFormSubmit` trigger in the sheet pushing each row to a Supabase
