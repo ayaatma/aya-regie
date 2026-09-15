@@ -52,6 +52,11 @@ give it its own `feature_*.md` when work starts.
   and the form says an address must be personal. Existing keys are never rewritten.
 - The confirmation form should be reached through a pre-filled link carrying the person's
   code, which removes all matching ambiguity.
+- **BUILT 2026-09-15, no schema:** `supersededRows` + `parseSubmittedAt` in `tools/src/import.ts`.
+  Rows sharing a `mail:` identity collapse to the latest (timestamp when both readable, row order
+  otherwise); each replaced row raises warning `reponse-en-double`, whose message also flags
+  differing names. Name-only identities still get `#n` + `identite-ambigue` (real homonyms).
+  Orga import (`import-organisers.ts`) not touched.
 
 ### 3. Skill tags
 - Tags on a person (permis, CACES, conduite d'engins, métier, bricolage...), and a pole or a

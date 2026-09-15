@@ -49,6 +49,8 @@ interface Row {
   buddies?: string;
   /** The time constraint, in the volunteer’s own words. Column 25 since 2026-09-10. */
   note?: string;
+  /** The form's timestamp. Defaults to one fixed instant. */
+  at?: string;
 }
 
 const VOLUME_4 = 'Je préfère rester sur un seul créneau de 4 h. 😊';
@@ -67,7 +69,7 @@ const csvOf = (rows: readonly Row[]): string =>
     FORM_COLUMNS.map(quote).join(','),
     ...rows.map((r) => {
       const row = new Array<string>(FORM_COLUMNS.length).fill('');
-      row[0] = '2026-10-01 10:00';
+      row[0] = r.at ?? '2026-10-01 10:00';
       row[1] = r.email;
       row[2] = r.last;
       row[3] = r.first;
@@ -143,6 +145,35 @@ test('without an email the name is the identity, and a clash is reported not mer
   strictEqual(twins.volunteers.length, 2, 'les deux réponses sont importées');
   ok(twins.volunteers[0]!.key !== twins.volunteers[1]!.key, 'avec des clés distinctes');
   ok(twins.issues.some((i) => i.code === 'identite-ambigue'), 'et le problème est signalé');
+});
+
+test('two answers on one address are one person, and the later answer is kept', () => {
+  const twice = importOf([
+    { first: 'Alice', last: 'Martin', email: 'alice@example.org', volume: VOLUME_4 },
+    BASE[1]!,
+    { first: 'Alice', last: 'Martin', email: 'Alice@Example.org', volume: VOLUME_8 },
+  ]);
+  strictEqual(twice.volunteers.length, 2, 'une seule fiche pour Alice');
+  const alice = twice.volunteers.find((v) => v.firstName === 'Alice')!;
+  strictEqual(alice.key, 'mail:alice@example.org');
+  strictEqual(alice.requestedHours, 8, 'la réponse la plus récente fait foi');
+  const issue = twice.issues.find((i) => i.code === 'reponse-en-double');
+  ok(issue, 'la réponse remplacée est signalée');
+  strictEqual(issue!.row, 1);
+  ok(!issue!.message.includes('même nom'), 'pas de doute sur le nom quand il est le même');
+  ok(!twice.issues.some((i) => i.code === 'identite-ambigue'));
+});
+
+test('the timestamp decides which answer is the later one, not the row order', () => {
+  // A sheet sorted by hand: the first row is the newer answer.
+  const result = importOf([
+    { first: 'Alice', last: 'Martin', email: 'alice@example.org', volume: VOLUME_8, at: '02/10/2026 09:30:00' },
+    { first: 'Alix', last: 'Martin', email: 'alice@example.org', volume: VOLUME_4, at: '01/10/2026 18:00:00' },
+  ]);
+  strictEqual(result.volunteers.length, 1);
+  strictEqual(result.volunteers[0]!.firstName, 'Alice');
+  const issue = result.issues.find((i) => i.code === 'reponse-en-double')!;
+  ok(issue.message.includes('même nom'), 'des noms différents sont signalés pour vérification');
 });
 
 // ---------------------------------------------------------------------------

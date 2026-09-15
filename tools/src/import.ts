@@ -545,6 +545,85 @@ export function volunteerIdentity(firstName: string, lastName: string, email: st
   return `nom:${slug(firstName)}-${slug(lastName)}`;
 }
 
+/**
+ * "15/09/2026 17:11:42", the way a French Google Sheet writes its timestamp, or an ISO-ish
+ * "2026-10-01 10:00". Milliseconds, only ever compared with each other; null when unreadable.
+ */
+export function parseSubmittedAt(value: string): number | null {
+  const v = value.trim();
+  const fr = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(v);
+  if (fr) return Date.UTC(+fr[3]!, +fr[2]! - 1, +fr[1]!, +(fr[4] ?? 0), +(fr[5] ?? 0), +(fr[6] ?? 0));
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(v);
+  if (iso) return Date.UTC(+iso[1]!, +iso[2]! - 1, +iso[3]!, +(iso[4] ?? 0), +(iso[5] ?? 0), +(iso[6] ?? 0));
+  return null;
+}
+
+/**
+ * The rows a later answer from the same address replaces, by row index, each with its issue.
+ *
+ * ONE ADDRESS IS ONE PERSON, decided 2026-09-15: the form asks for a personal address, and the
+ * address is already the identity (a corrected name finds the same person across re-imports). So
+ * two rows on one address are one person answering twice, which the field-test export did nine
+ * times out of nine, and the latest answer is the person's answer. Before this they became `key`
+ * and `key#2`: the same human twice in the pool, placeable twice.
+ *
+ * "Latest" is the timestamp when both rows carry a readable one, the row order otherwise (a sheet
+ * appends answers). Names that differ are still merged, because a corrected spelling is the
+ * common case, but the issue says so: a couple sharing one address is the case the rule excludes
+ * and the régisseur is the one who can tell. Rows identified by name only are not merged here:
+ * two real homonyms without an address stay two people, see `volunteerIdentity`.
+ */
+export function supersededRows(
+  rows: readonly (readonly string[])[],
+  read: {
+    identity: (row: readonly string[]) => string;
+    name: (row: readonly string[]) => string;
+    submittedAt: (row: readonly string[]) => string;
+  },
+): Map<number, { keptRow: number; issue: ImportIssue }> {
+  const byIdentity = new Map<string, number[]>();
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]!;
+    const identity = read.identity(row);
+    if (!identity.startsWith('mail:')) continue;
+    byIdentity.set(identity, [...(byIdentity.get(identity) ?? []), i]);
+  }
+
+  const result = new Map<number, { keptRow: number; issue: ImportIssue }>();
+  for (const indices of byIdentity.values()) {
+    if (indices.length < 2) continue;
+    const later = (a: number, b: number): number => {
+      const ta = parseSubmittedAt(read.submittedAt(rows[a]!));
+      const tb = parseSubmittedAt(read.submittedAt(rows[b]!));
+      if (ta !== null && tb !== null && ta !== tb) return ta > tb ? a : b;
+      return a > b ? a : b;
+    };
+    const kept = indices.reduce(later);
+    const keptName = read.name(rows[kept]!);
+    for (const i of indices) {
+      if (i === kept) continue;
+      const name = read.name(rows[i]!);
+      const sameName = normalise(name) === normalise(keptName);
+      result.set(i, {
+        keptRow: kept,
+        issue: {
+          severity: 'warning',
+          code: 'reponse-en-double',
+          row: i,
+          person: name,
+          message:
+            `Réponse remplacée par une réponse plus récente de la même adresse e-mail (ligne ${kept}).` +
+            (sameName
+              ? ''
+              : ` Les deux réponses ne portent pas le même nom (« ${name} » et « ${keptName} »): ` +
+                "une adresse désigne une seule personne, vérifier qu'il ne s'agit pas de deux personnes."),
+        },
+      });
+    }
+  }
+  return result;
+}
+
 const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
 /**
@@ -767,7 +846,15 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   const rowOf = new Map<string, number>();
   const identities = new Set<string>();
 
+  const superseded = supersededRows(rows, {
+    identity: (row) => volunteerIdentity(cell(row, 'firstName'), cell(row, 'lastName'), cell(row, 'email')),
+    name: (row) => `${cell(row, 'firstName')} ${cell(row, 'lastName')}`.trim(),
+    submittedAt: (row) => cell(row, 'submittedAt'),
+  });
+  for (const entry of superseded.values()) issues.push(entry.issue);
+
   for (let i = 1; i < rows.length; i++) {
+    if (superseded.has(i)) continue;
     const row = rows[i]!;
     const rowNumber = i;
     const firstName = cell(row, 'firstName');
@@ -1009,8 +1096,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
         row: rowNumber,
         person,
         message:
-          'Deux réponses portent la même identité. Une adresse e-mail les distinguerait; sans ' +
-          'cela, un ré-import peut les intervertir.',
+          'Deux réponses sans adresse e-mail portent le même nom. Une adresse les distinguerait; ' +
+          'sans cela, un ré-import peut les intervertir.',
       });
     }
     identities.add(key);
