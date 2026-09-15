@@ -89,6 +89,7 @@ where its `feature_*.md` is.
   departure brackets, montage days ticked).
 
 ### 8. Side activities without a grid
+- **BUILT 2026-09-15, see [[feature-side-activities]].**
 - Pré-montage, prep weekends, déco weekends: no grid, handled differently; what matters is the
   **list of people keen on each activity**.
 
