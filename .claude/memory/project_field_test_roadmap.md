@@ -81,6 +81,7 @@ where its `feature_*.md` is.
 - The orga form and the volunteer form may be the same form, per event.
 
 ### 7. Availability day by day
+- **BUILT 2026-09-15, see [[feature-availability-by-day]].**
 - The tool stores availability per day even when a form offers coarser choices (arrival and
   departure brackets, montage days ticked).
 
