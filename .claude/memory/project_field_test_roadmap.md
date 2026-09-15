@@ -78,6 +78,7 @@ where its `feature_*.md` is.
   through a volunteer code. See [[feature-leader-access]] for the leader read path.
 
 ### 6. Pole imposed by a leader
+- **BUILT 2026-09-15, see [[feature-imposed-pole]].**
 - "Envoyé·e par un·e responsable sur un poste précis": a default placement made up front. The
   régisseur can still change everything; the solver keeps it by default.
 - The orga form and the volunteer form may be the same form, per event.

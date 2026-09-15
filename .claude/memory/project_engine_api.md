@@ -113,7 +113,8 @@ Tier 1, illegal, always red: `chevauchement`, `pole-refuse`, `tranche-refusee`,
 `pause-insuffisante`, `volume-depasse`, `sureffectif`, `reference-inconnue`, `doublon`,
 `deja-affecte` (this last one only ever comes back from `blockersFor`, never from `validate`),
 `candidature-annulee` (2026-09-15, always blocking, see [[feature-application-tracking]]),
-`competence-manquante` (2026-09-15, tier by the `missingSkill` mode, see [[feature-skills]]).
+`competence-manquante` (2026-09-15, tier by the `missingSkill` mode, see [[feature-skills]]),
+`hors-pole-impose` (2026-09-15, tier by the `imposedPole` mode, see [[feature-imposed-pole]]).
 
 Tier 2, a real problem, reported not blocked: `sans-affectation`, `plancher-non-atteint`,
 `creneau-vide`, `creneau-incomplet`, `que-des-debutants`, `experience-insuffisante`,
