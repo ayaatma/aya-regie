@@ -180,7 +180,8 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
    */
   { field: 'phaseHelp',   test: (h) => /montage/.test(h) && /demontage/.test(h), required: false },
   { field: 'demontage',   test: (h) => /demontage/.test(h), required: false },
-  { field: 'montage',     test: (h) => /montage/.test(h), required: false },
+  // Never « pré-montage »: a weekend before the event is a side activity, not the montage.
+  { field: 'montage',     test: (h) => /montage/.test(h) && !/pre montage/.test(h), required: false },
   /*
    * THE ALLERGY BEFORE THE DIET, and that order is the whole of the care needed here. It is the
    * same pair of matchers the orgas' form uses, for the same reason, written down in
@@ -445,6 +446,38 @@ export function parseSkills(text: string, tags: readonly { key: string; label: s
 export function parseSkillCheck(header: string, answer: string, tags: readonly { key: string; label: string }[]): string[] {
   if (!/^oui\b/.test(normalise(answer))) return [];
   return parseSkills(header, tags);
+}
+
+/**
+ * The columns that ask about each side activity: one no field of the correspondence took, whose
+ * header holds the activity's label (accents, case and hyphens aside) or every word of it of four
+ * letters or more. The first such column wins; an activity no header names reads nobody.
+ */
+export function sideActivityColumns(
+  headers: readonly string[],
+  binding: FormBinding,
+  activities: readonly { key: string; label: string }[],
+): Array<{ key: string; column: number }> {
+  const used = new Set<number>([
+    ...Object.values(binding.map).filter((i): i is number => typeof i === 'number'),
+    ...binding.choices.flatMap((c) => [c.pole, ...(c.level === null ? [] : [c.level])]),
+  ]);
+  const out: Array<{ key: string; column: number }> = [];
+  for (const activity of activities) {
+    const label = normalise(activity.label);
+    const words = label.split(' ').filter((w) => w.length >= 4);
+    if (label === '') continue;
+    const column = headers.findIndex((h, i) => {
+      if (used.has(i)) return false;
+      const header = normalise(h);
+      return header.includes(label) || (words.length > 0 && words.every((w) => header.includes(w)));
+    });
+    if (column >= 0) {
+      out.push({ key: activity.key, column });
+      used.add(column);
+    }
+  }
+  return out;
 }
 
 /**
@@ -838,6 +871,11 @@ export interface ImportOptions {
   /** The event's competences, which the free-text and yes / no answers are read against. */
   skills?: readonly { key: string; label: string }[];
   /**
+   * The event's side activities. A column no field took whose header names one (« ... pour le
+   * pré-montage aussi ? ») is read as a yes / no about it, as many columns as activities.
+   */
+  sideActivities?: readonly { key: string; label: string }[];
+  /**
    * The montage and the démontage, so the days a form ticks for them become windows. Without them
    * a phase answer is read as present or not, as before 2026-09-15.
    */
@@ -987,6 +1025,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   /** Which CSV line each volunteer came from. Only ever used to talk to the régisseur. */
   const rowOf = new Map<string, number>();
   const identities = new Set<string>();
+
+  const activityColumns = sideActivityColumns(rows[0]!, binding, options.sideActivities ?? []);
 
   const superseded = supersededRows(rows, {
     identity: (row) => volunteerIdentity(cell(row, 'firstName'), cell(row, 'lastName'), cell(row, 'email')),
@@ -1336,6 +1376,9 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
         ]),
       ],
       skillsNote: cell(row, 'skills'),
+      sideActivityKeys: activityColumns
+        .filter(({ column }) => yesNo((row[column] ?? '').trim()) === true)
+        .map(({ key }) => key),
       emergencyContact: cell(row, 'emergencyContact'),
       // The details when given; a bare « oui » is kept as such, so the fiche still says there is
       // something to ask about.

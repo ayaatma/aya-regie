@@ -74,6 +74,7 @@ function makePlan(parts: {
     skills: [],
     teamsEnabled: false,
     teams: [],
+    sideActivities: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,

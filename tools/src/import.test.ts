@@ -623,3 +623,21 @@ test('a birth date only ever becomes « minor », and a yes / no reads yes past 
   strictEqual(yesNo('Non'), false);
   strictEqual(yesNo('peut-être'), null);
 });
+
+test('a yes to a question naming a side activity puts the person on its list, one column per activity', async () => {
+  const { sideActivityColumns } = await import('./import.js');
+  const headers = [
+    'Nom',
+    'Est-ce que tu serais dispo pour venir nous aider sur le pré-montage aussi ?',
+    'Es-tu intéressé.e pour faire des week-end déco avant le festival ?',
+    'Es-tu intéressé.e pour faire des week-end préparation du site avant le festival ?',
+  ];
+  const binding = bindForm(headers);
+  const columns = sideActivityColumns(headers, binding, [
+    { key: 'pre', label: 'Pré-montage' },
+    { key: 'deco', label: 'Week-end déco' },
+    { key: 'site', label: 'Préparation du site' },
+    { key: 'absent', label: 'Rangement hivernal' },
+  ]);
+  deepStrictEqual(columns, [{ key: 'pre', column: 1 }, { key: 'deco', column: 2 }, { key: 'site', column: 3 }]);
+});

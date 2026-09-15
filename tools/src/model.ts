@@ -318,6 +318,17 @@ export const DEFAULT_CATERING: CateringSettings = {
 };
 
 /**
+ * Something around the event that has no grid, since 2026-09-15: a pré-montage the week before, a
+ * weekend preparing the site, a weekend of déco. What the régisseur needs is the list of people
+ * keen on it, not a schedule. `when` is free text (« 10 au 12 septembre »).
+ */
+export interface SideActivity {
+  key: string;
+  label: string;
+  when: string;
+}
+
+/**
  * A team kept together across the créneaux, since 2026-09-15: a festival places groups of four to
  * six bénévoles as one crew on a pole's roulement. `poleKey` is where the team usually works, for
  * the régisseur's reading only; nothing forces a member there.
@@ -492,6 +503,8 @@ export interface Organiser {
   emergencyContact?: string;
   /** What they cannot do or need, as typed. See `Volunteer.healthNote`. */
   healthNote?: string;
+  /** The side activities this orga is keen on, ticked by hand. Since 2026-09-15. */
+  sideActivityKeys?: string[];
 }
 
 /**
@@ -895,6 +908,11 @@ export interface Volunteer {
    */
   teamKey?: string | null;
   /**
+   * The `SideActivity` keys this person is keen on. An answer: a yes to a form question naming the
+   * activity, correctable on the fiche. Since 2026-09-15.
+   */
+  sideActivityKeys?: string[];
+  /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *
    * KEPT VERBATIM AND NEVER REWRITTEN. `refusedSlotIds` is a guess about this sentence, and a
@@ -1069,6 +1087,7 @@ export const EDITABLE_FIELDS = [
   'minor',
   'nicknameMatters',
   'imposedPoleKey',
+  'sideActivityKeys',
   'refusedPoleKeys',
   // The whole list, since 2026-09-14: correcting one choice is correcting the reading of the
   // answers, and a list edited entry by entry would let a re-import reorder half of it.

@@ -154,6 +154,8 @@ export function ImportScreen() {
     phases: { montage: plan.montage, demontage: plan.demontage },
     // The competences the free-text answer is read for.
     skills: plan.skills,
+    // The side activities, each read from a column whose header names it.
+    sideActivities: plan.sideActivities,
   });
 
   const survey = useMemo(

@@ -108,6 +108,7 @@ function makePlan(ticketing: Partial<TicketingSettings> = {}): Plan {
     skills: [],
     teamsEnabled: false,
     teams: [],
+    sideActivities: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
   };

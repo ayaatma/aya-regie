@@ -2528,3 +2528,18 @@ test('teams: the card shows who is in each, and the grid rings a selected béné
   assert.deepEqual([...teammatesOf(teamed, first)], [second]);
   assert.deepEqual([...teammatesOf({ ...teamed, teamsEnabled: false }, first)], [], 'mode coupé, rien à entourer');
 });
+
+test('a side activity lists who is keen on it, without anybody cancelled', async () => {
+  const { SideActivitiesCard } = await import('./SideActivitiesCard.tsx');
+  const [keen, gone] = [plan.volunteers[0]!, plan.volunteers[1]!];
+  const withActivity: Plan = {
+    ...plan,
+    sideActivities: [{ key: 'pre', label: 'Pré-montage', when: '10 au 12 septembre' }],
+    volunteers: plan.volunteers.map((v) =>
+      v.key === keen.key ? { ...v, sideActivityKeys: ['pre'] } : v.key === gone.key ? { ...v, sideActivityKeys: ['pre'], status: 'annule' as const } : v),
+  };
+  const html = render(<SideActivitiesCard />, withActivity);
+  assert.ok(shows(html, `${keen.firstName} ${keen.lastName}`));
+  assert.ok(!shows(html, `${gone.firstName} ${gone.lastName}`), 'une annulation sort de la liste');
+  assert.ok(shows(html, 'Pré-montage (1)'));
+});

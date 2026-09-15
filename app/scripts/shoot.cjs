@@ -328,6 +328,24 @@ async function main() {
           await sleep(300);
         }
         await shot('102-reglages-equipes');
+        // Side activities: declare one, tick it on a fiche, read the list back.
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-side-activities');
+          card?.querySelector('button')?.click();
+        });
+        await sleep(300);
+        await page.type('input[name="new-side-activity"]', 'Pré-montage');
+        await page.keyboard.press('Enter');
+        await sleep(300);
+        await tab('Personnes');
+        await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
+        await sleep(400);
+        await page.evaluate(() => document.querySelector('input[name^="fiche-activity-"]')?.click());
+        await sleep(300);
+        await tab('Réglages');
+        await page.evaluate(() => document.querySelector('.setup-side-activities')?.scrollIntoView());
+        await sleep(300);
+        await shot('103-reglages-activites');
       }
       if (want('catering')) {
         await tab('Catering');

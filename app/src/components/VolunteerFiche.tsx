@@ -439,6 +439,21 @@ function VolunteerDetail({
 
       <SkillsSection volunteer={volunteer} readOnly={readOnly} />
 
+      {index.plan.sideActivities.length > 0 && (
+        <div className="panel-section">
+          <p className="panel-section-title">Activités annexes</p>
+          <SkillPicker
+            skills={index.plan.sideActivities.map((a) => ({ key: a.key, label: a.when ? `${a.label} (${a.when})` : a.label }))}
+            value={volunteer.sideActivityKeys ?? []}
+            readOnly={readOnly}
+            name={`fiche-activity-${volunteer.key}`}
+            onChange={(sideActivityKeys, changed, on) =>
+              edit((p) => correctVolunteer(p, volunteer.key, { sideActivityKeys }), `${changed.label} ${on ? 'coché' : 'décoché'}: ${index.volunteerName(volunteer.key)}`)
+            }
+          />
+        </div>
+      )}
+
       <AvailabilityDays volunteer={volunteer} readOnly={readOnly} />
 
       <BuddiesSection volunteer={volunteer} buddies={detail.buddies} readOnly={readOnly} />

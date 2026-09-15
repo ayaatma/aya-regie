@@ -124,6 +124,7 @@ const organiser = (value: unknown): Organiser => {
     skills: keys(loose.skills),
     emergencyContact: text(loose.emergencyContact),
     healthNote: text(loose.healthNote),
+    sideActivityKeys: keys(loose.sideActivityKeys),
   };
 };
 
@@ -594,6 +595,7 @@ const volunteer = (value: unknown): Volunteer => {
     // Absent from anything written before 2026-09-15: nobody was sent anywhere.
     imposedPoleKey: typeof loose.imposedPoleKey === 'string' && loose.imposedPoleKey !== '' ? loose.imposedPoleKey : null,
     teamKey: typeof loose.teamKey === 'string' && loose.teamKey !== '' ? loose.teamKey : null,
+    sideActivityKeys: keys(loose.sideActivityKeys),
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],
@@ -981,6 +983,11 @@ export function normalisePlan(raw: unknown): Plan {
     // Absent from anything written before 2026-09-14: nothing decided, everything detected.
     formMapping: formMapping(loose.formMapping),
     applicationSteps: applicationSteps((loose as Record<string, unknown>).applicationSteps),
+    // Absent from anything written before 2026-09-15: no side activity.
+    sideActivities: array<Record<string, unknown>>((loose as Record<string, unknown>).sideActivities)
+      .filter((a) => a !== null && typeof a === 'object')
+      .map((a) => ({ key: text(a.key), label: text(a.label), when: text(a.when) }))
+      .filter((a) => a.key !== ''),
     // Absent from anything written before 2026-09-15: no team, and the mode off.
     teamsEnabled: (loose as Record<string, unknown>).teamsEnabled === true,
     teams: array<Record<string, unknown>>((loose as Record<string, unknown>).teams)

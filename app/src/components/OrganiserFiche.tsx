@@ -24,6 +24,7 @@ import {
 } from '../engine.ts';
 import { updateOrganiser } from '../store/setupEdits.ts';
 import { setOrganiserSkills } from '../store/skillEdits.ts';
+import { setOrganiserSideActivities } from '../store/sideActivityEdits.ts';
 import { SkillPicker } from './SkillPicker.tsx';
 import { setOrganiserPhase } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
@@ -101,6 +102,20 @@ export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
             name={`orga-skill-${person.key}`}
             onChange={(skills, changed, on) =>
               edit((p) => setOrganiserSkills(p, person.key, skills), `${changed.label} ${on ? 'ajouté' : 'retiré'}: ${who}`)
+            }
+          />
+        </div>
+      )}
+
+      {plan.sideActivities.length > 0 && (
+        <div className="rule">
+          <span className="rule-label">Activités annexes</span>
+          <SkillPicker
+            skills={plan.sideActivities}
+            value={person.sideActivityKeys ?? []}
+            name={`orga-activity-${person.key}`}
+            onChange={(keys, changed, on) =>
+              edit((p) => setOrganiserSideActivities(p, person.key, keys), `${changed.label} ${on ? 'coché' : 'décoché'}: ${who}`)
             }
           />
         </div>

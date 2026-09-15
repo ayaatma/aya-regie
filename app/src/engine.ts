@@ -68,7 +68,7 @@ export type { VolumeScope, VolumeSettings } from '@engine/days.ts';
 export { PLAN_FORMAT, PlanIndex, alignPhases, buildBlocks, fmtHours, overlaps, emptyPlan, newEventPlan } from '@engine/plan.ts';
 
 /** The contact file that carries the access codes out to the mailing tool. */
-export { brevoContactsCsv } from '@engine/csv.ts';
+export { brevoContactsCsv, toCsv } from '@engine/csv.ts';
 export type { BrevoExport } from '@engine/csv.ts';
 export type {
   Assignment,
@@ -336,6 +336,8 @@ export { artistGuests } from '@engine/artists.ts';
 export type { SkillTag } from '@engine/model.ts';
 // Teams, 2026-09-15.
 export type { Team } from '@engine/model.ts';
+// Side activities, 2026-09-15.
+export type { SideActivity } from '@engine/model.ts';
 export type { TeamReport } from '@engine/validate.ts';
 
 // Availability day by day, 2026-09-15.

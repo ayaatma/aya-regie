@@ -135,6 +135,7 @@ function makePlan(parts: {
     skills: [],
     teamsEnabled: false,
     teams: [],
+    sideActivities: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     catering: parts.catering ?? {
