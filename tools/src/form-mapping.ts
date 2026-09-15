@@ -51,7 +51,8 @@ export type MappedField =
   | 'montage'
   | 'demontage'
   | 'backup'
-  | 'energy';
+  | 'energy'
+  | 'slotComfort';
 
 /** One pole choice as columns: the pole answer, and the level answer when the form asks one. */
 export interface ChoiceColumns {
@@ -70,6 +71,8 @@ export interface AnswerMaps {
   refusedSlots?: Record<string, SlotId[]>;
   /** A pole key, or '' for an answer naming no pole ("tout me va"). Choices and refusals alike. */
   pole?: Record<string, string>;
+  /** The tranches one answer refuses and avoids (« shifts de nuit ? »). Since 2026-09-15. */
+  slotComfort?: Record<string, { refused: SlotId[]; avoided: SlotId[] }>;
 }
 
 export type AnswerKind = keyof AnswerMaps;
@@ -105,13 +108,14 @@ export const MAPPED_FIELD_LABEL: Record<MappedField, string> = {
   demontage: 'Démontage',
   backup: 'Renfort (Réserve)',
   energy: "Profil d'énergie",
+  slotComfort: 'Tranche refusée ou à éviter (une question)',
 };
 
 /** The order the screen lists the fields in: who, then what they can do, then the rest. */
 export const MAPPED_FIELDS: readonly MappedField[] = [
   'firstName', 'lastName', 'nickname', 'email', 'phone',
   'volume', 'halfPreference', 'refusedSlotChoice', 'availabilityNote', 'refusedPoles',
-  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'submittedAt',
+  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'slotComfort', 'submittedAt',
 ];
 
 /** Which answer map a field's answers go through, for the fields that have one. */
@@ -120,4 +124,5 @@ export const ANSWER_KIND_OF: Partial<Record<MappedField, AnswerKind>> = {
   halfPreference: 'preferredSlot',
   refusedSlotChoice: 'refusedSlots',
   refusedPoles: 'pole',
+  slotComfort: 'slotComfort',
 };

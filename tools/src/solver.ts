@@ -188,6 +188,8 @@ export interface SolverWeights {
    * problem, which is why 20000 buys so little.
    */
   againstPreference: number;
+  /** Per hour inside a tranche the volunteer said they would rather avoid. Since 2026-09-15. */
+  avoided: number;
   /** Per hour in a refused pole, for an event that weighs the refusal rather than blocking it. */
   refusedPole: number;
   /** Per hour in a refused tranche or past the event's end, same condition. */
@@ -229,6 +231,7 @@ export function weightsFor(c: ResolvedConstraints): SolverWeights {
     debutantStacking: priceOf(c.debutantStacking),
     overflow: priceOf(c.preferenceOverflow),
     againstPreference: priceOf(c.preference),
+    avoided: priceOf(c.avoidedSlot),
     stability: priceOf(c.stability),
     refusedPole: priceOf(c.refusedPole),
     availability: priceOf(c.availability),
@@ -323,7 +326,8 @@ export function weightsFor(c: ResolvedConstraints): SolverWeights {
 // floorBelow 30000, floorPerHour 2000, reserve 20000, staffing 3000, poleFragmentation 2500,
 // blockSplit 1200, allDebutants 600, minExperienced 600, outsideChoice 700 (plus one rank step
 // of 100: the 800 measured above), volume 60, artist 50,
-// buddy 5000, choice2 100, debutantStacking 8, overflow 6, againstPreference 1500, stability 200,
+// buddy 5000, choice2 100, debutantStacking 8, overflow 6, againstPreference 1500, avoided 1000
+// (2026-09-15), stability 200,
 // and zero for the six rules that block by default. `solver.test.ts` holds them to it.
 export const DEFAULT_WEIGHTS: SolverWeights = weightsFor(resolveConstraints(DEFAULT_CONSTRAINTS));
 
@@ -351,6 +355,8 @@ interface Placement {
   overflow: number;
   /** Hours of this shift that go against the volunteer's answer outright. */
   againstPreference: number;
+  /** Hours of this shift inside a tranche the volunteer would rather avoid. */
+  avoidedHours: number;
   /** The shift's hours when it sits under a pole the volunteer refused, else 0. */
   refusedPoleHours: number;
   /** Hours of this shift in a tranche the volunteer refused or past the event's end. */
@@ -366,6 +372,7 @@ interface VolunteerState {
   artistHours: number;
   overflow: number;
   againstPreference: number;
+  avoidedHours: number;
   refusedPoleHours: number;
   unavailableHours: number;
   anchor: ReadonlySet<string>;
@@ -492,6 +499,7 @@ export class SolverState implements LegalityContext {
         artistHours: 0,
         overflow: 0,
         againstPreference: 0,
+        avoidedHours: 0,
         refusedPoleHours: 0,
         unavailableHours: 0,
         anchor: anchorSet,
@@ -557,6 +565,11 @@ export class SolverState implements LegalityContext {
     // Only an event that weighs these rather than blocking them ever reaches a placement where
     // they are not zero: a blocked one is absent from the eligibility lists.
     const refused = volunteer.refusedPoleKeys.some((root) => this.base.isUnder(shift.poleKey, root));
+    let avoidedHours = 0;
+    for (const id of volunteer.avoidedSlotIds ?? []) {
+      const slot = this.base.slots.find((s) => s.id === id);
+      if (slot) avoidedHours += Math.max(0, Math.min(slot.end, shift.end) - Math.max(slot.start, shift.start));
+    }
     let inside = 0;
     for (const w of this.base.windowsOf(volunteer.key)) {
       inside += Math.max(0, Math.min(w.end, shift.end) - Math.max(w.start, shift.start));
@@ -572,6 +585,7 @@ export class SolverState implements LegalityContext {
       artistHours,
       overflow,
       againstPreference: misfit.against,
+      avoidedHours,
       refusedPoleHours: refused ? duration : 0,
       unavailableHours: Math.max(0, duration - inside),
     };
@@ -781,6 +795,7 @@ export class SolverState implements LegalityContext {
     penalty += w.artist * state.artistHours;
     penalty += w.overflow * state.overflow;
     penalty += w.againstPreference * state.againstPreference;
+    penalty += w.avoided * state.avoidedHours;
     penalty += w.refusedPole * state.refusedPoleHours;
     penalty += w.availability * state.unavailableHours;
 
@@ -832,6 +847,7 @@ export class SolverState implements LegalityContext {
     vs.artistHours += sign * placement.artistHours;
     vs.overflow += sign * placement.overflow;
     vs.againstPreference += sign * placement.againstPreference;
+    vs.avoidedHours += sign * placement.avoidedHours;
     vs.refusedPoleHours += sign * placement.refusedPoleHours;
     vs.unavailableHours += sign * placement.unavailableHours;
     vs.changed += (vs.anchor.has(shift.key) ? -sign : sign);

@@ -115,8 +115,10 @@ import {
  * 16: 2026-09-15, application tracking. `Volunteer.status`, `statusSteps`, `regieNote`,
  *    `registeredAt`, `backup` (the new Réserve) and `energy`, and `Plan.applicationSteps`. A build
  *    that predates this writes every bénévole back as a fresh candidature with nothing ticked.
+ * 17: 2026-09-15, `Volunteer.avoidedSlotIds`, the tranches somebody would rather avoid. A build
+ *    that predates this writes every bénévole back as avoiding nothing.
  */
-export const PLAN_FORMAT = 16;
+export const PLAN_FORMAT = 17;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';

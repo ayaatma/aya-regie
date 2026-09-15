@@ -1036,3 +1036,14 @@ test('a Réserve bénévole held back by their volume alone is named on the gap'
   strictEqual(gap.enRenfort, 1);
   ok(gap.raison.includes('renfort'), gap.raison);
 });
+
+test('an avoided tranche costs and is reported, never refused', () => {
+  const night = DEFAULT_SLOTS[2]!;
+  const s1 = shift('s1', 'bar-service', night.start, night.start + 4);
+  const v1 = volunteer('v1', { avoidedSlotIds: [night.id] });
+  const plan = makePlan({ shifts: [s1], volunteers: [v1], assignments: [assign('v1', 's1')] });
+  deepStrictEqual(blockersFor(new PlanIndex({ ...plan, assignments: [] }), v1, s1).map((b) => b.code), []);
+  const result = validate(plan);
+  strictEqual(count(result, TIER2.trancheEvitee), 1);
+  strictEqual(result.issues.find((i) => i.code === TIER2.trancheEvitee)!.tier, 2);
+});

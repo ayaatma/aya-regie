@@ -98,6 +98,9 @@ const FIELDS = [
   'phaseHelp', 'montage', 'demontage',
   // 2026-09-15, from a field test on another festival's form. Both optional.
   'backup', 'energy',
+  // One closed question about one tranche, read two ways: « Non » refuses it, « oui mais je
+  // préfère ne pas » avoids it. Optional.
+  'slotComfort',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -181,6 +184,9 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   // shortage, not on « bénévole », which half the headers carry.
   { field: 'backup',      test: (h) => /renfort|manque des benevoles|manque de benevoles/.test(h), required: false },
   { field: 'energy',      test: (h) => /energie|comment te considere/.test(h), required: false },
+  // « Peux-tu faire des shifts de nuit ? ». Anchored on a shift or créneau question naming a
+  // moment, never on « nuit » alone, which a quiz or a camping question may carry.
+  { field: 'slotComfort', test: (h) => /(shifts?|creneaux?|postes?) de nuit|travailler la nuit/.test(h), required: false },
 ];
 
 export type ColumnMap = Partial<Record<FormField, number>>;
@@ -397,6 +403,38 @@ function matchSlot<T extends { id: SlotId; label: string }>(v: string, slots: re
       normalise(s.label).includes(v) ||
       v.includes(normalise(s.label)),
   );
+}
+
+/** What one answer about one tranche says: refused, avoided, or neither. */
+export interface SlotComfort {
+  refused: SlotId[];
+  avoided: SlotId[];
+}
+
+/**
+ * « Peux-tu faire des shifts de nuit ? » and its three answers, read against the event's own
+ * refusable tranches, since 2026-09-15.
+ *
+ * The TRANCHE comes from its label, found in the question or in the answer (« Nuit » in « shifts
+ * de nuit »); the VERDICT from the answer's words, the avoidance tested first because « oui mais
+ * je préfère ne pas » also says « pas ». Null for an empty answer, `inconnu` for an answer whose
+ * verdict or tranche is not found: the fiche then goes to review and the correspondence screen is
+ * where the régisseur settles it for everybody.
+ */
+export function parseSlotComfort(header: string, answer: string, slots: readonly EventSlot[]): SlotComfort | 'inconnu' | null {
+  const v = normalise(answer);
+  if (v === '') return null;
+  const h = normalise(header);
+  const words = (label: string) => normalise(label).split(' ').filter((w) => w.length >= 4);
+  const slot =
+    slots.find((s) => normalise(s.label) !== '' && (h.includes(normalise(s.label)) || v.includes(normalise(s.label)))) ??
+    slots.find((s) => words(s.label).some((w) => h.includes(w) || v.includes(w)));
+  const avoided = /prefere\w* (ne )?pas|eviter|si possible|plutot pas/.test(v);
+  const refused = !avoided && /^non\b|ne peux pas|pas possible|impossible/.test(v);
+  const fine = !avoided && !refused && /^oui\b|volontiers|sans (souci|probleme)|avec plaisir/.test(v);
+  if (fine) return { refused: [], avoided: [] };
+  if (!slot || (!avoided && !refused)) return 'inconnu';
+  return avoided ? { refused: [], avoided: [slot.id] } : { refused: [slot.id], avoided: [] };
 }
 
 /**
@@ -940,9 +978,22 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     if (availability.reason) reviewReasons.push(availability.reason);
 
     // Merged, and deduplicated: naming the same tranche in both columns is one refusal.
+    const comfortCell = cell(row, 'slotComfort');
+    const decidedComfort = comfortCell === '' ? undefined : decidedAnswer('slotComfort', comfortCell);
+    const comfort = decidedComfort ?? parseSlotComfort(map.slotComfort === undefined ? '' : rows[0]![map.slotComfort]!, comfortCell, slots);
+    readable.saw('slotComfort', comfort !== 'inconnu');
+    if (comfort === 'inconnu') {
+      reviewReasons.push(
+        `Réponse « ${comfortCell} »: ni la tranche ni le refus ne sont reconnus. À relier dans la correspondance du formulaire.`,
+      );
+    }
+    const readComfort: SlotComfort = comfort === null || comfort === 'inconnu' ? { refused: [], avoided: [] } : comfort;
+
     const refusedSlotIds = [
-      ...new Set([...chosenIds, ...availability.value]),
+      ...new Set([...chosenIds, ...availability.value, ...readComfort.refused]),
     ];
+    // A tranche both refused and avoided is refused: the hard answer wins over the soft one.
+    const avoidedSlotIds = readComfort.avoided.filter((id) => !refusedSlotIds.includes(id));
     readable.saw('refusedSlotChoice', choiceCell.trim() === '' || !chosenIsProse);
     readable.saw('availabilityNote', noteCell.trim() === '' || availability.confident);
     readable.saw('halfPreference', preferred !== 'inconnu');
@@ -1179,6 +1230,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       reviewReasons,
       montage: phasePresence.montage,
       demontage: phasePresence.demontage,
+      avoidedSlotIds,
       registeredAt: firstAnswer.get(identity)?.raw ?? '',
       backup: parseBackup(cell(row, 'backup')) ?? false,
       energy: parseEnergy(cell(row, 'energy')),
@@ -1383,6 +1435,7 @@ export interface FormSurvey {
     level: SurveyAnswer<SkillLevel>[];
     preferredSlot: SurveyAnswer<SlotId | null>[];
     refusedSlots: SurveyAnswer<SlotId[]>[];
+    slotComfort: SurveyAnswer<SlotComfort>[];
     pole: SurveyAnswer<string>[];
   };
 }
@@ -1452,6 +1505,10 @@ export function surveyForm(csvText: string, options: ImportOptions): FormSurvey 
       refusedSlots: collect(column(binding.map.refusedSlotChoice), (raw) => {
         const v = parseSlotChoice(raw, slots);
         return v === 'inconnu' ? null : { value: v === null ? [] : [v] };
+      }),
+      slotComfort: collect(column(binding.map.slotComfort), (raw) => {
+        const v = parseSlotComfort(headers[binding.map.slotComfort!] ?? '', raw, slots);
+        return v === null || v === 'inconnu' ? null : { value: v };
       }),
       pole: collect(poleCells, (raw) => {
         const reading = parsePoleAnswer(raw, options.poles);

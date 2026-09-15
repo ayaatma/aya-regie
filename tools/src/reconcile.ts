@@ -116,6 +116,10 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
       label: 'Tranches refusées',
       show: (v) => (v.length > 0 ? v.join(', ') : 'aucune'),
     },
+    avoidedSlotIds: {
+      label: 'Tranches à éviter',
+      show: (v) => ((v ?? []).length > 0 ? (v ?? []).join(', ') : 'aucune'),
+    },
     availabilityNote: {
       label: 'Contrainte horaire (réponse)',
       show: (v) => (v.trim() === '' ? 'aucune' : v.trim()),
@@ -228,6 +232,7 @@ export const FIELD_LABEL: Record<EditableField, string> = {
   requestedHours: 'Volume demandé',
   preferredSlotId: 'Préférence',
   refusedSlotIds: 'Tranches refusées',
+  avoidedSlotIds: 'Tranches à éviter',
   refusedPoleKeys: 'Pôles refusés',
   choices: 'Choix de pôles',
   montage: 'Montage',

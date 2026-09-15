@@ -109,6 +109,8 @@ export const TIER2 = {
   reserveInjustifiee: 'reserve-injustifiee',
   reserveAffectee: 'reserve-affectee',
   preferenceContrariee: 'preference-contrariee',
+  /** Hours in a tranche the person would rather avoid (`Volunteer.avoidedSlotIds`). Never tier 1. */
+  trancheEvitee: 'tranche-evitee',
 } as const;
 
 /**
@@ -223,6 +225,15 @@ function refusedRootOf(
   return volunteer.refusedPoleKeys.find((root) => ctx.isUnder(poleKey, root)) ?? null;
 }
 
+/** The first tranche this person would rather avoid that the shift runs into, or null. */
+function avoidedSlotOf(ctx: { slots: readonly EventSlot[] }, volunteer: Volunteer, shift: Shift): SlotId | null {
+  for (const id of volunteer.avoidedSlotIds ?? []) {
+    const slot = ctx.slots.find((s) => s.id === id);
+    if (slot && overlaps(shift, slot)) return id;
+  }
+  return null;
+}
+
 /** A violation plus just enough detail to render its sentence later, if anyone asks for one. */
 interface Violation {
   code: string;
@@ -325,6 +336,13 @@ function violationsFor(
       found.push({ code: TIER2.preferenceContrariee, slot: preferred.id });
       if (stopEarly) return found;
     }
+  }
+
+  // Weight only by construction: an avoided tranche that blocked would be a refusal, which the
+  // person did not give. So it is a cost the grid names under a drop, never a reason to refuse.
+  if (level === 'weight' && c.avoidedSlot.mode === 'weight') {
+    const avoided = avoidedSlotOf(ctx, volunteer, shift);
+    if (avoided) found.push({ code: TIER2.trancheEvitee, slot: avoided });
   }
 
   if (c.artist.mode === level) {
@@ -488,6 +506,10 @@ function describe(
     }
     case TIER2.artisteManque:
       return `Le créneau tombe pendant ${violation.artist!.name}, cité comme à ne pas manquer.`;
+    case TIER2.trancheEvitee: {
+      const slot = ctx.slots.find((s) => s.id === violation.slot);
+      return `Le créneau empiète sur « ${slot?.label ?? violation.slot} », une tranche que la personne préfère éviter.`;
+    }
     default:
       return violation.code;
   }
@@ -855,6 +877,21 @@ export function validate(plan: Plan): ValidationResult {
         `${name} a répondu préférer « ${preferred.label} » (${index.label(preferred.start)} -> ` +
         `${index.label(preferred.end)}) et travaille ${fmtHours(against)} en dehors${band}.`,
         { volunteers: [volunteer.key], shifts: shifts.map((s) => s.key) });
+    }
+
+    // The avoided tranches, once per person like the preference: hours, not boxes, are what the
+    // régisseur weighs against the answer.
+    if (tierOf(c.avoidedSlot) !== null) {
+      for (const id of volunteer.avoidedSlotIds ?? []) {
+        const slot = plan.slots.find((s) => s.id === id);
+        if (!slot) continue;
+        const inside = shifts.filter((s) => overlaps(s, slot));
+        const hours = inside.reduce((t, s) => t + Math.max(0, Math.min(s.end, slot.end) - Math.max(s.start, slot.start)), 0);
+        if (hours <= 1e-9) continue;
+        add(tierOf(c.avoidedSlot)!, TIER2.trancheEvitee,
+          `${name} préfère éviter « ${slot.label} » et y travaille ${fmtHours(hours)}.`,
+          { volunteers: [volunteer.key], shifts: inside.map((s) => s.key) });
+      }
     }
 
     // Overlaps are reported per pair, on the sorted list, so each pair is named once.

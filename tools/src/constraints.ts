@@ -44,6 +44,7 @@ export type CriterionId =
   | 'availability'
   | 'refusedPole'
   | 'preference'
+  | 'avoidedSlot'
   | 'preferenceOverflow'
   | 'artist'
   | 'volumeOver'
@@ -178,6 +179,19 @@ export const CRITERIA: readonly CriterionDefinition[] = [
     modes: BWO,
     defaultMode: 'weight',
     defaultWeight: 1500,
+    unit: 'par heure',
+  },
+  {
+    // 2026-09-15. Under `preference` (1500) on purpose: « je préfère éviter » is a softer answer
+    // than a stated preference worked against outright, and far under `staffing` (3000), so an
+    // avoided hour is taken whenever it fills a place.
+    id: 'avoidedSlot',
+    group: 'horaires',
+    label: 'Dans une tranche que la personne préfère éviter',
+    hint: "« Oui, mais je préfère ne pas en faire si possible »: la tranche reste possible, chaque heure dedans a un coût.",
+    modes: WO,
+    defaultMode: 'weight',
+    defaultWeight: 1000,
     unit: 'par heure',
   },
   {

@@ -588,3 +588,14 @@ test('the reinforcement and stamina answers of a festival form are read', async 
   strictEqual(parseEnergy("Je fonce, je donne tout, et je dormirai demain., J'ai parfois du mal à me poser et j'ai tendance à fatiguer vite."), 'fatigable');
   strictEqual(parseEnergy("Je ne sais pas, c'est une première."), 'premiere');
 });
+
+test('the night question of a festival form refuses, avoids or accepts one tranche', async () => {
+  const { parseSlotComfort } = await import('./import.js');
+  const slots = [{ id: 'jour', label: 'Journée', start: 0, end: 12 }, { id: 'nuit', label: 'Nuit', start: 12, end: 18 }];
+  const q = 'Peux-tu faire des shifts de nuit ? (entre 3h et 7h)';
+  deepStrictEqual(parseSlotComfort(q, 'Oui', slots), { refused: [], avoided: [] });
+  deepStrictEqual(parseSlotComfort(q, 'Oui mais je préfère ne pas en faire si possible', slots), { refused: [], avoided: ['nuit'] });
+  deepStrictEqual(parseSlotComfort(q, 'Non je ne peux pas', slots), { refused: ['nuit'], avoided: [] });
+  strictEqual(parseSlotComfort(q, '', slots), null);
+  strictEqual(parseSlotComfort('Peux-tu venir tôt ?', 'Non je ne peux pas', slots), 'inconnu');
+});

@@ -2463,3 +2463,14 @@ test('a fiche carries the application, and a cancelled person still placed is of
   assert.ok(shows(reading, 'Annulée'));
   assert.ok(!reading.includes('>Libérer ses places</button>'), 'rien à modifier en lecture seule');
 });
+
+test('a fiche names the tranches somebody would rather avoid, apart from the refused ones', () => {
+  const key = plan.volunteers[0]!.key;
+  const slot = plan.slots[plan.slots.length - 1]!;
+  const avoiding: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, refusedSlotIds: [], avoidedSlotIds: [slot.id] } : v)),
+  };
+  const html = infoOf(avoiding, { kind: 'benevole', volunteerKey: key });
+  assert.ok(shows(html, 'Préfère éviter'));
+});

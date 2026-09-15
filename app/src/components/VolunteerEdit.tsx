@@ -75,6 +75,7 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
       if (!same(draft[field], volunteer[field])) patch[field] = draft[field];
     };
     compare('refusedSlotIds');
+    compare('avoidedSlotIds');
     compare('refusedPoleKeys');
     compare('choices');
     compare('requestedHours');
@@ -103,6 +104,26 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
               type="checkbox"
               checked={draft.refusedSlotIds.includes(slot.id)}
               onChange={() => set('refusedSlotIds', toggle(draft.refusedSlotIds, slot.id))}
+            />
+            {slot.label}
+          </label>
+        ))}
+      </div>
+
+      <div className="panel-section">
+        <p className="panel-section-title">Préfère éviter</p>
+        <p className="panel-sub">
+          Possible, mais chaque heure dans ces tranches a un coût: le calcul les évite quand il le
+          peut. Une tranche refusée au-dessus l'emporte.
+        </p>
+        {index.slots.map((slot) => (
+          <label className="checkline" key={slot.id}>
+            <input
+              type="checkbox"
+              name={`fiche-avoid-${slot.id}`}
+              disabled={draft.refusedSlotIds.includes(slot.id)}
+              checked={(draft.avoidedSlotIds ?? []).includes(slot.id)}
+              onChange={() => set('avoidedSlotIds', toggle(draft.avoidedSlotIds ?? [], slot.id))}
             />
             {slot.label}
           </label>

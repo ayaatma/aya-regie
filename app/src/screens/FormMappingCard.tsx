@@ -249,6 +249,20 @@ export function FormMappingCard({
         onSet={setAnswer}
       />
       <AnswerTable
+        title="Réponses: tranche refusée ou à éviter"
+        kind="slotComfort"
+        entries={survey.answers.slotComfort}
+        mapping={mapping}
+        options={[
+          { value: { refused: [], avoided: [] } as { refused: string[]; avoided: string[] }, label: 'Aucune contrainte' },
+          ...plan.slots.flatMap((s) => [
+            { value: { refused: [s.id], avoided: [] as string[] }, label: `Refuse « ${s.label} »` },
+            { value: { refused: [] as string[], avoided: [s.id] }, label: `Préfère éviter « ${s.label} »` },
+          ]),
+        ]}
+        onSet={setAnswer}
+      />
+      <AnswerTable
         title="Réponses: pôles"
         kind="pole"
         entries={survey.answers.pole}

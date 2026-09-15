@@ -806,6 +806,13 @@ export interface Volunteer {
    */
   refusedSlotIds: SlotId[];
   /**
+   * The slots this person would rather not work, without refusing them: « oui, mais je préfère
+   * ne pas en faire si possible ». Since 2026-09-15. The same tranches as `refusedSlotIds` (the
+   * night is one tranche, refused by some and avoided by others), scored per hour by the criterion
+   * `avoidedSlot` and never enforced. Absent means none.
+   */
+  avoidedSlotIds?: SlotId[];
+  /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *
    * KEPT VERBATIM AND NEVER REWRITTEN. `refusedSlotIds` is a guess about this sentence, and a
@@ -971,6 +978,7 @@ export const EDITABLE_FIELDS = [
   'requestedHours',
   'preferredSlotId',
   'refusedSlotIds',
+  'avoidedSlotIds',
   'refusedPoleKeys',
   // The whole list, since 2026-09-14: correcting one choice is correcting the reading of the
   // answers, and a list edited entry by entry would let a re-import reorder half of it.

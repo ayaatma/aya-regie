@@ -925,3 +925,14 @@ test('a re-solve hands back the places of somebody who cancelled, and gives them
   ok(!result.plan.assignments.some((a) => a.volunteerKey === 'v1'));
   ok(!result.plan.reserve.includes('v1'), "pas de liste d'attente pour une annulation");
 });
+
+test('between two equal créneaux, the solver keeps somebody out of the tranche they avoid', () => {
+  const night = DEFAULT_SLOTS[2]!;
+  const day = DEFAULT_SLOTS[0]!;
+  const plan = makePlan({
+    shifts: [shift('nuit', 'alpha', night.start, night.start + 4), shift('jour', 'alpha', day.start, day.start + 4)],
+    volunteers: [volunteer('v1', { requestedHours: 4, avoidedSlotIds: [night.id] })],
+  });
+  const result = solve(plan, { seed: 3, iterations: 300 });
+  deepStrictEqual(result.plan.assignments.map((a) => a.shiftKey), ['jour']);
+});

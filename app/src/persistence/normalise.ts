@@ -575,6 +575,8 @@ const volunteer = (value: unknown): Volunteer => {
     // and a plan had no sentence to keep. An empty note beside a slot id is exactly what a
     // pre-2026-09-10 answer was, so nothing is invented here.
     availabilityNote: text(loose.availabilityNote),
+    // Absent from anything written before 2026-09-15: nobody avoided anything.
+    avoidedSlotIds: keys(loose.avoidedSlotIds),
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],
@@ -651,11 +653,15 @@ function formMapping(value: unknown): FormMapping {
   const preferredAnswers = pick('preferredSlot', (v): v is string | null => v === null || typeof v === 'string');
   const slotAnswers = pick('refusedSlots', (v): v is string[] => Array.isArray(v) && v.every((s) => typeof s === 'string'));
   const poleAnswers = pick('pole', (v): v is string => typeof v === 'string');
+  const idList = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === 'string');
+  const comfortAnswers = pick('slotComfort', (v): v is { refused: string[]; avoided: string[] } =>
+    v !== null && typeof v === 'object' && idList((v as Record<string, unknown>).refused) && idList((v as Record<string, unknown>).avoided));
   if (volumeAnswers) answers.volume = volumeAnswers;
   if (levelAnswers) answers.level = levelAnswers;
   if (preferredAnswers) answers.preferredSlot = preferredAnswers;
   if (slotAnswers) answers.refusedSlots = slotAnswers;
   if (poleAnswers) answers.pole = poleAnswers;
+  if (comfortAnswers) answers.slotComfort = comfortAnswers;
   return { columns, ...(choices === undefined ? {} : { choices }), answers };
 }
 

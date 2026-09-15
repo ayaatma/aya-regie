@@ -222,6 +222,17 @@ function VolunteerDetail({
         hard constraints: placing somebody in a slot or a pole they ruled out is a tier 1 issue,
         and the régisseur looking at a box needs to see the veto without hunting for it.
       */}
+      {(volunteer.avoidedSlotIds ?? []).length > 0 && (
+        <div className="panel-section">
+          <p className="panel-section-title">Préfère éviter</p>
+          {(volunteer.avoidedSlotIds ?? []).map((id) => (
+            <span className="chip is-warn" key={id}>
+              Travailler {slotLabel(index.slots, id)}
+            </span>
+          ))}
+        </div>
+      )}
+
       {(volunteer.refusedSlotIds.length > 0 || volunteer.refusedPoleKeys.length > 0) && (
         <div className="panel-section">
           <p className="panel-section-title">Ne veut pas</p>
