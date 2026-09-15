@@ -1,6 +1,6 @@
 ---
 name: project-field-test-roadmap
-description: 2026-09-15, what a field test on another festival's volunteer form taught us, and the developer's decisions on each point; the roadmap after the Personnes tab. Nothing built yet.
+description: 2026-09-15, what a field test on another festival's volunteer form taught us, and the developer's decisions on each point; the roadmap after the Personnes tab, built item by item since.
 metadata:
   type: project
 ---
@@ -13,12 +13,13 @@ event's filled volunteer sheet: 45 form questions plus 8 columns the organisers 
 The raw export was profiled in a session scratchpad and never entered the repository. **No real
 answer, name or event figure belongs in this file or in a fixture** (see [[project-open-source]]).
 
-**State: analysis and decisions only, NOTHING BUILT.** Each block below is a future feature;
-give it its own `feature_*.md` when work starts.
+**State: being built in order, one commit per item.** Each block says when it is built and
+where its `feature_*.md` is.
 
 ## Decided, in the developer's words turned into specs
 
 ### 1. Application tracking and automatic sync (top priority)
+- **Tracking BUILT 2026-09-15, see [[feature-application-tracking]]; sync and confirmation form NOT built.**
 - The organisers' "Statut" column stacks a decision (validé / annulé / liste d'attente) with a
   checklist of messages sent (confirmation, demande de reconfirmation, présence reconfirmée,
   infos importantes, relance photo). About one registration in five was cancelled.
@@ -91,12 +92,14 @@ give it its own `feature_*.md` when work starts.
   equipment: available, lent, returned.
 
 ### 10. Réserve becomes Liste d'attente, and a new Réserve
+- **BUILT 2026-09-15 with item 1, see [[feature-application-tracking]].**
 - Today's Réserve (see [[feature-people-tab]]) is used for people with no créneau who will
   probably not be taken: **rename it "Liste d'attente"**.
 - A new **Réserve** holds validated people ready to work more hours (the form's "je viens en
   renfort" answer).
 
 ### 11. Energy profile
+- **BUILT 2026-09-15 with item 1 (display only).**
 - On the person's fiche ("je fonce", "je maîtrise", "je fatigue vite", "première fois"), read
   together with the hours given to them, notably when drawing someone from the Réserve.
 

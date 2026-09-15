@@ -111,13 +111,14 @@ mode; its tier follows the mode. New codes `pas-choix-1`, `hors-choix`. See
 Tier 1, illegal, always red: `chevauchement`, `pole-refuse`, `tranche-refusee`,
 `hors-disponibilite`, `duree-consecutive`, `trop-de-blocs`,
 `pause-insuffisante`, `volume-depasse`, `sureffectif`, `reference-inconnue`, `doublon`,
-`deja-affecte` (this last one only ever comes back from `blockersFor`, never from `validate`).
+`deja-affecte` (this last one only ever comes back from `blockersFor`, never from `validate`),
+`candidature-annulee` (2026-09-15, always blocking, see [[feature-application-tracking]]).
 
 Tier 2, a real problem, reported not blocked: `sans-affectation`, `plancher-non-atteint`,
 `creneau-vide`, `creneau-incomplet`, `que-des-debutants`, `experience-insuffisante`,
 `artiste-manque`, `creneau-trop-long`, `reserve-injustifiee`, `reserve-affectee`.
 
-Import codes: `colonne-manquante`, `identite-incomplete`, `reponse-illisible`,
+Import codes: `reponse-en-double` (2026-09-15), `colonne-manquante`, `identite-incomplete`, `reponse-illisible`,
 `volume-impossible`, `choix-contradictoire`, `pole-inconnu`, `artiste-inconnu`, `choix-identique`,
 `homonyme`, `binome-soi-meme`, `binome-ambigu`, `binome-non-resolu`.
 
