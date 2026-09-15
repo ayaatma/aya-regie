@@ -2510,3 +2510,21 @@ test('a fiche names the pole a responsable imposed, and lets the régisseur chan
   assert.ok(infoOf(imposed, { kind: 'benevole', volunteerKey: key }).includes('name="fiche-imposed-pole"'));
   assert.ok(shows(infoOf(imposed, { kind: 'benevole', volunteerKey: key }, true), `Pôle imposé: ${pole.path}`));
 });
+
+test('teams: the card shows who is in each, and the grid rings a selected bénévole’s teammates', async () => {
+  const { TeamsCard } = await import('./TeamsCard.tsx');
+  const [first, second] = [plan.assignments[0]!.volunteerKey, plan.assignments.find((a) => a.volunteerKey !== plan.assignments[0]!.volunteerKey)!.volunteerKey];
+  const teamed: Plan = {
+    ...plan,
+    teamsEnabled: true,
+    teams: [{ key: 't1', name: 'Équipe A', poleKey: null }],
+    volunteers: plan.volunteers.map((v) => (v.key === first || v.key === second ? { ...v, teamKey: 't1' } : v)),
+  };
+  const index = new PlanIndex(teamed);
+  const card = render(<TeamsCard />, teamed);
+  assert.ok(card.includes('value="Équipe A"'));
+  assert.ok(shows(card, index.volunteerName(first)) && shows(card, index.volunteerName(second)));
+  const { teammatesOf } = await import('../components/relations.ts');
+  assert.deepEqual([...teammatesOf(teamed, first)], [second]);
+  assert.deepEqual([...teammatesOf({ ...teamed, teamsEnabled: false }, first)], [], 'mode coupé, rien à entourer');
+});

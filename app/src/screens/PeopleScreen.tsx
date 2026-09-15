@@ -383,6 +383,7 @@ function PeopleTable({
             {view === 'candidature' && (
               <>
                 <th>Candidature</th>
+                <th>Équipe</th>
                 <th>Étapes</th>
                 <th>Inscription</th>
                 <th>Énergie</th>
@@ -568,7 +569,7 @@ function PersonLine({
 function ApplicationCells({ row }: { row: TicketingRow }) {
   const { plan, index } = useLoadedPlan();
   const volunteer = row.kind === 'benevole' ? index.volunteerByKey.get(row.key) : undefined;
-  if (!volunteer) return <><td /><td /><td /><td /><td /></>;
+  if (!volunteer) return <><td /><td /><td /><td /><td /><td /></>;
   const status = statusOf(volunteer);
   const ticked = new Set(volunteer.statusSteps ?? []);
   const waiting = plan.reserve.includes(volunteer.key);
@@ -581,6 +582,7 @@ function ApplicationCells({ row }: { row: TicketingRow }) {
         {waiting && <span className="chip">Liste d'attente</span>}
         {volunteer.backup && <span className="chip is-ok">Réserve</span>}
       </td>
+      <td>{plan.teams.find((t) => t.key === volunteer.teamKey)?.name ?? ''}</td>
       <td>
         {plan.applicationSteps.length > 0 && (
           <span

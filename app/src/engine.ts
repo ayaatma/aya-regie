@@ -334,6 +334,9 @@ export { artistGuests } from '@engine/artists.ts';
 
 // Competences, 2026-09-15.
 export type { SkillTag } from '@engine/model.ts';
+// Teams, 2026-09-15.
+export type { Team } from '@engine/model.ts';
+export type { TeamReport } from '@engine/validate.ts';
 
 // Availability day by day, 2026-09-15.
 export {

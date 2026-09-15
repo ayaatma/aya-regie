@@ -593,6 +593,7 @@ const volunteer = (value: unknown): Volunteer => {
     nicknameMatters: typeof loose.nicknameMatters === 'boolean' ? loose.nicknameMatters : null,
     // Absent from anything written before 2026-09-15: nobody was sent anywhere.
     imposedPoleKey: typeof loose.imposedPoleKey === 'string' && loose.imposedPoleKey !== '' ? loose.imposedPoleKey : null,
+    teamKey: typeof loose.teamKey === 'string' && loose.teamKey !== '' ? loose.teamKey : null,
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],
@@ -980,6 +981,12 @@ export function normalisePlan(raw: unknown): Plan {
     // Absent from anything written before 2026-09-14: nothing decided, everything detected.
     formMapping: formMapping(loose.formMapping),
     applicationSteps: applicationSteps((loose as Record<string, unknown>).applicationSteps),
+    // Absent from anything written before 2026-09-15: no team, and the mode off.
+    teamsEnabled: (loose as Record<string, unknown>).teamsEnabled === true,
+    teams: array<Record<string, unknown>>((loose as Record<string, unknown>).teams)
+      .filter((t) => t !== null && typeof t === 'object')
+      .map((t) => ({ key: text(t.key), name: text(t.name), poleKey: text(t.poleKey) === '' ? null : text(t.poleKey) }))
+      .filter((t) => t.key !== ''),
     // Absent from anything written before 2026-09-15: an event naming no competence.
     skills: array<Record<string, unknown>>((loose as Record<string, unknown>).skills)
       .filter((s) => s !== null && typeof s === 'object')

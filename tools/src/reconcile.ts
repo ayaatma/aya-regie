@@ -182,6 +182,7 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
     // so never a change to announce. The registration date is the earliest answer's and only moves
     // when the export starts carrying a timestamp.
     status: null,
+    teamKey: null,
     statusSteps: null,
     regieNote: null,
     registeredAt: null,
@@ -301,6 +302,7 @@ export function mergeWithManual(before: Volunteer, imported: Volunteer): Volunte
     // The régisseur's tracking of the application is not in any export. An import that let a
     // fresh row reset it would put a cancelled person back among the candidatures in silence.
     status: before.status,
+    teamKey: before.teamKey,
     statusSteps: before.statusSteps,
     regieNote: before.regieNote,
     registeredAt: earliestRegistration(before.registeredAt, imported.registeredAt),

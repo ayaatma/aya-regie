@@ -194,6 +194,8 @@ export interface SolverWeights {
   missingSkill: number;
   /** Per hour outside the pole a responsable sent the volunteer to. */
   imposedPole: number;
+  /** Per hour a team member works a créneau holding nobody else of their team. Teams on only. */
+  teamSplit: number;
   /** Per hour in a refused pole, for an event that weighs the refusal rather than blocking it. */
   refusedPole: number;
   /** Per hour in a refused tranche or past the event's end, same condition. */
@@ -238,6 +240,7 @@ export function weightsFor(c: ResolvedConstraints): SolverWeights {
     avoided: priceOf(c.avoidedSlot),
     missingSkill: priceOf(c.missingSkill),
     imposedPole: priceOf(c.imposedPole),
+    teamSplit: priceOf(c.teamSplit),
     stability: priceOf(c.stability),
     refusedPole: priceOf(c.refusedPole),
     availability: priceOf(c.availability),
@@ -333,7 +336,7 @@ export function weightsFor(c: ResolvedConstraints): SolverWeights {
 // blockSplit 1200, allDebutants 600, minExperienced 600, outsideChoice 700 (plus one rank step
 // of 100: the 800 measured above), volume 60, artist 50,
 // buddy 5000, choice2 100, debutantStacking 8, overflow 6, againstPreference 1500, avoided 1000
-// (2026-09-15), missingSkill 4000 and imposedPole 10000 (2026-09-15), stability 200,
+// (2026-09-15), missingSkill 4000, imposedPole 10000 and teamSplit 400 (2026-09-15), stability 200,
 // and zero for the six rules that block by default. `solver.test.ts` holds them to it.
 export const DEFAULT_WEIGHTS: SolverWeights = weightsFor(resolveConstraints(DEFAULT_CONSTRAINTS));
 
@@ -437,6 +440,13 @@ export class SolverState implements LegalityContext {
   private readonly pairList: BuddyPair[] = [];
   private readonly pairShared: number[] = [];
   /**
+   * Teams, 2026-09-15. Per créneau, how many of each team stand in it; and the hours team members
+   * work with nobody of their team beside them, kept up to date on every mutation.
+   */
+  private readonly teamOf = new Map<string, string>();
+  private readonly teamCount = new Map<string, Map<string, number>>();
+  private teamAloneHours = 0;
+  /**
    * Boxes the search may not touch, for any reason: a locked assignment or a locked pole.
    *
    * Kept apart from `ownLocks` below, which is the assignments own flag. A pole lock pins a box
@@ -481,6 +491,11 @@ export class SolverState implements LegalityContext {
       const set = anchorByVolunteer.get(a.volunteerKey) ?? new Set<string>();
       set.add(a.shiftKey);
       anchorByVolunteer.set(a.volunteerKey, set);
+    }
+
+    if (plan.teamsEnabled === true) {
+      const known = new Set((plan.teams ?? []).map((t) => t.key));
+      for (const v of plan.volunteers) if (v.teamKey && known.has(v.teamKey)) this.teamOf.set(v.key, v.teamKey);
     }
 
     // Buddy pairs, deduplicated and stripped of self-requests, indexed from both ends so a
@@ -897,10 +912,24 @@ export class SolverState implements LegalityContext {
       if (ss.assignees.has(other)) this.pairShared[i] = this.pairShared[i]! + sign;
     }
 
+    // The team term. Adding somebody to a créneau holding no teammate makes them alone there;
+    // holding exactly one makes that one no longer alone. Removing mirrors it.
+    const team = this.teamOf.get(volunteerKey);
+    let teamDelta = 0;
+    if (team !== undefined) {
+      const counts = this.teamCount.get(shift.key) ?? new Map<string, number>();
+      this.teamCount.set(shift.key, counts);
+      const others = (counts.get(team) ?? 0) - (adding ? 0 : 1);
+      if (others === 0) teamDelta += sign * placement.duration;
+      if (others === 1) teamDelta -= sign * placement.duration;
+      counts.set(team, (counts.get(team) ?? 0) + sign);
+      this.teamAloneHours += teamDelta;
+    }
+
     let after = this.shiftPenalty(ss) + this.volunteerPenalty(vs);
     for (const i of vs.pairs) after += this.pairPenalty(i);
 
-    this.score += after - before;
+    this.score += after - before + this.weights.teamSplit * teamDelta;
   }
 
   add(volunteerKey: string, shift: Shift): void {

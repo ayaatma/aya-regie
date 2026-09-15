@@ -28,6 +28,7 @@ import {
   type Window,
   type ApplicationStep,
   type SkillTag,
+  type Team,
 } from './model.js';
 import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
 import { type Phase, alignPhase, defaultPhase, defaultPhaseStart } from './phase.js';
@@ -127,8 +128,10 @@ import {
  *    and `nicknameMatters` on bénévoles. A build that predates this erases them on its next save.
  * 21: 2026-09-15, `Volunteer.imposedPoleKey`, the pole a responsable sent somebody to. A build
  *    that predates this frees everybody from it on its next save.
+ * 22: 2026-09-15, teams: `Plan.teamsEnabled`, `Plan.teams`, `Volunteer.teamKey`. A build that
+ *    predates this dissolves every team on its next save.
  */
-export const PLAN_FORMAT = 21;
+export const PLAN_FORMAT = 22;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -267,6 +270,12 @@ export interface Plan {
   applicationSteps: readonly ApplicationStep[];
   /** The competences this event names, in order. See `SkillTag`. Since 2026-09-15. */
   skills: readonly SkillTag[];
+  /**
+   * « Fonctionnement en équipe », since 2026-09-15: whether this event keeps teams together. Off,
+   * the teams below are kept and simply not scored.
+   */
+  teamsEnabled: boolean;
+  teams: readonly Team[];
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *
@@ -862,6 +871,8 @@ export function emptyPlan(
     | 'dismissedBuddies'
     | 'applicationSteps'
     | 'skills'
+    | 'teamsEnabled'
+    | 'teams'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -894,5 +905,7 @@ export function emptyPlan(
     formMapping: EMPTY_FORM_MAPPING,
     applicationSteps: DEFAULT_APPLICATION_STEPS,
     skills: [],
+    teamsEnabled: false,
+    teams: [],
   };
 }

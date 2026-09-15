@@ -47,6 +47,7 @@ export type CriterionId =
   | 'avoidedSlot'
   | 'missingSkill'
   | 'imposedPole'
+  | 'teamSplit'
   | 'preferenceOverflow'
   | 'artist'
   | 'volumeOver'
@@ -194,6 +195,19 @@ export const CRITERIA: readonly CriterionDefinition[] = [
     modes: WO,
     defaultMode: 'weight',
     defaultWeight: 1000,
+    unit: 'par heure',
+  },
+  {
+    // 2026-09-15. Between a rank step (100) and an artist hour (50 × a set) on one side and
+    // `staffing` (3000) on the other: a team stays together whenever that costs a choice or two,
+    // and a place is never left empty to keep it together. Not measured with a probe yet.
+    id: 'teamSplit',
+    group: 'poles',
+    label: 'Un membre d’équipe sur un créneau sans personne de son équipe',
+    hint: "Seulement quand le fonctionnement en équipe est activé (Réglages > Équipes). Jamais bloquant: une équipe incomplète plus une autre personne reste un créneau possible.",
+    modes: WO,
+    defaultMode: 'weight',
+    defaultWeight: 400,
     unit: 'par heure',
   },
   {

@@ -305,6 +305,29 @@ async function main() {
         await page.evaluate(() => document.querySelector('.skill-picker')?.scrollIntoView({ block: 'center' }));
         await sleep(300);
         await shot('101-personnes-fiche-competences');
+        // Teams: switch the mode on, make a team of three, then select one of them on the grid.
+        await tab('Réglages');
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-teams');
+          card?.querySelector('button')?.click();
+          card?.scrollIntoView();
+        });
+        await sleep(300);
+        await page.click('input[name="teams-enabled"]');
+        await clickButton(/^Ajouter une équipe$/);
+        for (let i = 0; i < 3; i++) {
+          await page.evaluate(() => {
+            const select = document.querySelector('select[name^="team-add-"]');
+            const option = select?.options[1];
+            if (select && option) {
+              const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+              setter.call(select, option.value);
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+          await sleep(300);
+        }
+        await shot('102-reglages-equipes');
       }
       if (want('catering')) {
         await tab('Catering');

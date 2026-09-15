@@ -59,6 +59,7 @@ import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
 import { SkillsCard } from './SkillsCard.tsx';
+import { TeamsCard } from './TeamsCard.tsx';
 import { SkillPicker } from '../components/SkillPicker.tsx';
 import { setPoleSkills } from '../store/skillEdits.ts';
 import { AdvancedSettingsCard } from './AdvancedSettingsCard.tsx';
@@ -178,6 +179,8 @@ export function SetupScreen() {
           <ApplicationStepsCard />
 
           <SkillsCard />
+
+          <TeamsCard />
 
           {/*
             The two phases, between the people and the poles of the exploit. They are settings of

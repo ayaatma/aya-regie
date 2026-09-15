@@ -115,6 +115,8 @@ function makePlan(): Plan {
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
     skills: [],
+    teamsEnabled: false,
+    teams: [],
     constraints: DEFAULT_CONSTRAINTS,
   };
 }

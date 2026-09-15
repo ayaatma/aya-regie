@@ -106,6 +106,8 @@ function makePlan(ticketing: Partial<TicketingSettings> = {}): Plan {
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
     skills: [],
+    teamsEnabled: false,
+    teams: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
   };

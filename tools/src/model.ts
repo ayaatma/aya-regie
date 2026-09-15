@@ -318,6 +318,17 @@ export const DEFAULT_CATERING: CateringSettings = {
 };
 
 /**
+ * A team kept together across the créneaux, since 2026-09-15: a festival places groups of four to
+ * six bénévoles as one crew on a pole's roulement. `poleKey` is where the team usually works, for
+ * the régisseur's reading only; nothing forces a member there.
+ */
+export interface Team {
+  key: string;
+  name: string;
+  poleKey: string | null;
+}
+
+/**
  * A competence the event cares about: « Permis B », « CACES », « Conduite d'engins », « Secourisme ».
  * Since 2026-09-15. The event's own list (`Plan.skills`), so a festival and a loto each name what
  * matters to them; a stable key so renaming a tag never untags anybody.
@@ -878,6 +889,11 @@ export interface Volunteer {
    * event blocks it). The régisseur can still place them anywhere by hand. Null means none.
    */
   imposedPoleKey?: string | null;
+  /**
+   * The `Team` this person belongs to, set by the régisseur, or null. Since 2026-09-15. Not an
+   * answer: carried whole across re-imports like the status.
+   */
+  teamKey?: string | null;
   /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *

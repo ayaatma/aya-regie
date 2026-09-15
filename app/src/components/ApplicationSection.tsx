@@ -24,6 +24,7 @@ import {
 } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { correctVolunteer } from '../store/edits.ts';
+import { setVolunteerTeam } from '../store/teamEdits.ts';
 import {
   placesHeld,
   releasePlaces,
@@ -63,6 +64,9 @@ export function ApplicationSection({
           {detail.reserve && <span className="chip">Liste d'attente</span>}
           {volunteer.backup && <span className="chip is-ok">Réserve</span>}
           {volunteer.energy && <span className="chip">{ENERGY_LABEL[volunteer.energy]}</span>}
+          {volunteer.teamKey && (
+            <span className="chip">{plan.teams.find((t) => t.key === volunteer.teamKey)?.name ?? 'Équipe'}</span>
+          )}
         </p>
       </div>
     );
@@ -107,6 +111,26 @@ export function ApplicationSection({
             Libérer ses places
           </button>
         </div>
+      )}
+
+      {plan.teams.length > 0 && (
+        <label className="field">
+          <span className="field-label">Équipe</span>
+          <select
+            className="select"
+            name="fiche-team"
+            value={volunteer.teamKey ?? ''}
+            onChange={(event) => {
+              const teamKey = event.target.value === '' ? null : event.target.value;
+              edit((p) => setVolunteerTeam(p, volunteer.key, teamKey), `équipe de ${name}`);
+            }}
+          >
+            <option value="">Aucune</option>
+            {plan.teams.map((t) => (
+              <option key={t.key} value={t.key}>{t.name}</option>
+            ))}
+          </select>
+        </label>
       )}
 
       {detail.reserve && <p className="people-meta">En liste d'attente.</p>}

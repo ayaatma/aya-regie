@@ -775,12 +775,49 @@ export interface PlanSummary {
   overRecruited: boolean;
 }
 
+/**
+ * One team, as the régisseur reads it: who is in it, and how much of their work they do together.
+ * Reported, never an issue: a team split for one créneau is ordinary, and one signalement per
+ * member per créneau would bury the grid.
+ */
+export interface TeamReport {
+  key: string;
+  name: string;
+  poleKey: string | null;
+  memberKeys: string[];
+  /** Person-hours the members work in total. */
+  hours: number;
+  /** Of those, the hours worked with nobody of the team on the same créneau. */
+  aloneHours: number;
+}
+
 export interface ValidationResult {
   issues: ValidationIssue[];
   volunteers: VolunteerReport[];
   shifts: ShiftReport[];
   artists: ArtistReport[];
+  /** Every team of the plan, whether or not the event scores them. Since 2026-09-15. */
+  teams: TeamReport[];
   summary: PlanSummary;
+}
+
+/** The team reports, from who stands in which créneau. */
+function teamReports(index: PlanIndex): TeamReport[] {
+  const plan = index.plan;
+  return (plan.teams ?? []).map((team) => {
+    const members = plan.volunteers.filter((v) => v.teamKey === team.key).map((v) => v.key);
+    const inTeam = new Set(members);
+    let hours = 0;
+    let aloneHours = 0;
+    for (const key of members) {
+      for (const shift of index.shiftsOf(key)) {
+        const duration = shiftHours(shift);
+        hours += duration;
+        if (!index.assigneesOf(shift.key).some((v) => v.key !== key && inTeam.has(v.key))) aloneHours += duration;
+      }
+    }
+    return { key: team.key, name: team.name, poleKey: team.poleKey, memberKeys: members, hours, aloneHours };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1446,5 +1483,5 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
     overRecruited: coming.length > ceiling,
   };
 
-  return { issues, volunteers, shifts, artists, summary };
+  return { issues, volunteers, shifts, artists, teams: teamReports(index), summary };
 }

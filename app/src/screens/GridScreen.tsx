@@ -54,7 +54,7 @@ import { ZoomSlider } from '../components/ZoomSlider.tsx';
 import { TrashTarget } from '../components/TrashTarget.tsx';
 import { poleColours } from '../components/poleColours.ts';
 import { laneRows } from '../components/laneRows.ts';
-import { buddiesOf } from '../components/relations.ts';
+import { buddiesOf, teammatesOf } from '../components/relations.ts';
 import { stepCursor, type NavLanes } from '../components/gridNav.ts';
 import {
   assignOrganiserToPoleAt,
@@ -354,6 +354,7 @@ export function GridScreen({
    * currently selected.
    */
   const buddyKeys = useMemo(() => buddiesOf(plan, selected), [plan, selected]);
+  const teammateKeys = useMemo(() => teammatesOf(plan, selected), [plan, selected]);
 
   const namedArtistKeys = useMemo(() => {
     const volunteer = selected ? index.volunteerByKey.get(selected) : undefined;
@@ -1111,6 +1112,7 @@ export function GridScreen({
                                   volumeBands={volumeBands}
                                   selectedVolunteerKey={selected}
                                   buddyKeys={buddyKeys}
+                                  teammateKeys={teammateKeys}
                                   dragActive={drag !== null}
                                   legalTarget={drag ? drag.legalShifts.has(shift.key) : true}
                                   draggingKey={drag?.payload.kind === 'benevole' ? drag.payload.personKey : null}

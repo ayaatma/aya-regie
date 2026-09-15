@@ -130,6 +130,10 @@ create table event (
     check (jsonb_typeof(form_mapping) = 'object'),
   -- The messages and checks ticked per benevole (« Mail de confirmation envoyé »...), in order,
   -- as [{key, label}]. Since 2026-09-15. A document for the reason form_mapping is one.
+  -- « Fonctionnement en equipe » and the teams, [{key, name, poleKey}]. Since 2026-09-15.
+  teams_enabled         boolean not null default false,
+  teams                 jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(teams) = 'array'),
   -- The competences this event names, [{key, label}] in order. Since 2026-09-15.
   skills                jsonb not null default '[]'::jsonb
     check (jsonb_typeof(skills) = 'array'),
@@ -501,6 +505,8 @@ create table volunteer (
   -- The pole a responsable sent this person to, by key, or null. Since 2026-09-15. Not a foreign
   -- key, for the reason volunteer_refused_slot gives: a removed pole must not delete the decision.
   imposed_pole_key text,
+  -- The team (event.teams key) this person belongs to, or null. Since 2026-09-15.
+  team_key        text,
   -- The pole choices live in volunteer_choice since 2026-09-14: a form may ask for any number.
   -- Answers the regisseur corrected by hand, by field name, and the reason the fiche is in
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
@@ -1061,7 +1067,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 21,
+values ('min_plan_format', 22,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1376,6 +1382,7 @@ as $fn$
              'minor',           v.minor,
              'nicknameMatters', v.nickname_matters,
              'imposedPoleKey',  v.imposed_pole_key,
+             'teamKey',         v.team_key,
              -- A list since 2026-09-08, ordered by the pole's own sort order so the same
              -- database always produces the same JSON. That is what makes the round trip
              -- checkable at all.
@@ -1681,6 +1688,8 @@ as $fn$
       'formMapping', e.form_mapping,
       'applicationSteps', e.application_steps,
       'skills', e.skills,
+      'teamsEnabled', e.teams_enabled,
+      'teams', e.teams,
       'dismissedBuddies', dismissed_buddies.j))
   from event e, slots, preference_slots, poles, shifts, artists, organisers, leader_roles, volunteers, buddies,
        dismissed_buddies, assignments, reserve, organiser_shifts, catering, ticketing, travel
@@ -1769,7 +1778,10 @@ begin
     application_steps     = case when jsonb_typeof(p_plan->'applicationSteps') = 'array'
                                  then p_plan->'applicationSteps' else application_steps end,
     skills                = case when jsonb_typeof(p_plan->'skills') = 'array'
-                                 then p_plan->'skills' else '[]'::jsonb end
+                                 then p_plan->'skills' else '[]'::jsonb end,
+    teams_enabled         = coalesce((p_plan->>'teamsEnabled')::boolean, false),
+    teams                 = case when jsonb_typeof(p_plan->'teams') = 'array'
+                                 then p_plan->'teams' else '[]'::jsonb end
   where id = p_event_id;
 
   insert into ticket_type (event_id, key, label, start_hours, end_hours, sort_order)
@@ -1924,7 +1936,7 @@ begin
                          email, phone, access_code, diet, allergies,
                          requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
                          skills, skills_note, emergency_contact, health_note, minor, nickname_matters,
-                         imposed_pole_key,
+                         imposed_pole_key, team_key,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
@@ -1960,6 +1972,7 @@ begin
          (x->>'minor')::boolean,
          (x->>'nicknameMatters')::boolean,
          nullif(x->>'imposedPoleKey', ''),
+         nullif(x->>'teamKey', ''),
          coalesce((select array_agg(raw #>> '{}')
                    from jsonb_array_elements(coalesce(x->'buddyRawNames', '[]'::jsonb))
                         as bn(raw)),

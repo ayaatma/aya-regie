@@ -95,6 +95,8 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     formMapping: { columns: {}, answers: {} },
     applicationSteps: DEFAULT_APPLICATION_STEPS,
     skills: [],
+    teamsEnabled: false,
+    teams: [],
     dismissedBuddies: [],
     slots: DEFAULT_SLOTS,
     preferenceSlots: DEFAULT_PREFERENCE_SLOTS,

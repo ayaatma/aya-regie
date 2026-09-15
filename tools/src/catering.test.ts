@@ -133,6 +133,8 @@ function makePlan(parts: {
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
     skills: [],
+    teamsEnabled: false,
+    teams: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     catering: parts.catering ?? {

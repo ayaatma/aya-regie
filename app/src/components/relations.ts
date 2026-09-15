@@ -9,6 +9,19 @@
 
 import type { Plan } from '../engine.ts';
 
+/**
+ * The selected bénévole's teammates, when the event works in teams. Since 2026-09-15: ringed on
+ * the grid beside the buddies, so a team split across créneaux is read off the screen.
+ */
+export function teammatesOf(plan: Plan, volunteerKey: string | null): Set<string> {
+  const keys = new Set<string>();
+  if (!volunteerKey || plan.teamsEnabled !== true) return keys;
+  const team = plan.volunteers.find((v) => v.key === volunteerKey)?.teamKey;
+  if (!team) return keys;
+  for (const v of plan.volunteers) if (v.teamKey === team && v.key !== volunteerKey) keys.add(v.key);
+  return keys;
+}
+
 export function buddiesOf(plan: Plan, volunteerKey: string | null): Set<string> {
   const keys = new Set<string>();
   if (!volunteerKey) return keys;

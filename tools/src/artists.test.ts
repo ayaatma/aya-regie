@@ -75,6 +75,8 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
     skills: [],
+    teamsEnabled: false,
+    teams: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     catering: catering ?? {

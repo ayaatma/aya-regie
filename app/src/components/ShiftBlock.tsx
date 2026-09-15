@@ -61,6 +61,8 @@ export interface ShiftBlockProps {
   selectedVolunteerKey: string | null;
   /** People the selected volunteer asked to work with. Highlighted in the buddy colour. */
   buddyKeys: ReadonlySet<string>;
+  /** The selected volunteer's teammates, when the event works in teams. Ringed dashed. */
+  teammateKeys?: ReadonlySet<string>;
   /** True while something is being dragged, whatever it is. */
   dragActive: boolean;
   /** Whether the dragged person may legally take a place here, per the engine. */
@@ -133,6 +135,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     volumeBands,
     selectedVolunteerKey,
     buddyKeys,
+    teammateKeys,
     dragActive,
     legalTarget,
     draggingKey,
@@ -344,6 +347,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
         // there, moving the cursor selects whoever stands in it), so this is exactly one box.
         const picked = selected && row === cursorIndex;
         const buddy = !selected && buddyKeys.has(entry.volunteerKey);
+        const teammate = !selected && !buddy && (teammateKeys?.has(entry.volunteerKey) ?? false);
         const stars = starsFor(entry.level);
 
         // Attributed by the engine to this box and no other, so a problem on somebody's evening
@@ -359,6 +363,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           selected ? 'is-kin' : '',
           picked ? 'is-picked' : '',
           buddy ? 'is-buddy' : '',
+          teammate ? 'is-teammate' : '',
           entry.volunteerKey === draggingKey ? 'is-dragging' : '',
           entry.volunteerKey === dropBoxVolunteerKey ? 'is-swap-target' : '',
           // No colour of its own: the cursor box is the picked box, which is already blue. The

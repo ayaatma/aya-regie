@@ -72,6 +72,8 @@ function makePlan(parts: {
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
     skills: [],
+    teamsEnabled: false,
+    teams: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,
@@ -946,4 +948,25 @@ test('somebody a responsable sent to a pole is placed there, even outside their 
   const result = solve(plan, { seed: 5, iterations: 300 });
   deepStrictEqual(result.plan.assignments.map((a) => a.shiftKey), ['g1']);
   strictEqual(validate(result.plan).issues.filter((i) => i.code === 'hors-choix' || i.code === 'hors-pole-impose').length, 0);
+});
+
+test('with teams on, two teammates end up on the same créneau when it costs nothing else', () => {
+  const base = makePlan({
+    shifts: [shift('m', 'alpha', 0, 4, 2), shift('n', 'alpha', 6, 10, 2)],
+    volunteers: [
+      volunteer('a', { requestedHours: 4, teamKey: 't1' }),
+      volunteer('b', { requestedHours: 4, teamKey: 't1' }),
+      volunteer('c', { requestedHours: 4 }),
+      volunteer('d', { requestedHours: 4 }),
+    ],
+  });
+  const plan = { ...base, teamsEnabled: true, teams: [{ key: 't1', name: 'Équipe A', poleKey: null }] };
+  for (const seed of [1, 2, 3]) {
+    const result = solve(plan, { seed, iterations: 400 });
+    const where = (key: string) => result.plan.assignments.find((a) => a.volunteerKey === key)?.shiftKey;
+    strictEqual(where('a'), where('b'), `graine ${seed}: l'équipe reste ensemble`);
+    const team = validate(result.plan).teams[0]!;
+    strictEqual(team.aloneHours, 0);
+    strictEqual(team.hours, 8);
+  }
 });
