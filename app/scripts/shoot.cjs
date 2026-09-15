@@ -347,6 +347,19 @@ async function main() {
         await sleep(300);
         await shot('103-reglages-activites');
       }
+      if (want('magasin')) {
+        // Le Magasin: two lines, one of them lent and out.
+        await tab('Magasin');
+        await clickButton(/^Ajouter du matériel$/);
+        await clickButton(/^Ajouter du matériel$/);
+        await page.type('input[name="equipment-name-materiel-1"]', 'Tonnelle 3x3');
+        await page.type('input[name="equipment-lender-materiel-1"]', 'Mairie');
+        await page.select('select[name="equipment-status-materiel-1"]', 'sorti');
+        await page.type('input[name="equipment-holder-materiel-1"]', 'Bar');
+        await page.type('input[name="equipment-name-materiel-2"]', 'Rallonges 25 m');
+        await sleep(400);
+        await shot('104-magasin');
+      }
       if (want('catering')) {
         await tab('Catering');
         await shot('80-catering');

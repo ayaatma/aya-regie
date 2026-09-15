@@ -30,6 +30,7 @@ import { useIsPhone } from './components/useIsPhone.ts';
 import { CheckpointBar } from './components/CheckpointBar.tsx';
 import { AccountBar } from './auth/AccountBar.tsx';
 import { JournalScreen } from './screens/JournalScreen.tsx';
+import { MagasinScreen } from './screens/MagasinScreen.tsx';
 import { StackedScreen, scrollToSection } from './screens/StackedScreen.tsx';
 import { log } from './log/logger.ts';
 
@@ -45,6 +46,7 @@ type Screen =
   | 'tableau'
   | 'artistes'
   | 'catering'
+  | 'magasin'
   | 'personnes'
   | 'reglages'
   | 'import'
@@ -59,6 +61,8 @@ const TABS: Array<{ id: Screen; label: string }> = [
   { id: 'personnes', label: 'Personnes' },
   { id: 'artistes', label: 'Artistes' },
   { id: 'catering', label: 'Catering' },
+  // 2026-09-15: the equipment, lent or owned, and where each piece is.
+  { id: 'magasin', label: 'Magasin' },
   { id: 'reglages', label: 'Réglages' },
   { id: 'import', label: 'Import/Export' },
   { id: 'historique', label: 'Historique' },
@@ -393,6 +397,7 @@ export function App({
         )}
         {screen === 'artistes' && <ArtistsScreen />}
         {screen === 'catering' && <CateringScreen onGoToSetup={() => setScreen('reglages')} />}
+        {screen === 'magasin' && <MagasinScreen />}
         {screen === 'personnes' && (
           <PeopleScreen
             focus={personFocus}

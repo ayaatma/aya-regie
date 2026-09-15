@@ -2543,3 +2543,25 @@ test('a side activity lists who is keen on it, without anybody cancelled', async
   assert.ok(!shows(html, `${gone.firstName} ${gone.lastName}`), 'une annulation sort de la liste');
   assert.ok(shows(html, 'Pré-montage (1)'));
 });
+
+test('le Magasin lists the equipment and turns a bénévole’s offer into an expected line, once', async () => {
+  const { MagasinScreen } = await import('./MagasinScreen.tsx');
+  const { equipmentFromOffer } = await import('../store/equipmentEdits.ts');
+  const offering = plan.volunteers[0]!;
+  const withOffer: Plan = {
+    ...plan,
+    equipment: [],
+    volunteers: plan.volunteers.map((v) => (v.key === offering.key ? { ...v, equipmentNote: 'Une tonnelle 3x3' } : v)),
+  };
+  const before = render(<MagasinScreen />, withOffer);
+  assert.ok(shows(before, 'Une tonnelle 3x3'));
+  assert.ok(before.includes('>Ajouter au magasin</button>'));
+
+  const after = equipmentFromOffer(withOffer, offering.key);
+  assert.equal(after.equipment.length, 1);
+  assert.equal(after.equipment[0]!.status, 'attendu');
+  assert.equal(after.equipment[0]!.lenderKey, offering.key);
+  const html = render(<MagasinScreen />, after);
+  assert.ok(shows(html, 'au magasin') && !html.includes('>Ajouter au magasin</button>'));
+  assert.ok(shows(html, '1 prêt à rendre'));
+});

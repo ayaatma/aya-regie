@@ -30,6 +30,7 @@ import {
   type SkillTag,
   type Team,
   type SideActivity,
+  type EquipmentItem,
 } from './model.js';
 import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
 import { type Phase, alignPhase, defaultPhase, defaultPhaseStart } from './phase.js';
@@ -133,8 +134,10 @@ import {
  *    predates this dissolves every team on its next save.
  * 23: 2026-09-15, side activities: `Plan.sideActivities`, `sideActivityKeys` on bénévoles and
  *    orgas. A build that predates this empties every list on its next save.
+ * 24: 2026-09-15, le Magasin: `Plan.equipment` and `Volunteer.equipmentNote`. A build that
+ *    predates this empties the store on its next save.
  */
-export const PLAN_FORMAT = 23;
+export const PLAN_FORMAT = 24;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -281,6 +284,8 @@ export interface Plan {
   teams: readonly Team[];
   /** Pré-montage, weekends: activities with a list of volunteers and no grid. Since 2026-09-15. */
   sideActivities: readonly SideActivity[];
+  /** « Magasin »: the equipment, lent or owned, and where each piece is. Since 2026-09-15. */
+  equipment: readonly EquipmentItem[];
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *
@@ -879,6 +884,7 @@ export function emptyPlan(
     | 'teamsEnabled'
     | 'teams'
     | 'sideActivities'
+    | 'equipment'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -914,5 +920,6 @@ export function emptyPlan(
     teamsEnabled: false,
     teams: [],
     sideActivities: [],
+    equipment: [],
   };
 }

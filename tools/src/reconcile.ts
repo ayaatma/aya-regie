@@ -129,6 +129,10 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
     healthNote: { label: 'Santé, besoins', show: (v) => ((v ?? '').trim() === '' ? 'rien' : (v ?? '').trim()) },
     minor: { label: 'Mineur·e', show: (v) => (v === true ? 'oui' : v === false ? 'non' : 'non renseigné') },
     imposedPoleKey: { label: 'Pôle imposé', show: (v) => (v ? poleName(v) : 'aucun') },
+    equipmentNote: {
+      label: 'Matériel proposé',
+      show: (v) => ((v ?? '').trim() === '' ? 'rien' : (v ?? '').trim()),
+    },
     sideActivityKeys: {
       label: 'Activités annexes',
       show: (v) => ((v ?? []).length > 0 ? [...(v ?? [])].sort().join(', ') : 'aucune'),

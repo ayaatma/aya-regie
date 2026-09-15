@@ -118,6 +118,7 @@ function makePlan(): Plan {
     teamsEnabled: false,
     teams: [],
     sideActivities: [],
+    equipment: [],
     constraints: DEFAULT_CONSTRAINTS,
   };
 }

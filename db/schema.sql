@@ -130,6 +130,10 @@ create table event (
     check (jsonb_typeof(form_mapping) = 'object'),
   -- The messages and checks ticked per benevole (« Mail de confirmation envoyé »...), in order,
   -- as [{key, label}]. Since 2026-09-15. A document for the reason form_mapping is one.
+  -- Le Magasin: the equipment and where each piece is, [{key, name, quantity, lender, lenderKind,
+  -- lenderKey, status, holder, note}]. A ledger typed by hand, never queried inside. 2026-09-15.
+  equipment             jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(equipment) = 'array'),
   -- Pre-montage, weekends: activities with a list and no grid, [{key, label, when}]. 2026-09-15.
   side_activities       jsonb not null default '[]'::jsonb
     check (jsonb_typeof(side_activities) = 'array'),
@@ -514,6 +518,8 @@ create table volunteer (
   team_key        text,
   -- The side activities (event.side_activities keys) this person is keen on. Since 2026-09-15.
   side_activity_keys text[] not null default '{}',
+  -- « Peux-tu ramener du matos ? », as typed, for the Magasin. Since 2026-09-15.
+  equipment_note  text not null default '',
   -- The pole choices live in volunteer_choice since 2026-09-14: a form may ask for any number.
   -- Answers the regisseur corrected by hand, by field name, and the reason the fiche is in
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
@@ -1074,7 +1080,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 23,
+values ('min_plan_format', 24,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1392,6 +1398,7 @@ as $fn$
              'imposedPoleKey',  v.imposed_pole_key,
              'teamKey',         v.team_key,
              'sideActivityKeys', to_jsonb(v.side_activity_keys),
+             'equipmentNote',   v.equipment_note,
              -- A list since 2026-09-08, ordered by the pole's own sort order so the same
              -- database always produces the same JSON. That is what makes the round trip
              -- checkable at all.
@@ -1698,6 +1705,7 @@ as $fn$
       'applicationSteps', e.application_steps,
       'skills', e.skills,
       'sideActivities', e.side_activities,
+      'equipment', e.equipment,
       'teamsEnabled', e.teams_enabled,
       'teams', e.teams,
       'dismissedBuddies', dismissed_buddies.j))
@@ -1791,6 +1799,8 @@ begin
                                  then p_plan->'skills' else '[]'::jsonb end,
     side_activities       = case when jsonb_typeof(p_plan->'sideActivities') = 'array'
                                  then p_plan->'sideActivities' else '[]'::jsonb end,
+    equipment             = case when jsonb_typeof(p_plan->'equipment') = 'array'
+                                 then p_plan->'equipment' else '[]'::jsonb end,
     teams_enabled         = coalesce((p_plan->>'teamsEnabled')::boolean, false),
     teams                 = case when jsonb_typeof(p_plan->'teams') = 'array'
                                  then p_plan->'teams' else '[]'::jsonb end
@@ -1952,7 +1962,7 @@ begin
                          email, phone, access_code, diet, allergies,
                          requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
                          skills, skills_note, emergency_contact, health_note, minor, nickname_matters,
-                         imposed_pole_key, team_key, side_activity_keys,
+                         imposed_pole_key, team_key, side_activity_keys, equipment_note,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
@@ -1993,6 +2003,7 @@ begin
                    from jsonb_array_elements(case when jsonb_typeof(x->'sideActivityKeys') = 'array'
                                                   then x->'sideActivityKeys' else '[]'::jsonb end) as sa(k)),
                   '{}'::text[]),
+         coalesce(x->>'equipmentNote', ''),
          coalesce((select array_agg(raw #>> '{}')
                    from jsonb_array_elements(coalesce(x->'buddyRawNames', '[]'::jsonb))
                         as bn(raw)),

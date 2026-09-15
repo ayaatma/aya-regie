@@ -2099,6 +2099,24 @@ button {
   outline-offset: -1px;
 }
 
+/* Le Magasin (2026-09-15). */
+.magasin-table .select {
+  width: 100%;
+  min-width: 90px;
+}
+
+.magasin-status.is-attendu {
+  border-color: var(--orange-fonce, var(--line));
+}
+
+.magasin-status.is-sorti {
+  border-color: var(--ok);
+}
+
+.magasin-offers li {
+  margin: 4px 0;
+}
+
 /* Un coéquipier de la personne sélectionnée (2026-09-15): la couleur du binôme, en pointillés. */
 .box.is-teammate {
   outline: 2px dashed var(--ok);

@@ -16,6 +16,8 @@
  */
 
 import {
+  EQUIPMENT_STATUSES,
+  type EquipmentStatus,
   APPLICATION_STATUSES,
   DEFAULT_APPLICATION_STEPS,
   ENERGY_PROFILES,
@@ -596,6 +598,7 @@ const volunteer = (value: unknown): Volunteer => {
     imposedPoleKey: typeof loose.imposedPoleKey === 'string' && loose.imposedPoleKey !== '' ? loose.imposedPoleKey : null,
     teamKey: typeof loose.teamKey === 'string' && loose.teamKey !== '' ? loose.teamKey : null,
     sideActivityKeys: keys(loose.sideActivityKeys),
+    equipmentNote: text(loose.equipmentNote),
     refusedPoleKeys,
     choices: choices(loose),
     artistKeys: array<string>(loose.artistKeys) as string[],
@@ -983,6 +986,21 @@ export function normalisePlan(raw: unknown): Plan {
     // Absent from anything written before 2026-09-14: nothing decided, everything detected.
     formMapping: formMapping(loose.formMapping),
     applicationSteps: applicationSteps((loose as Record<string, unknown>).applicationSteps),
+    // Absent from anything written before 2026-09-15: an empty store.
+    equipment: array<Record<string, unknown>>((loose as Record<string, unknown>).equipment)
+      .filter((e) => e !== null && typeof e === 'object')
+      .map((e) => ({
+        key: text(e.key),
+        name: text(e.name),
+        quantity: typeof e.quantity === 'number' && Number.isFinite(e.quantity) && e.quantity >= 0 ? e.quantity : 1,
+        lender: text(e.lender),
+        lenderKind: e.lenderKind === 'benevole' || e.lenderKind === 'orga' ? (e.lenderKind as 'benevole' | 'orga') : null,
+        lenderKey: text(e.lenderKey) === '' ? null : text(e.lenderKey),
+        status: (EQUIPMENT_STATUSES as readonly unknown[]).includes(e.status) ? (e.status as EquipmentStatus) : 'stock',
+        holder: text(e.holder),
+        note: text(e.note),
+      }))
+      .filter((e) => e.key !== ''),
     // Absent from anything written before 2026-09-15: no side activity.
     sideActivities: array<Record<string, unknown>>((loose as Record<string, unknown>).sideActivities)
       .filter((a) => a !== null && typeof a === 'object')

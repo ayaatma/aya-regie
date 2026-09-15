@@ -338,6 +338,9 @@ export type { SkillTag } from '@engine/model.ts';
 export type { Team } from '@engine/model.ts';
 // Side activities, 2026-09-15.
 export type { SideActivity } from '@engine/model.ts';
+// Le Magasin, 2026-09-15.
+export { EQUIPMENT_STATUSES, EQUIPMENT_STATUS_LABEL } from '@engine/model.ts';
+export type { EquipmentItem, EquipmentStatus } from '@engine/model.ts';
 export type { TeamReport } from '@engine/validate.ts';
 
 // Availability day by day, 2026-09-15.

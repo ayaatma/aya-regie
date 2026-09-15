@@ -98,6 +98,7 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     teamsEnabled: false,
     teams: [],
     sideActivities: [],
+    equipment: [],
     dismissedBuddies: [],
     slots: DEFAULT_SLOTS,
     preferenceSlots: DEFAULT_PREFERENCE_SLOTS,

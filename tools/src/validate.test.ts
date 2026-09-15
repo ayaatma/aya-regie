@@ -120,6 +120,7 @@ function makePlan(parts: {
     teamsEnabled: false,
     teams: [],
     sideActivities: [],
+    equipment: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,

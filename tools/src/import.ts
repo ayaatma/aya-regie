@@ -114,6 +114,8 @@ const FIELDS = [
   // « Si tu es déjà affecté à une équipe »: sent by a responsable, or a responsable themselves,
   // and which team they run. Read into a doubt on the fiche, never into a silent change.
   'assignedBy', 'leadsTeam',
+  // « Peux-tu ramener du matos ? Si oui quoi ? », for the Magasin. Optional.
+  'equipmentOffer',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -204,6 +206,7 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'arrival',     test: (h) => /heure (peux|pourras) tu arriver|heure d arrivee|quand arrives tu/.test(h), required: false },
   { field: 'departure',   test: (h) => /heure (dois|peux) tu (re)?partir|heure de depart|quand (re)?pars tu/.test(h), required: false },
   { field: 'emergencyContact', test: (h) => /urgence/.test(h), required: false },
+  { field: 'equipmentOffer', test: (h) => /(ramener|apporter|preter) (du )?(matos|materiel)/.test(h), required: false },
   { field: 'leadsTeam',   test: (h) => /en tant que respo|equipe es tu (affecte|responsable)/.test(h), required: false },
   { field: 'assignedBy',  test: (h) => /deja affecte|envoye par un respo/.test(h), required: false },
   // The details before the yes / no: both say « besoins spécifiques ».
@@ -1376,6 +1379,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
         ]),
       ],
       skillsNote: cell(row, 'skills'),
+      // A bare « non » offers nothing; anything else is kept as typed.
+      equipmentNote: yesNo(cell(row, 'equipmentOffer')) === false ? '' : cell(row, 'equipmentOffer'),
       sideActivityKeys: activityColumns
         .filter(({ column }) => yesNo((row[column] ?? '').trim()) === true)
         .map(({ key }) => key),

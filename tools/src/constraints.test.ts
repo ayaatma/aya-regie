@@ -79,6 +79,7 @@ function makePlan(parts: {
     teamsEnabled: false,
     teams: [],
     sideActivities: [],
+    equipment: [],
     dismissedBuddies: [],
     constraints: { ...DEFAULT_CONSTRAINTS, ...parts.longDay, criteria: parts.criteria ?? {} },
     slots: DEFAULT_SLOTS, preferenceSlots: DEFAULT_PREFERENCE_SLOTS,

@@ -318,6 +318,44 @@ export const DEFAULT_CATERING: CateringSettings = {
 };
 
 /**
+ * Where a piece of equipment stands, since 2026-09-15:
+ *   attendu     promised (somebody said they would bring it), not on site yet
+ *   stock       on site, free
+ *   sorti       taken out, `holder` says by whom or where
+ *   rendu       given back to whoever lent it: the loan is closed
+ */
+export type EquipmentStatus = 'attendu' | 'stock' | 'sorti' | 'rendu';
+
+export const EQUIPMENT_STATUSES: readonly EquipmentStatus[] = ['attendu', 'stock', 'sorti', 'rendu'];
+
+export const EQUIPMENT_STATUS_LABEL: Record<EquipmentStatus, string> = {
+  attendu: 'Attendu',
+  stock: 'En stock',
+  sorti: 'Sorti',
+  rendu: 'Rendu',
+};
+
+/**
+ * One line of « Magasin », since 2026-09-15: the equipment of the event, the association's own or
+ * lent by somebody. A lender who is a bénévole or an orga of the plan is named by key, so their
+ * fiche can say what they brought; anybody else is a free label. Nothing is derived: the régisseur
+ * types what is there and what went where.
+ */
+export interface EquipmentItem {
+  key: string;
+  name: string;
+  quantity: number;
+  /** Empty for the association's own; a name otherwise (« Mairie », a bénévole's name). */
+  lender: string;
+  lenderKind: 'benevole' | 'orga' | null;
+  lenderKey: string | null;
+  status: EquipmentStatus;
+  /** Who or where it is while `sorti` (« Bar », « Camille »). */
+  holder: string;
+  note: string;
+}
+
+/**
  * Something around the event that has no grid, since 2026-09-15: a pré-montage the week before, a
  * weekend preparing the site, a weekend of déco. What the régisseur needs is the list of people
  * keen on it, not a schedule. `when` is free text (« 10 au 12 septembre »).
@@ -912,6 +950,11 @@ export interface Volunteer {
    * activity, correctable on the fiche. Since 2026-09-15.
    */
   sideActivityKeys?: string[];
+  /**
+   * « Peux-tu ramener du matos à toi ? Si oui quoi ? », as typed. Since 2026-09-15. Read on the
+   * Magasin tab, where one click turns it into an expected item lent by this person.
+   */
+  equipmentNote?: string;
   /**
    * The time constraint, in the volunteer's own words, exactly as they typed it.
    *

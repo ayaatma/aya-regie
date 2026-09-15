@@ -78,6 +78,7 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     teamsEnabled: false,
     teams: [],
     sideActivities: [],
+    equipment: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     catering: catering ?? {
