@@ -1,7 +1,7 @@
 /**
- * The pool pane: who is still to place, who is held back, and which fiches are still to proofread.
+ * The pool pane: who is still to place, and which fiches are still to proofread.
  *
- * ONE PANE FOR THE THREE MOMENTS, since 2026-09-11, and the same three tabs in each. The exploit
+ * ONE PANE FOR THE THREE MOMENTS, since 2026-09-11, and the same tabs in each. The exploit
  * had `SidePanel` and the two phases had `PhasePool`, and they agreed on nothing: different tabs,
  * different markup, different words for the same idea, and only one of the two had any CSS at all,
  * so the montage's panel was raw browser defaults stacked in a column. The régisseur asked for one
@@ -9,8 +9,17 @@
  *
  * WHAT DIFFERS BETWEEN THE MOMENTS IS THE CONTENT OF ONE TAB. "Disponibles" means "has hours
  * nobody has used yet", which on the exploit is the volume they asked for and on a phase is the
- * presence they declared. "Réserve" and "À relire" are facts about people rather than about a
- * moment, so they read the same everywhere.
+ * presence they declared. "À relire" is a fact about people rather than about a moment, so it
+ * reads the same everywhere.
+ *
+ * NO "RÉSERVE" TAB ANY MORE, since 2026-09-15. The régisseur asked for a narrower pane and for the
+ * reserve to live in Personnes, apart from everybody else: people in reserve are normally not on
+ * site, so a list beside the grid of who is on site was the wrong place for them. Putting somebody
+ * in reserve is still one button on their fiche (`VolunteerFiche`).
+ *
+ * THE PANE IS NARROW ON PURPOSE (`--panel-w`), since the same day: every pixel given to it is taken
+ * from the grid. The how-to sentence that used to open the list is the tab's tooltip, and a row's
+ * figure is the bare hours, the row's own tooltip saying what they are.
  *
  * ORGAS ARE IN "DISPONIBLES" IN THE THREE MOMENTS, since 2026-09-12. They were on the two phases
  * and not on the exploit, and the exploit is where an orga is put on a créneau or made responsable
@@ -41,13 +50,12 @@ import { useMemo, useState } from 'react';
 
 import type { PersonKind, PhaseId } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
-import { DRAG_MIME, DRAG_MIME_ORGA, type DragPayload } from './drag.ts';
+import { DRAG_MIME, type DragPayload } from './drag.ts';
 import { PersonMark } from './PersonMark.tsx';
-import { volumeText } from './layout.ts';
 import { exploitPoolRows, phasePoolRows, poleMatchOf, type PoleMatch, type PoolRow } from './poolRows.ts';
 import { sameSelection, type Selection } from './selection.ts';
 
-export type PanelTab = 'disponibles' | 'reserve' | 'relecture';
+export type PanelTab = 'disponibles' | 'relecture';
 
 /** Which planning is on screen. The exploit and the two phases, named as the régisseur names them. */
 export type Moment = 'exploit' | PhaseId;
@@ -96,8 +104,6 @@ export interface PoolPanelProps {
    * which is why this is what the tab means as a target rather than a separate control.
    */
   onDropUnassign?(): void;
-  /** Dropping a box on "Réserve" makes it a deliberate zero. Exploit only. */
-  onDropReserve?(): void;
   readOnly?: boolean;
 }
 
@@ -113,7 +119,6 @@ export function PoolPanel(props: PoolPanelProps) {
     onDragStartPhase,
     onDragEndPool,
     onDropUnassign,
-    onDropReserve,
     readOnly = false,
   } = props;
 
@@ -137,28 +142,6 @@ export function PoolPanel(props: PoolPanelProps) {
   const available = poleKey === ALL_POLES ? byKind : byKind.filter((row) => matchOf(row) !== null);
   // The exploit's poles, in the order Réglages draws them, each by its full path.
   const poles = plan.poles;
-
-  /** The reserve: zero hours on the exploit, deliberately. A fact about a person, shown anywhere. */
-  const reserved = useMemo(
-    () =>
-      report.volunteers
-        .filter((v) => v.reserve)
-        .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
-        .map(
-          (entry): PoolRow => ({
-            id: entry.key,
-            personKey: entry.key,
-            kind: 'benevole',
-            selection: { kind: 'benevole', volunteerKey: entry.key },
-            name: entry.name,
-            meta: `${volumeText(entry.requestedHours, index.dayMode)} proposées`,
-            zero: true,
-            review: index.volunteerByKey.get(entry.key)?.needsReview === true,
-            title: `${entry.name}\nEn réserve: zéro heure, volontairement.`,
-          }),
-        ),
-    [report.volunteers, index],
-  );
 
   /*
    * The review queue: every fiche the importer was not sure about.
@@ -190,35 +173,23 @@ export function PoolPanel(props: PoolPanelProps) {
   );
 
   /*
-   * The two drops this panel accepts, and what each tab means as a target.
-   *
-   * "Disponibles" took over from the tab that used to be called "À zéro": dropping a box there
-   * unplaces the person, which is exactly what putting them back in the pool of available people
-   * means. It works on the three moments since 2026-09-12; the screen decides what "unplace"
-   * means, since a créneau and a phase box are not removed the same way.
-   *
-   * "Réserve" stays the exploit's, and only the exploit's: it means zero hours on the event, and
-   * a phase has no such decision to offer. The `onDropReserve` callback being absent is what says
-   * so, so there is no second rule here to contradict the first.
+   * The one drop this panel accepts. "Disponibles" took over from the tab that used to be called
+   * "À zéro": dropping a box there unplaces the person, which is exactly what putting them back in
+   * the pool of available people means. It works on the three moments since 2026-09-12; the
+   * screen decides what "unplace" means, since a créneau and a phase box are not removed the same
+   * way. The review queue is a list of fiches to read, not a place to put a person: dropping
+   * somebody on it would be an edit nobody asked for.
    */
-  const acceptDrop = (event: React.DragEvent): boolean => {
-    if (readOnly || !event.dataTransfer.types.includes(DRAG_MIME)) return false;
-    // The review queue is a list of fiches to read, not a place to put a person: dropping
-    // somebody on it would be an edit nobody asked for.
-    //
-    // The reserve refuses an orga outright rather than accepting the drop and doing nothing. It
-    // means "zéro heure sur l'exploit, volontairement", which is a decision about a volume, and an
-    // orga has none: there is nothing for them to give up.
-    if (tab === 'reserve') {
-      return onDropReserve !== undefined && !event.dataTransfer.types.includes(DRAG_MIME_ORGA);
-    }
-    return tab === 'disponibles' && onDropUnassign !== undefined;
-  };
+  const acceptDrop = (event: React.DragEvent): boolean =>
+    !readOnly &&
+    event.dataTransfer.types.includes(DRAG_MIME) &&
+    tab === 'disponibles' &&
+    onDropUnassign !== undefined;
 
-  const rows = tab === 'disponibles' ? available : tab === 'reserve' ? reserved : toReview;
+  const rows = tab === 'disponibles' ? available : toReview;
 
   return (
-    <aside className="panel">
+    <aside className="panel is-pool">
       <div className="panel-tabs">
         <button
           className="panel-tab"
@@ -226,19 +197,11 @@ export function PoolPanel(props: PoolPanelProps) {
           onClick={() => onTabChange('disponibles')}
           title={
             isPhase
-              ? 'Les personnes sur place dont il reste des heures à placer'
-              : 'Tout le monde à qui il reste des heures à donner'
+              ? "Les heures que ces personnes ont déclarées et que personne ne leur a encore attribuées. Glissez un nom sur un pôle: il prend les heures déclarées pour le jour visé. Déposez ici une case de la grille pour la retirer."
+              : "Tout le monde à qui il reste des heures à donner. Glissez un bénévole dans un créneau, ou déposez ici une case pour la retirer de son créneau. Un orga se glisse dans un créneau pour y tenir une place, ou sur la frise d'un pôle pour en devenir responsable pendant 2 h."
           }
         >
           Disponibles ({available.length})
-        </button>
-        <button
-          className="panel-tab"
-          aria-current={tab === 'reserve'}
-          onClick={() => onTabChange('reserve')}
-          title="Zéro heure sur l'exploit, volontairement"
-        >
-          Réserve ({reserved.length})
         </button>
         {/*
           Only there when there is something in it. An empty queue is not a job to do, and a
@@ -269,66 +232,48 @@ export function PoolPanel(props: PoolPanelProps) {
           if (!acceptDrop(event)) return;
           event.preventDefault();
           setDropHot(false);
-          if (tab === 'reserve') onDropReserve?.();
-          else onDropUnassign?.();
+          onDropUnassign?.();
         }}
       >
         {tab === 'disponibles' && (
-          <>
-            <p className="panel-sub">
-              {isPhase
-                ? "Les heures que ces personnes ont déclarées et que personne ne leur a encore attribuées. Glissez un nom sur un pôle: il prend les heures déclarées pour le jour visé. Déposez ici une case de la grille pour la retirer."
-                : "Glissez un bénévole dans un créneau, ou déposez ici une case pour la retirer de son créneau. Un orga se glisse dans un créneau pour y tenir une place, ou sur la frise d'un pôle pour en devenir responsable pendant 2 h."}
-            </p>
+          /*
+            THE SAME FILTER IN THE THREE MOMENTS, since the exploit's list gained the orgas on
+            2026-09-12. It was a phase-only control while the exploit knew bénévoles alone, and
+            leaving it that way would have meant one list of two kinds of person with no way to
+            ask for one of them. The day filter is NOT here: it belongs to the phase screen's
+            toolbar, where it narrows the grid and this list at once. See `PoolPanelProps.day`.
 
-            {/*
-              THE SAME FILTER IN THE THREE MOMENTS, since the exploit's list gained the orgas on
-              2026-09-12. It was a phase-only control while the exploit knew bénévoles alone, and
-              leaving it that way would have meant one list of two kinds of person with no way to
-              ask for one of them. The day filter is NOT here: it belongs to the phase screen's
-              toolbar, where it narrows the grid and this list at once. See `PoolPanelProps.day`.
-            */}
-            <div className="pool-filters">
-              <label className="pool-filter">
-                <span>Qui</span>
-                <select
-                  className="select"
-                  value={kind}
-                  aria-label="Filtrer par type de personne"
-                  onChange={(event) => setKind(event.target.value as PersonKind | typeof ALL_KINDS)}
-                >
-                  <option value={ALL_KINDS}>Tout le monde</option>
-                  <option value="orga">Orgas</option>
-                  <option value="benevole">Bénévoles</option>
-                </select>
-              </label>
-              <label className="pool-filter">
-                <span>Pôle demandé</span>
-                <select
-                  className="select"
-                  value={poleKey}
-                  aria-label="Filtrer par pôle demandé"
-                  title="Les bénévoles dont c'est le choix 1 ou le choix 2, et les orgas qui en sont responsables"
-                  onChange={(event) => setPoleKey(event.target.value)}
-                >
-                  <option value={ALL_POLES}>Tous les pôles</option>
-                  {poles.map((pole) => (
-                    <option key={pole.key} value={pole.key}>
-                      {pole.path}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </>
-        )}
-
-        {tab === 'reserve' && (
-          <p className="panel-sub">
-            {isPhase
-              ? "La réserve est une décision de l'exploit: ces personnes n'y font aucune heure. Elles peuvent tout de même venir au montage si elles l'ont dit."
-              : 'Déposez ici une personne pour la mettre en réserve: zéro heure, volontairement.'}
-          </p>
+            No visible label: the first option of each select names its subject (« Tout le
+            monde », « Tous les pôles »), and two labels above two selects cost a line in a pane
+            kept narrow for the grid's sake.
+          */
+          <div className="pool-filters">
+            <select
+              className="select"
+              value={kind}
+              aria-label="Filtrer par type de personne"
+              title="Qui"
+              onChange={(event) => setKind(event.target.value as PersonKind | typeof ALL_KINDS)}
+            >
+              <option value={ALL_KINDS}>Tout le monde</option>
+              <option value="orga">Orgas</option>
+              <option value="benevole">Bénévoles</option>
+            </select>
+            <select
+              className="select"
+              value={poleKey}
+              aria-label="Filtrer par pôle demandé"
+              title="Pôle demandé: les bénévoles dont c'est le choix 1 ou le choix 2, et les orgas qui en sont responsables"
+              onChange={(event) => setPoleKey(event.target.value)}
+            >
+              <option value={ALL_POLES}>Tous les pôles</option>
+              {poles.map((pole) => (
+                <option key={pole.key} value={pole.key}>
+                  {pole.path}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
 
         {tab === 'relecture' && (
@@ -375,11 +320,13 @@ export function PoolPanel(props: PoolPanelProps) {
           >
             <PersonMark kind={row.kind} />
             <span className="pool-item-name">{row.name}</span>
-            {/* "À zéro" used to be a tab of its own. It is the same fact, said on the row. */}
+            {/*
+              "À zéro" used to be a tab of its own. It is the same fact, said on the row: a chip
+              until 2026-09-15, a dot since, because on a montage nearly every row carries it and
+              the words cost the names their width.
+            */}
             {row.zero && tab === 'disponibles' && (
-              <span className="chip is-zero" title="Rien de placé pour l'instant">
-                à zéro
-              </span>
+              <span className="pool-zero" role="img" aria-label="à zéro" title="À zéro: rien de placé pour l'instant" />
             )}
             {tab === 'disponibles' && poleKey !== ALL_POLES && matchOf(row) !== null && (
               <span
@@ -408,7 +355,6 @@ export function PoolPanel(props: PoolPanelProps) {
 
 /** What an empty list says, which is never just "vide": it says why it is empty. */
 function emptyWord(tab: PanelTab, isPhase: boolean, kind: PersonKind | typeof ALL_KINDS): string {
-  if (tab === 'reserve') return 'La réserve est vide.';
   if (tab === 'relecture') return 'Plus rien à relire.';
   // The kind comes first, and on the exploit too since its list gained the orgas: "tout le monde a
   // déjà le volume proposé" is a sentence about bénévoles, and reading it under "Orgas" would say
@@ -418,6 +364,3 @@ function emptyWord(tab: PanelTab, isPhase: boolean, kind: PersonKind | typeof AL
   if (!isPhase) return 'Tout le monde a déjà le volume proposé.';
   return 'Tout le monde est placé sur cette période.';
 }
-
-
-

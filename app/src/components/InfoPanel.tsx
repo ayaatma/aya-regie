@@ -23,6 +23,8 @@
  * remove them from the événement on the spot.
  */
 
+import { useState } from 'react';
+
 import {
   allPlacements,
   eventFills,
@@ -46,6 +48,39 @@ import { useNavigation } from './personNav.ts';
 import type { Selection } from './selection.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
 
+/** Where the folded state is remembered, per browser. A convenience, so a failure costs nothing. */
+const COLLAPSED_KEY = 'aya-regie.info-panel.collapsed';
+
+const readCollapsed = (): boolean => {
+  try {
+    return globalThis.localStorage?.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Whether the pane is folded, remembered across the three moments and across reloads.
+ *
+ * FOLDABLE SINCE 2026-09-15, on the régisseur's request: the two panes on the right were taking
+ * the grid's room. Folding leaves a strip the width of a button, and the SCREEN'S GRID COLUMN
+ * follows through `:has()` in the stylesheet (`.screen.has-info:has(> .panel.is-info.is-collapsed)`)
+ * rather than a prop threaded through `GridScreen` and `PhaseGrid`. A selection made while folded
+ * does not unfold it: folding is a decision, and the strip carries a dot saying something is there.
+ */
+function useCollapsed(): [boolean, (value: boolean) => void] {
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const set = (value: boolean): void => {
+    setCollapsed(value);
+    try {
+      globalThis.localStorage?.setItem(COLLAPSED_KEY, value ? '1' : '0');
+    } catch {
+      // Private window or blocked storage: the pane still folds, it just forgets on reload.
+    }
+  };
+  return [collapsed, set];
+}
+
 export function InfoPanel({
   selection,
   onSelect,
@@ -55,6 +90,27 @@ export function InfoPanel({
   onSelect(selection: Selection | null): void;
   readOnly?: boolean;
 }) {
+  const [collapsed, setCollapsed] = useCollapsed();
+
+  if (collapsed) {
+    return (
+      <aside className="panel is-info is-collapsed">
+        <button
+          className="panel-unfold"
+          title="Déplier le volet Info sélection"
+          aria-label="Déplier le volet Info sélection"
+          onClick={() => setCollapsed(false)}
+        >
+          <span aria-hidden>«</span>
+          <span className="panel-unfold-label">Info sélection</span>
+          {selection !== null && (
+            <span className="panel-unfold-dot" title="Un élément est sélectionné" />
+          )}
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="panel is-info">
       <div className="panel-tabs is-single">
@@ -70,6 +126,14 @@ export function InfoPanel({
             ✕
           </button>
         )}
+        <button
+          className="panel-tab is-close"
+          title="Replier le volet"
+          aria-label="Replier le volet Info sélection"
+          onClick={() => setCollapsed(true)}
+        >
+          »
+        </button>
       </div>
 
       <div className="panel-body">

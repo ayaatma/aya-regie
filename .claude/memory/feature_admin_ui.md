@@ -890,6 +890,24 @@ about behaviour. The full account is in [[feature-montage-demontage]] under "Nin
   here", which is the wrong question for a swap: both people move, in opposite directions. It asks
   `blockersFor` twice on the plan the drop would produce, and says nothing when that is clean.
 
+## The right-hand panes give the grid its room back, 2026-09-15
+
+« Les volets de droite prennent de la place dans la partie grille. » No schema, no plan format.
+
+- **« Info sélection » folds** to a 28 px strip (`--info-folded-w`) with its title written
+  sideways and a dot when something is selected; « » » in its head folds, the strip unfolds. The
+  state is `localStorage` (`aya-regie.info-panel.collapsed`), shared by the three moments. The
+  screen's grid column follows through `.screen.has-info:has(> .panel.is-info.is-collapsed)`,
+  not a prop through `GridScreen` / `PhaseGrid`. A selection made while folded does not unfold it.
+  The zoom does not refit on fold (a zoom chosen by hand is a decision): « Ajuster » does.
+- **The pool pane is 250 px** (`--panel-w`, was 330; `.panel.is-pool` tightens its padding). Its
+  how-to sentence is the Disponibles tab's tooltip, the two filters are bare selects side by side
+  (no « Qui » / « Pôle demandé » label line), a row's figure is bare hours (`PoolRow.meta`, the
+  row's tooltip says libres / placées / à placer), and « à zéro » is an orange dot (`.pool-zero`).
+- **The « Réserve » tab is gone from the pool pane**, and with it the drop-to-reserve on the
+  exploit (`onDropReserve`). The reserve is a card of its own in Personnes, see
+  [[feature-people-tab]]; putting somebody in it is the fiche's button, as before.
+
 ## Things that are decided and should not be reopened
 
 - Toute personne placée sert: no minimum viable headcount per pole, the staffing penalty stays

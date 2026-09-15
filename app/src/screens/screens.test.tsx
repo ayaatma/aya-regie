@@ -156,7 +156,6 @@ const poolOf = (source: Plan, tab: PanelTab, moment: Moment = 'exploit'): string
       onDragStartPerson={noop}
       onDragEndPool={noop}
       onDropUnassign={noop}
-      onDropReserve={noop}
     />,
     source,
   );
@@ -723,7 +722,9 @@ test('the panel offers everyone with hours left to give, not only those at zero'
   const html = poolOf(plan, 'disponibles');
 
   assert.equal((html.match(/class="pool-item"/g) ?? []).length, available.length);
+  // The figure on the row is bare hours since 2026-09-15 (a narrower pane); the tooltip names it.
   assert.ok(shows(html, 'libres'), 'chaque entrée doit dire ce qui lui reste, pas ce qu\'elle a demandé');
+  assert.ok(!/class="pool-item-meta">[^<]*libres/.test(html), 'le mot est dans l\'infobulle, pas sur la ligne');
   assert.ok(shows(html, `Disponibles (${available.length})`));
 });
 
@@ -740,7 +741,7 @@ test('"À zéro" is a mark inside Disponibles and no longer a tab of its own', (
 
   // The tab is gone, so the one list carries the fact instead, once per person at zero.
   assert.ok(!shows(html, 'À zéro ('), 'plus d\'onglet "À zéro"');
-  assert.equal((html.match(/chip is-zero/g) ?? []).length, 1);
+  assert.equal((html.match(/class="pool-zero"/g) ?? []).length, 1);
 });
 
 test('the three moments draw the same pool pane, with the same tabs', () => {
@@ -751,9 +752,10 @@ test('the three moments draw the same pool pane, with the same tabs', () => {
   for (const moment of ['exploit', 'montage', 'demontage'] as const) {
     const html = poolOf(withPhase, 'disponibles', moment);
     assert.ok(shows(html, 'Disponibles ('), `${moment}: l'onglet Disponibles`);
-    assert.ok(shows(html, 'Réserve ('), `${moment}: l'onglet Réserve`);
+    // The reserve left this pane for Personnes on 2026-09-15.
+    assert.ok(!shows(html, 'Réserve ('), `${moment}: plus d'onglet Réserve`);
     // The one piece of markup the montage used to lack entirely: the panel's own frame.
-    assert.ok(html.includes('class="panel"'), `${moment}: le volet a le même cadre`);
+    assert.ok(html.includes('class="panel is-pool"'), `${moment}: le volet a le même cadre`);
     assert.ok(html.includes('class="panel-tabs"'), `${moment}: les mêmes onglets`);
   }
 });
@@ -763,6 +765,7 @@ test('the info pane names what it is describing, orga or bénévole', () => {
   // si c'est un orga ou bénévole".
   const asOrga = infoOf(planWithMontage(), { kind: 'orga', organiserKey: 'o1' });
   assert.ok(shows(asOrga, 'Info sélection'), 'le volet porte un titre');
+  assert.ok(asOrga.includes('aria-label="Replier le volet Info sélection"'), 'et se replie');
   assert.ok(shows(asOrga, 'Orga'), "et dit qu'il s'agit d'un orga");
   assert.ok(shows(asOrga, 'Camille Dubois'), 'sous son nom');
 
@@ -2275,13 +2278,34 @@ function planWithTicketing(): Plan {
   };
 }
 
+test('the Personnes tab lists the reserve apart, under everybody else', () => {
+  const current = planWithTicketing();
+  const held = current.volunteers[1]!;
+  const withReserve: Plan = {
+    ...current,
+    reserve: [held.key],
+    assignments: current.assignments.filter((a) => a.volunteerKey !== held.key),
+  };
+  const html = peopleOf(withReserve);
+  const card = html.indexOf('people-reserve');
+  assert.ok(card > 0, 'une carte Réserve à part');
+  assert.ok(shows(html, 'Réserve (1)'));
+  assert.ok(shows(html, '+ 1 en réserve'), 'annoncée dans la barre');
+  const row = html.indexOf(`data-person="benevole|${held.key}"`);
+  assert.ok(row > card, 'la ligne de la personne en réserve est dans la carte Réserve, pas avant');
+  assert.equal(html.split(`data-person="benevole|${held.key}"`).length, 2, 'et une seule fois');
+
+  assert.ok(!peopleOf({ ...current, reserve: [] }).includes('people-reserve'), 'pas de carte sans réserve');
+});
+
 const peopleOf = (current: Plan, focus: { kind: TicketPersonKind; key: string } | null = null): string =>
   render(<PeopleScreen focus={focus} onFocus={noop} onGoToSetup={noop} />, current);
 
 test('the Personnes tab lists everybody by name with statuses, tickets, bracelet, and reports the incohérences', () => {
   const current = planWithTicketing();
   const html = peopleOf(current);
-  assert.ok(shows(html, `${ticketingReport(current).rows.length} personnes`), 'the count leads the toolbar');
+  const reserved = ticketingReport(current).rows.filter((r) => r.kind === 'benevole' && current.reserve.includes(r.key)).length;
+  assert.ok(shows(html, `${ticketingReport(current).rows.length - reserved} personnes`), 'the count leads the toolbar');
   assert.ok(html.includes('aria-label="Chercher une personne"'));
   assert.ok(html.includes('aria-label="Filtrer par statut"'));
   assert.ok(html.includes('aria-label="Colonnes affichées"'));

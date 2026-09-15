@@ -40,6 +40,15 @@ Rename it.
 
 `npm run shots personnes` captures 85 to 92.
 
+## The reserve, listed apart (2026-09-15, no schema)
+
+Asked the same day: reserve people are normally not on site, so they left the grids' pool pane
+and sit in a « Réserve (n) » card under the main list (`.people-reserve`, `PeopleTable` drawn
+twice). Split in the screen only (`plan.reserve`, bénévoles); search and statut filter apply to
+both, the arrow keys walk the main list then the reserve, the toolbar counts « N personnes + n en
+réserve ». **`ticketingCsv` (the door's export) still includes them**: an open question put to the
+régisseur, not decided. Shot `95-personnes-reserve`.
+
 ## V2: conversion bénévole ↔ orga
 
 `tools/src/convert.ts`, `convertPerson(plan, kind, key)`: pure, returns `{toKind, newKey, carried,

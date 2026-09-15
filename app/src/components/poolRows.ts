@@ -43,7 +43,11 @@ export interface PoolRow {
   /** What clicking it puts in the info pane. */
   selection: Selection;
   name: string;
-  /** The right-hand figure: "3 h libres", "4 h à placer". */
+  /**
+   * The right-hand figure, bare hours: what is left to place for a bénévole or on a phase, what is
+   * already held for an orga, nothing for an orga holding nothing (the « à zéro » mark says it).
+   * Bare since 2026-09-15, to keep the pane narrow; `title` says which figure it is.
+   */
   meta: string;
   /** Nothing placed at all yet. Drawn as a mark, since "À zéro" is no longer a tab. */
   zero: boolean;
@@ -83,12 +87,12 @@ export function exploitPoolRows(index: PlanIndex, report: ValidationResult): Poo
         kind: 'orga',
         selection: { kind: 'orga', organiserKey: orga.key },
         name,
-        meta: mine.length === 0 ? 'aucun créneau' : `${fmt(hours)} placées`,
+        meta: mine.length === 0 ? '' : fmt(hours),
         zero: mine.length === 0 && roles.length === 0,
         review: false,
         title:
           `${name}\nOrga: aucune règle d'heures, jamais placé·e par le solveur.\n` +
-          `${mine.length} créneau(x), responsable de ${roles.length} pôle(s)\n` +
+          `${mine.length} créneau(x) pour ${fmt(hours)}, responsable de ${roles.length} pôle(s)\n` +
           "Glisser sur un créneau pour y tenir une place, ou sur la frise d'un pôle pour en être responsable 2 h",
       };
     })
@@ -110,11 +114,11 @@ export function exploitPoolRows(index: PlanIndex, report: ValidationResult): Poo
         kind: 'benevole' as PersonKind,
         selection: { kind: 'benevole', volunteerKey: entry.key } as Selection,
         name: entry.name,
-        meta: `${fmt(left)} libres`,
+        meta: fmt(left),
         zero: entry.assignedHours === 0,
         review: volunteer?.needsReview === true,
         title: volunteer
-          ? `${entry.name}\n${volumeText(volunteer.requestedHours, index.dayMode)} demandées, ${fmt(entry.assignedHours)} placées\n` +
+          ? `${entry.name}\n${volumeText(volunteer.requestedHours, index.dayMode)} demandées, ${fmt(entry.assignedHours)} placées, ${fmt(left)} libres\n` +
             choicesText(index, volunteer) +
             `Glisser sur un créneau`
           : entry.name,
@@ -170,7 +174,7 @@ export function phasePoolRows(
             ? { kind: 'orga', organiserKey: person.key }
             : { kind: 'benevole', volunteerKey: person.key },
         name,
-        meta: `${fmt(free)} à placer`,
+        meta: fmt(free),
         zero: placed < 0.01,
         review: volunteer?.needsReview === true,
         title:

@@ -156,6 +156,12 @@ async function main() {
         await page.select('select[aria-label="Filtrer par pôle demandé"]', await page.evaluate(() => document.querySelector('select[aria-label="Filtrer par pôle demandé"]').options[2].value));
         await sleep(400);
         await shot('20-grille-pole-filter');
+        // The info pane folded, then unfolded again so the later shots keep it open.
+        await page.evaluate(() => document.querySelector('[aria-label="Replier le volet Info sélection"]')?.click());
+        await sleep(400);
+        await shot('21-grille-info-repliee');
+        await page.evaluate(() => document.querySelector('.panel-unfold')?.click());
+        await sleep(300);
       }
       if (want('tableau')) {
         await tab('Tableau de bord');
@@ -246,6 +252,15 @@ async function main() {
         await clickButton(/^Ouvrir dans Personnes$/);
         await sleep(400);
         await shot('92-personnes-depuis-grille');
+        // The reserve, listed apart under everybody else: put the open bénévole in it, then undo.
+        await page.$eval('input[name="people-search"]', (el) => { el.value = ''; });
+        await clickButton(/^Mettre en réserve$/).catch(() => {});
+        await sleep(400);
+        await page.evaluate(() => document.querySelector('.people-reserve')?.scrollIntoView());
+        await sleep(300);
+        await shot('95-personnes-reserve');
+        await clickButton(/^↶$/);
+        await sleep(400);
       }
       if (want('catering')) {
         await tab('Catering');

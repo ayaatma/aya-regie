@@ -81,11 +81,26 @@ export function PeopleScreen({
 
   const report = ticketingReport(plan, index);
   const needle = flatten(search);
-  const rows = report.rows.filter((row) => {
+  const matching = report.rows.filter((row) => {
     if (status !== ALL && !row.statuses.some((s) => s.status === status)) return false;
     if (needle === '') return true;
     return flatten(`${row.lastName} ${row.firstName} ${row.firstName} ${row.lastName}`).includes(needle);
   });
+
+  /*
+   * THE RESERVE IS A LIST OF ITS OWN, below everybody else, since 2026-09-15. It left the grids'
+   * pool pane the same day: a bénévole in reserve does zero hours and is normally not on site, so
+   * mixing them into the list of people the door expects read as the opposite. They are still
+   * people the tool holds, with a fiche, a phone to call when somebody does not turn up, and the
+   * same filters. The door's CSV is `ticketingCsv` and is not narrowed here.
+   */
+  const reserveKeys = new Set(plan.reserve);
+  const inReserve = (row: TicketingRow): boolean => row.kind === 'benevole' && reserveKeys.has(row.key);
+  const rows = matching.filter((row) => !inReserve(row));
+  const reserveRows = matching.filter(inReserve);
+  const reserveTotal = report.rows.filter(inReserve).length;
+  /** What the arrow keys walk: the main list, then the reserve, as drawn. */
+  const walk = [...rows, ...reserveRows];
   const issues = report.rows.filter((r) => r.issues.length > 0).length;
   const statuses = Object.keys(PERSON_STATUS_LABEL) as PersonStatus[];
 
@@ -94,8 +109,8 @@ export function PeopleScreen({
    * has the focus: the fiche is full of fields, and a régisseur typing a name must never find they
    * have jumped to the next person. Kept in a ref so the listener is attached once.
    */
-  const latest = useRef({ rows, focus, onFocus });
-  latest.current = { rows, focus, onFocus };
+  const latest = useRef({ rows: walk, focus, onFocus });
+  latest.current = { rows: walk, focus, onFocus };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -132,8 +147,13 @@ export function PeopleScreen({
       <div className="screen-main">
         <div className="toolbar">
           <strong>
-            {report.rows.length} personne{report.rows.length > 1 ? 's' : ''}
+            {report.rows.length - reserveTotal} personne{report.rows.length - reserveTotal > 1 ? 's' : ''}
           </strong>
+          {reserveTotal > 0 && (
+            <span className="people-meta" title="Listées à part, sous les autres">
+              + {reserveTotal} en réserve
+            </span>
+          )}
           {issues > 0 && (
             <span className="chip is-warn" title="Des lignes portent une incohérence, signalée en bout de ligne">
               {issues} incohérence{issues > 1 ? 's' : ''}
@@ -229,69 +249,121 @@ export function PeopleScreen({
           )}
 
           <section className="screen-card">
-            <div className="screen-scroll">
-              <table className="setup-table catering-table ticketing-table people-table">
-                <thead>
-                  <tr>
-                    <th>Nom</th>
-                    <th>Prénom</th>
-                    <th>Statut</th>
-                    {view === 'accueil' && (
-                      <>
-                        <th title="Tickets boisson à remettre">Boissons</th>
-                        <th title="Tickets repas à remettre">Repas</th>
-                        <th>Ticket</th>
-                        <th>Bracelet</th>
-                        {withPhones && <th>Téléphone</th>}
-                        <th>Remarques</th>
-                        <th />
-                      </>
-                    )}
-                    {view === 'contact' && (
-                      <>
-                        <th>Téléphone</th>
-                        <th>E-mail</th>
-                      </>
-                    )}
-                    {view === 'repas' && (
-                      <>
-                        <th>Régime</th>
-                        <th>Allergies</th>
-                        <th title="Tickets repas à remettre">Repas</th>
-                        <th title="Tickets boisson à remettre">Boissons</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <PersonLine
-                      key={`${row.kind}|${row.key}`}
-                      row={row}
-                      report={report}
-                      view={view}
-                      withPhones={withPhones}
-                      selected={samePerson(refOf(row), focus)}
-                      onOpen={() => onFocus(refOf(row))}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <PeopleTable
+              rows={rows}
+              report={report}
+              view={view}
+              withPhones={withPhones}
+              focus={focus}
+              onFocus={onFocus}
+            />
             {rows.length === 0 && (
               <p className="panel-sub catering-empty">
-                {report.rows.length === 0
+                {report.rows.length === reserveTotal
                   ? "Personne n'est encore entré dans l'outil."
                   : 'Personne ne correspond à cette recherche.'}
               </p>
             )}
           </section>
+
+          {reserveTotal > 0 && (
+            <section className="screen-card people-reserve">
+              <div className="setup-group-head">
+                <span className="setup-group-title">Réserve ({reserveTotal})</span>
+                <span className="people-meta">
+                  zéro heure sur l'exploit, volontairement: ces personnes ne sont normalement pas
+                  sur place, on les appelle si quelqu'un manque
+                </span>
+              </div>
+              {reserveRows.length > 0 ? (
+                <PeopleTable
+                  rows={reserveRows}
+                  report={report}
+                  view={view}
+                  withPhones={withPhones}
+                  focus={focus}
+                  onFocus={onFocus}
+                />
+              ) : (
+                <p className="panel-sub catering-empty">Personne en réserve ne correspond à cette recherche.</p>
+              )}
+            </section>
+          )}
         </div>
       </div>
 
       {focus && (
         <PersonPanel person={focus} report={report} onClose={() => onFocus(null)} onFocus={onFocus} />
       )}
+    </div>
+  );
+}
+
+/** The list's table, drawn once for everybody and once more for the reserve. */
+function PeopleTable({
+  rows,
+  report,
+  view,
+  withPhones,
+  focus,
+  onFocus,
+}: {
+  rows: readonly TicketingRow[];
+  report: TicketingReport;
+  view: PeopleView;
+  withPhones: boolean;
+  focus: PersonRef | null;
+  onFocus(person: PersonRef | null): void;
+}) {
+  return (
+    <div className="screen-scroll">
+      <table className="setup-table catering-table ticketing-table people-table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Prénom</th>
+            <th>Statut</th>
+            {view === 'accueil' && (
+              <>
+                <th title="Tickets boisson à remettre">Boissons</th>
+                <th title="Tickets repas à remettre">Repas</th>
+                <th>Ticket</th>
+                <th>Bracelet</th>
+                {withPhones && <th>Téléphone</th>}
+                <th>Remarques</th>
+                <th />
+              </>
+            )}
+            {view === 'contact' && (
+              <>
+                <th>Téléphone</th>
+                <th>E-mail</th>
+              </>
+            )}
+            {view === 'repas' && (
+              <>
+                <th>Régime</th>
+                <th>Allergies</th>
+                <th title="Tickets repas à remettre">Repas</th>
+                <th title="Tickets boisson à remettre">Boissons</th>
+              </>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <PersonLine
+              key={`${row.kind}|${row.key}`}
+              row={row}
+              report={report}
+              view={view}
+              withPhones={withPhones}
+              selected={samePerson(refOf(row), focus)}
+              onOpen={() => onFocus(refOf(row))}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

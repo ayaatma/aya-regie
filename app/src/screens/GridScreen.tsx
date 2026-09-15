@@ -4,8 +4,8 @@
  * Poles down the side, the eighteen hours of the event across the top and repeated above every
  * pole, and inside every shift one box per volunteer needed. Everything the régisseur decides
  * happens here: dragging a person from one box to another, exchanging two people, locking a
- * place so nothing can ever move it again, taking somebody off the plan or putting them on the
- * reserve.
+ * place so nothing can ever move it again, taking somebody off the plan. The reserve is a button
+ * on the fiche and a list in Personnes, no longer a drop target here.
  *
  * Not one scheduling rule is written in this file. Legality is `isLegal`, the reason a target is
  * greyed is `blockersFor`, and which box is red is attributed by `validate` to the box itself.
@@ -31,7 +31,6 @@ import {
   removeOrganiserFromShift,
   move,
   setLocked,
-  setReserve,
   swap,
   unassign,
 } from '../store/edits.ts';
@@ -536,17 +535,6 @@ export function GridScreen({
           : unassign(p, personKey, fromShiftKey),
       `retrait de ${personName}`,
     );
-  }, [drag, edit, endDrag]);
-
-  const onDropReserve = useCallback(() => {
-    const session = drag;
-    endDrag();
-    if (!session) return;
-    const { kind, personKey, personName } = session.payload;
-    // The panel already refuses the drop for an orga; this is the second lock on the same door,
-    // because the reserve is a volume decision and an orga has no volume to give up.
-    if (kind === 'orga') return;
-    edit((p) => setReserve(p, personKey, true), `mise en réserve de ${personName}`);
   }, [drag, edit, endDrag]);
 
   /**
@@ -1181,7 +1169,6 @@ export function GridScreen({
         onDragStartPerson={beginDrag}
         onDragEndPool={endDrag}
         onDropUnassign={onDropUnassign}
-        onDropReserve={onDropReserve}
         readOnly={readOnly}
       />
 

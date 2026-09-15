@@ -47,9 +47,12 @@
 
   --header-h: 52px;
   --label-w: 190px;
-  --panel-w: 330px;
+  /* The pool pane. 330 px until 2026-09-15, narrowed on request: every pixel here is the grid's. */
+  --panel-w: 250px;
   /** The "Info sélection" pane, beside the pools. See `.screen.has-info`. */
   --info-w: 320px;
+  /** The same pane folded down to its unfold button. See `InfoPanel`. */
+  --info-folded-w: 28px;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
@@ -334,6 +337,12 @@ button {
   .screen.has-info {
     grid-template-columns: 1fr var(--panel-w) minmax(240px, var(--info-w));
   }
+}
+
+/* The info pane folded: its column shrinks to the unfold strip. After the media query and more
+   specific than it, so a narrow window folds too. */
+.screen.has-info:has(> .panel.is-info.is-collapsed) {
+  grid-template-columns: 1fr var(--panel-w) var(--info-folded-w);
 }
 
 .screen-main {
@@ -1026,7 +1035,45 @@ button {
 
 .panel-tab.is-close {
   flex: 0 0 auto;
-  padding: 8px 12px;
+  padding: 8px 10px;
+}
+
+/* The folded info pane: one button the height of the pane, its title written sideways. */
+.panel.is-info.is-collapsed {
+  grid-template-rows: 1fr;
+}
+
+.panel-unfold {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: var(--surface-sunken);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.panel-unfold:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.panel-unfold-label {
+  writing-mode: vertical-rl;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.panel-unfold-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 /* What kind of thing the info pane is describing, above its name. */
@@ -1214,6 +1261,21 @@ button {
   min-width: 0;
 }
 
+/* The pool pane is kept narrow, so its body and rows give back the side padding a fiche needs. */
+.panel.is-pool .panel-body {
+  padding: 6px 6px 24px;
+}
+
+.panel.is-pool .pool-item {
+  gap: 4px;
+  padding: 3px 5px;
+  margin-bottom: 2px;
+}
+
+.panel.is-pool .panel-tab {
+  padding: 8px 2px;
+}
+
 .pool-item:hover {
   border-color: var(--accent);
 }
@@ -1224,34 +1286,30 @@ button {
   background: var(--accent-soft);
 }
 
-/* "À zéro", which used to be a tab and is now a mark on the one list. */
-.chip.is-zero {
+/* "À zéro", which used to be a tab, then a chip, and is now a dot on the one list. */
+.pool-zero {
   flex: 0 0 auto;
-  font-size: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange-fonce);
 }
 
-/* The two filters a phase adds above its list of available people: who, and which day. */
+/* The two filters above the list of available people: who, and which pole they asked for. Two
+   bare selects side by side, each first option naming its subject, so no label line. */
 .pool-filters {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
 }
 
-/* One filter left in the pane: the day moved to the phase screen's toolbar. */
-.pool-filters.is-single {
-  grid-template-columns: 1fr;
-}
-
-.pool-filter {
-  display: grid;
-  gap: 2px;
+.pool-filters .select {
   min-width: 0;
-}
-
-.pool-filter span {
-  color: var(--ink-faint);
-  font-size: 11px;
+  width: 100%;
+  padding-left: 4px;
+  padding-right: 2px;
+  font-size: 12px;
 }
 
 .pool-item-name {
