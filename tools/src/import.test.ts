@@ -577,3 +577,14 @@ test('the survey lists each distinct closed answer once, with the automatic read
   strictEqual(survey.answers.volume[0]!.auto?.value, 4);
   strictEqual(bindForm(REAL_HEADERS).choices.length, 2, 'le formulaire du Loto Tekno garde ses deux choix');
 });
+
+test('the reinforcement and stamina answers of a festival form are read', async () => {
+  const { parseBackup, parseEnergy } = await import('./import.js');
+  strictEqual(parseBackup(''), undefined);
+  strictEqual(parseBackup("Je viens en renfort si mon emploi du temps bénévole me le permet, J'aide le responsable"), true);
+  strictEqual(parseBackup("Rien à faire c'est pas mon problème !"), false);
+  strictEqual(parseEnergy('Je fonce, je donne tout, et je dormirai demain.'), 'fonce');
+  strictEqual(parseEnergy("Je maîtrise mon temps, j'ai plutôt l'habitude."), 'regulier');
+  strictEqual(parseEnergy("Je fonce, je donne tout, et je dormirai demain., J'ai parfois du mal à me poser et j'ai tendance à fatiguer vite."), 'fatigable');
+  strictEqual(parseEnergy("Je ne sais pas, c'est une première."), 'premiere');
+});

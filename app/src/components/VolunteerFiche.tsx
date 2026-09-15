@@ -41,6 +41,7 @@ import { setVolunteerPhase } from '../store/phaseEdits.ts';
 import { preferenceLabel, slotLabel } from './labels.ts';
 import { choiceRankLabel, levelLabel, volumeText } from './layout.ts';
 import { VolunteerEdit } from './VolunteerEdit.tsx';
+import { ApplicationSection } from './ApplicationSection.tsx';
 
 /**
  * The chips at the top of somebody's panel, and what each one is allowed to claim.
@@ -84,7 +85,7 @@ export function VolunteerFiche({
     const name = index.volunteerName(key);
     edit(
       (p) => setReserve(p, key, reserve),
-      reserve ? `mise en réserve de ${name}` : `sortie de réserve de ${name}`,
+      reserve ? `mise en liste d'attente de ${name}` : `sortie de liste d'attente de ${name}`,
     );
   };
 
@@ -179,6 +180,8 @@ function VolunteerDetail({
         {preferenceLabel(index.plan.preferenceSlots, volunteer.preferredSlotId)},{' '}
         {volumeText(volunteer.requestedHours, index.dayMode)} demandées
       </p>
+
+      <ApplicationSection volunteer={volunteer} detail={detail} readOnly={readOnly} />
 
       {/*
         The doubt the importer had, and the one button that clears it.
@@ -353,7 +356,7 @@ function VolunteerDetail({
         <p className="panel-section-title">Sa journée</p>
         {detail.blocks.length === 0 && (
           <p className="pool-empty">
-            {detail.reserve ? 'En réserve, zéro heure, volontairement.' : 'Aucune affectation.'}
+            {detail.reserve ? "En liste d'attente, zéro heure, volontairement." : 'Aucune affectation.'}
           </p>
         )}
         {detail.blocks.map((block, i) => (
@@ -407,25 +410,25 @@ function VolunteerDetail({
           instead is the fact, which is what they came for.
         */}
         {readOnly ? (
-          detail.reserve && <p className="panel-sub">Cette personne est en réserve.</p>
+          detail.reserve && <p className="panel-sub">Cette personne est en liste d'attente.</p>
         ) : (
           <button
             className={`btn ${detail.reserve ? '' : 'is-danger'}`}
             disabled={!detail.reserve && pinned}
             onClick={() => onSetReserve(volunteerKey, !detail.reserve)}
           >
-            {detail.reserve ? 'Sortir de la réserve' : 'Mettre en réserve'}
+            {detail.reserve ? "Sortir de la liste d'attente" : "Mettre en liste d'attente"}
           </button>
         )}
         {!readOnly && !detail.reserve && pinned && (
           <p className="panel-sub" style={{ marginTop: 6 }}>
-            Impossible: la réserve met à zéro heure, et cette personne occupe une place
+            Impossible: la liste d'attente met à zéro heure, et cette personne occupe une place
             verrouillée. Déverrouillez-la d'abord sur la grille.
           </p>
         )}
         {!readOnly && !detail.reserve && !pinned && detail.assignedHours > 0 && (
           <p className="panel-sub" style={{ marginTop: 6 }}>
-            La mise en réserve retire ses {fmtHours(detail.assignedHours)} d'affectation.
+            La mise en liste d'attente retire ses {fmtHours(detail.assignedHours)} d'affectation.
           </p>
         )}
       </div>

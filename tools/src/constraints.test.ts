@@ -74,6 +74,7 @@ function makePlan(parts: {
     poleChoicesRanked: true,
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8], ...parts.volume },
     formMapping: { columns: {}, answers: {} },
+    applicationSteps: [],
     dismissedBuddies: [],
     constraints: { ...DEFAULT_CONSTRAINTS, ...parts.longDay, criteria: parts.criteria ?? {} },
     slots: DEFAULT_SLOTS, preferenceSlots: DEFAULT_PREFERENCE_SLOTS,

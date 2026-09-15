@@ -22,8 +22,8 @@
  */
 
 import { fmtHours, type Plan } from './plan.js';
-import type { EditableField, Volunteer } from './model.js';
-import type { ImportIssue, ImportResult } from './import.js';
+import { ENERGY_LABEL, type EditableField, type Volunteer } from './model.js';
+import { parseSubmittedAt, type ImportIssue, type ImportResult } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
 
 /** One answer that differs between the plan and the new export. */
@@ -156,6 +156,15 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
     reviewReasons: null,
     // Bookkeeping too, and it only ever goes from true to false: the person filled the form in.
     enteredByHand: null,
+    // The régisseur's own tracking, never an answer: kept across every import by `mergeWithManual`,
+    // so never a change to announce. The registration date is the earliest answer's and only moves
+    // when the export starts carrying a timestamp.
+    status: null,
+    statusSteps: null,
+    regieNote: null,
+    registeredAt: null,
+    backup: { label: 'Réserve (renfort)', show: (v) => (v === true ? 'oui' : 'non') },
+    energy: { label: "Profil d'énergie", show: (v) => (v ? ENERGY_LABEL[v] : 'non renseigné') },
     needsReview: {
       label: 'Relecture',
       show: (v) => (v ? 'à relire' : 'validée'),
@@ -225,6 +234,8 @@ export const FIELD_LABEL: Record<EditableField, string> = {
   demontage: 'Démontage',
   artistKeys: 'Artistes à ne pas manquer',
   buddyRawNames: 'Binômes demandés',
+  backup: 'Réserve (renfort)',
+  energy: "Profil d'énergie",
 };
 
 /**
@@ -255,6 +266,12 @@ export function mergeWithManual(before: Volunteer, imported: Volunteer): Volunte
     ...imported,
     accessCode: before.accessCode,
     manualFields: [...before.manualFields],
+    // The régisseur's tracking of the application is not in any export. An import that let a
+    // fresh row reset it would put a cancelled person back among the candidatures in silence.
+    status: before.status,
+    statusSteps: before.statusSteps,
+    regieNote: before.regieNote,
+    registeredAt: earliestRegistration(before.registeredAt, imported.registeredAt),
   };
 
   /*
@@ -311,6 +328,15 @@ export function mergeWithManual(before: Volunteer, imported: Volunteer): Volunte
   }
 
   return { ...merged, needsReview, reviewReasons: reasons };
+}
+
+/** The earlier of two form timestamps, either of which may be missing or unreadable. */
+function earliestRegistration(a: string | undefined, b: string | undefined): string | undefined {
+  const ta = a ? parseSubmittedAt(a) : null;
+  const tb = b ? parseSubmittedAt(b) : null;
+  if (ta === null) return b || a;
+  if (tb === null) return a;
+  return ta <= tb ? a : b;
 }
 
 /**

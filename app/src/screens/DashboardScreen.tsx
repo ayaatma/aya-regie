@@ -132,7 +132,7 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
             <strong>Sur-recrutement.</strong> Le planning n'offre pas assez d'heures pour{' '}
             {summary.volunteersTotal} personnes. Au-delà de {summary.volunteerCeiling} inscrits,
             quelqu'un passe forcément sous le plancher de {index.rules.minHoursPerPerson} h. C'est
-            le moment de fermer les inscriptions et d'assumer une réserve.
+            le moment de fermer les inscriptions et d'assumer une liste d'attente.
           </p>
         ) : (
           <p className="alert is-ok">
@@ -213,7 +213,7 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
       </section>
 
       <section className="board-card">
-        <h2>Réserve ({reserve.length})</h2>
+        <h2>Liste d'attente ({reserve.length})</h2>
         <p className="board-note">
           Zéro heure, volontairement. Ce sont les personnes à qui il faudra dire qu'on n'a
           finalement pas eu besoin d'elles, et celles qu'on rappellera en premier.
@@ -253,7 +253,7 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
           <h2>Sous le plancher de {index.rules.minHoursPerPerson} h ({belowFloor.length})</h2>
           <p className="board-note">
             Trop peu d'heures pour que le déplacement en vaille la peine. Soit on leur en donne
-            plus, soit on les met en réserve et on le leur dit.
+            plus, soit on les met en liste d'attente et on le leur dit.
           </p>
           <ul className="people">
             {belowFloor.map((v) => (

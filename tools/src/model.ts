@@ -872,7 +872,87 @@ export interface Volunteer {
    * import predates it; absent means false.
    */
   enteredByHand?: boolean;
+  /**
+   * Where this application stands, set by the régisseur, never by an import. See
+   * `ApplicationStatus`. Absent means 'candidature', which is every fiche written before
+   * 2026-09-15 and every fresh row of an export.
+   */
+  status?: ApplicationStatus;
+  /** The `ApplicationStep` keys ticked for this person, by the régisseur or a later form. */
+  statusSteps?: string[];
+  /** The régisseur's own note on the fiche. Not an answer, so no import ever touches it. */
+  regieNote?: string;
+  /**
+   * When they first answered the form, as the export writes it ("15/09/2026 17:11:42"). The
+   * earliest of their answers when they answered several times, since that is their place in the
+   * queue for a waiting list. Empty when the export has no timestamp column.
+   */
+  registeredAt?: string;
+  /**
+   * « Réserve » since 2026-09-15: ready to come and reinforce a short créneau beyond their own
+   * volume, when rested. NOT `Plan.reserve`, which the screens call « Liste d'attente » since the
+   * same day (people with no créneau, kept until the plan is settled). An answer, correctable.
+   */
+  backup?: boolean;
+  /** How they describe their stamina, or null when not asked. An answer, correctable. */
+  energy?: EnergyProfile | null;
 }
+
+/**
+ * Where an application stands. The waiting list is NOT a status: it is `Plan.reserve`, which the
+ * solver fills and empties itself, and a second source of truth for it would disagree with the
+ * first on the first re-solve. The screens show « Liste d'attente » from that list instead.
+ *
+ *   candidature   registered, not decided yet. Placeable, as every bénévole was before.
+ *   valide        accepted by the régisseur. Placeable.
+ *   annule        withdrew or was withdrawn. Never placed: a placement becomes a tier 1 issue
+ *                 (`candidature-annulee`) and a re-solve proposes its removal. Nothing is removed
+ *                 silently: the fiche offers to free the places, as one edit the régisseur makes.
+ */
+export type ApplicationStatus = 'candidature' | 'valide' | 'annule';
+
+export const APPLICATION_STATUSES: readonly ApplicationStatus[] = ['candidature', 'valide', 'annule'];
+
+/** Gender-neutral on purpose: half the bénévoles are women. */
+export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
+  candidature: 'Candidature',
+  valide: 'Validée',
+  annule: 'Annulée',
+};
+
+export const statusOf = (volunteer: Pick<Volunteer, 'status'>): ApplicationStatus =>
+  volunteer.status ?? 'candidature';
+
+/**
+ * One message or check the régisseur ticks per person ("Mail de confirmation envoyé"). A setting
+ * per event, because every event runs its own sequence; the key is stable so renaming a step
+ * never unticks anybody.
+ */
+export interface ApplicationStep {
+  key: string;
+  label: string;
+}
+
+export const DEFAULT_APPLICATION_STEPS: readonly ApplicationStep[] = [
+  { key: 'confirmation', label: 'Mail de confirmation envoyé' },
+  { key: 'reconfirmee', label: 'Présence reconfirmée' },
+  { key: 'infos', label: 'Infos pratiques envoyées' },
+];
+
+/**
+ * Stamina, as a form asks it ("je fonce", "je gère mon rythme"...). Shown on the fiche beside the
+ * hours given, and read before drawing somebody from the Réserve. Informs, never scores.
+ */
+export type EnergyProfile = 'fonce' | 'regulier' | 'fatigable' | 'premiere';
+
+export const ENERGY_PROFILES: readonly EnergyProfile[] = ['fonce', 'regulier', 'fatigable', 'premiere'];
+
+export const ENERGY_LABEL: Record<EnergyProfile, string> = {
+  fonce: 'Fonce, récupère après',
+  regulier: 'Gère son rythme, habitude',
+  fatigable: 'Fatigue vite',
+  premiere: 'Première expérience',
+};
 
 /**
  * The answers a régisseur may correct on a fiche, and therefore the ones a re-import can be
@@ -907,6 +987,10 @@ export const EDITABLE_FIELDS = [
   // constraint is: they arrive as a sentence and the tool's reading of one can be wrong.
   'montage',
   'demontage',
+  // Two answers added 2026-09-15, both correctable like any other: the reinforcement answer and
+  // the stamina one.
+  'backup',
+  'energy',
 ] as const;
 
 export type EditableField = (typeof EDITABLE_FIELDS)[number];

@@ -16,6 +16,12 @@
  */
 
 import {
+  APPLICATION_STATUSES,
+  DEFAULT_APPLICATION_STEPS,
+  ENERGY_PROFILES,
+  type ApplicationStatus,
+  type ApplicationStep,
+  type EnergyProfile,
   CRITERIA,
   DEFAULT_CONSTRAINTS,
   type PoleChoice,
@@ -592,8 +598,27 @@ const volunteer = (value: unknown): Volunteer => {
     demontage: loose.demontage === undefined ? absentFromPhase() : presence(loose.demontage),
     // Absent from anything written before 2026-09-15, when nobody was entered by hand.
     enteredByHand: loose.enteredByHand === true,
+    // Absent from anything written before 2026-09-15: a candidature nobody has decided yet, nothing
+    // ticked, no note, no stamina answer, not in the Réserve.
+    status: (APPLICATION_STATUSES as readonly unknown[]).includes(loose.status)
+      ? (loose.status as ApplicationStatus)
+      : 'candidature',
+    statusSteps: keys(loose.statusSteps),
+    regieNote: text(loose.regieNote),
+    registeredAt: text(loose.registeredAt),
+    backup: loose.backup === true,
+    energy: (ENERGY_PROFILES as readonly unknown[]).includes(loose.energy) ? (loose.energy as EnergyProfile) : null,
   };
 };
+
+/** The steps of an event, keeping only rows with a key; absent before 2026-09-15, the defaults. */
+function applicationSteps(value: unknown): ApplicationStep[] {
+  if (!Array.isArray(value)) return [...DEFAULT_APPLICATION_STEPS];
+  return value
+    .map((row) => (row && typeof row === 'object' ? (row as Record<string, unknown>) : {}))
+    .map((row) => ({ key: text(row.key), label: text(row.label) }))
+    .filter((row) => row.key !== '');
+}
 
 /**
  * The import correspondence, keeping only what has the right shape: a header is a string, a
@@ -932,5 +957,6 @@ export function normalisePlan(raw: unknown): Plan {
     volume: volume(loose.volume),
     // Absent from anything written before 2026-09-14: nothing decided, everything detected.
     formMapping: formMapping(loose.formMapping),
+    applicationSteps: applicationSteps((loose as Record<string, unknown>).applicationSteps),
   });
 }

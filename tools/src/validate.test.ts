@@ -115,6 +115,7 @@ function makePlan(parts: {
     poleChoicesRanked: true,
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
+    applicationSteps: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,
@@ -1005,4 +1006,33 @@ test('the tolerated overflow is priced by its distance from the edge, on either 
   // Inside the tranche, and with no preference at all, nothing costs anything.
   deepStrictEqual(preferenceMisfit(milieu, { start: 4, end: 8 }), { tolerated: 0, against: 0, toleratedDistance: 0 });
   deepStrictEqual(preferenceMisfit(null, { start: 0, end: 18 }), { tolerated: 0, against: 0, toleratedDistance: 0 });
+});
+
+// ---------------------------------------------------------------------------
+// Application status (2026-09-15)
+// ---------------------------------------------------------------------------
+
+test('a cancelled bénévole can never be placed, and a place still held is tier 1', () => {
+  const s1 = shift('s1', 'bar-service', 0, 4);
+  const gone = volunteer('v1', { status: 'annule' });
+  const empty = makePlan({ shifts: [s1], volunteers: [gone] });
+  ok(blockersFor(new PlanIndex(empty), gone, s1).some((b) => b.code === TIER1.candidatureAnnulee));
+  // Nobody owes them a créneau: no « sans affectation », no floor.
+  deepStrictEqual(codes(validate(empty)), ['creneau-vide']);
+
+  const held = validate(makePlan({ shifts: [s1], volunteers: [gone], assignments: [assign('v1', 's1')] }));
+  strictEqual(count(held, TIER1.candidatureAnnulee), 1);
+  strictEqual(held.summary.volunteersTotal, 0, 'hors des effectifs');
+  strictEqual(held.summary.volunteersCancelled, 1);
+});
+
+test('a Réserve bénévole held back by their volume alone is named on the gap', () => {
+  const plan = makePlan({
+    shifts: [shift('s1', 'bar-service', 0, 4), shift('s2', 'bar-service', 6, 10)],
+    volunteers: [volunteer('v1', { requestedHours: 4, backup: true })],
+    assignments: [assign('v1', 's1')],
+  });
+  const gap = validate(plan).shifts.find((s) => s.key === 's2')!.gap!;
+  strictEqual(gap.enRenfort, 1);
+  ok(gap.raison.includes('renfort'), gap.raison);
 });

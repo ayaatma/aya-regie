@@ -254,13 +254,36 @@ async function main() {
         await shot('92-personnes-depuis-grille');
         // The reserve, listed apart under everybody else: put the open bénévole in it, then undo.
         await page.$eval('input[name="people-search"]', (el) => { el.value = ''; });
-        await clickButton(/^Mettre en réserve$/).catch(() => {});
+        await clickButton(/^Mettre en liste d'attente$/).catch(() => {});
         await sleep(400);
         await page.evaluate(() => document.querySelector('.people-reserve')?.scrollIntoView());
         await sleep(300);
         await shot('95-personnes-reserve');
         await clickButton(/^↶$/);
         await sleep(400);
+      }
+      if (want('candidature')) {
+        // Le suivi des candidatures: the Candidature columns, a fiche cancelled while still placed,
+        // then the steps card in Réglages. Everything undone after.
+        await tab('Personnes');
+        await page.select('select[aria-label="Colonnes affichées"]', 'candidature');
+        await sleep(300);
+        await shot('96-personnes-candidature');
+        await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
+        await sleep(400);
+        await page.select('select[name="fiche-status"]', 'annule');
+        await sleep(400);
+        await shot('97-personnes-fiche-annulee');
+        await clickButton(/^↶$/);
+        await sleep(400);
+        await tab('Réglages');
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-application');
+          card?.querySelector('button')?.click();
+          card?.scrollIntoView();
+        });
+        await sleep(400);
+        await shot('98-reglages-suivi');
       }
       if (want('catering')) {
         await tab('Catering');

@@ -57,6 +57,7 @@ import { OrganisersCard } from './OrganisersCard.tsx';
 import { PhaseCard } from './PhaseCard.tsx';
 import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
+import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
 import { AdvancedSettingsCard } from './AdvancedSettingsCard.tsx';
 
 /** What to say under a organiser's two hour fields, including while only one is filled. */
@@ -170,6 +171,8 @@ export function SetupScreen() {
 
           {/* The people, before the poles they run: issuing codes is a list job, not a per-pole one. */}
           <OrganisersCard />
+
+          <ApplicationStepsCard />
 
           {/*
             The two phases, between the people and the poles of the exploit. They are settings of

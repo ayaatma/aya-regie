@@ -156,7 +156,7 @@ function reserveProposals(from: PlanIndex, to: PlanIndex): Proposal[] {
         volunteerName: name,
         fromShiftKey: null,
         toShiftKey: null,
-        rationale: `Met ${name} en réserve: plus aucun créneau disponible ne lui convient. ` +
+        rationale: `Met ${name} en liste d'attente: plus aucun créneau disponible ne lui convient. ` +
                    `À prévenir de ce statut de renfort, et à rappeler au premier désistement.`,
       });
     } else if (!now.has(volunteer.key) && was.has(volunteer.key)) {
@@ -168,8 +168,8 @@ function reserveProposals(from: PlanIndex, to: PlanIndex): Proposal[] {
         fromShiftKey: null,
         toShiftKey: null,
         rationale: hours > 0
-          ? `Sort ${name} de la réserve: ${fmtHours(hours)} lui sont maintenant proposées.`
-          : `Sort ${name} de la réserve, mais sans lui donner de créneau. À vérifier.`,
+          ? `Sort ${name} de la liste d'attente: ${fmtHours(hours)} lui sont maintenant proposées.`
+          : `Sort ${name} de la liste d'attente, mais sans lui donner de créneau. À vérifier.`,
       });
     }
   }
@@ -254,7 +254,7 @@ export function summariseProposals(proposals: readonly Proposal[]): string {
   for (const p of proposals) counts[p.kind]++;
   return `${proposals.length} propositions : ${counts.add} ajouts, ` +
          `${counts.move} déplacements, ${counts.remove} retraits, ` +
-         `${counts.reserve} mises en réserve, ${counts.unreserve} rappels`;
+         `${counts.reserve} mises en liste d'attente, ${counts.unreserve} rappels`;
 }
 
 
@@ -329,7 +329,7 @@ function titleFor(group: readonly Proposal[]): string {
   if (group.length === 1) {
     switch (first.kind) {
       case 'reserve':
-        return `Mise en réserve de ${first.volunteerName}`;
+        return `Mise en liste d'attente de ${first.volunteerName}`;
       case 'unreserve':
         return `Rappel de ${first.volunteerName}`;
       case 'move':

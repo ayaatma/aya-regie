@@ -20,6 +20,8 @@
 
 import {
   PERSON_STATUS_LABEL,
+  statusOf,
+  type ApplicationStatus,
   type BraceletType,
   type PersonStatus,
   type TicketPersonKind,
@@ -54,6 +56,8 @@ export interface TicketingRow {
   diet: string;
   allergies: string;
   statuses: StatusTag[];
+  /** A bénévole's application status; null for everybody else, who has none. */
+  applicationStatus: ApplicationStatus | null;
   drinks: number;
   /** True when the drinks figure is the régisseur's, not the computed one. */
   drinksByHand: boolean;
@@ -189,6 +193,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     statuses: StatusTag[],
     given: { drinks: number; meals: number; serviceKeys: readonly string[] },
     extraIssues: string[] = [],
+    applicationStatus: ApplicationStatus | null = null,
   ): void => {
     const choice = choices.get(choiceKey(kind, key));
     const ticket =
@@ -209,6 +214,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       diet: who.diet,
       allergies: who.allergies,
       statuses,
+      applicationStatus,
       drinks: choice?.drinkTickets ?? given.drinks,
       computedDrinks: given.drinks,
       drinksByHand: choice?.drinkTickets !== null && choice?.drinkTickets !== undefined,
@@ -252,7 +258,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       { status: 'benevole', label: PERSON_STATUS_LABEL.benevole },
       ...actTags('benevole', v.key),
     ];
-    push('benevole', v.key, v, statuses, fed('benevole', v.key));
+    push('benevole', v.key, v, statuses, fed('benevole', v.key), [], statusOf(v));
   }
 
   const acts = [...plan.artists].sort((a, b) => a.start - b.start);
@@ -397,9 +403,11 @@ export function ticketingCsv(
   ];
   // The reserve is on the door's list only when the event says so. See `reserveOnDoorList`.
   const reserve = new Set(plan.reserve);
+  // A cancelled bénévole is not coming, whatever the setting: never on the door's list.
+  const coming = report.rows.filter((row) => row.applicationStatus !== 'annule');
   const onList = plan.ticketing.reserveOnDoorList
-    ? report.rows
-    : report.rows.filter((row) => !(row.kind === 'benevole' && reserve.has(row.key)));
+    ? coming
+    : coming.filter((row) => !(row.kind === 'benevole' && reserve.has(row.key)));
   const rows = onList.map((row) => [
     row.lastName,
     row.firstName,

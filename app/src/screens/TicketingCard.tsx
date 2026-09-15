@@ -76,7 +76,7 @@ export function TicketingCard() {
           </span>
         </label>
         <label className="rule">
-          <span className="rule-label">Réserve</span>
+          <span className="rule-label">Liste d'attente</span>
           <span className="rule-input">
             <input
               type="checkbox"
@@ -85,14 +85,14 @@ export function TicketingCard() {
               onChange={(event) =>
                 edit(
                   (p) => setReserveOnDoorList(p, event.target.checked),
-                  event.target.checked ? "réserve ajoutée à la liste d'entrée" : "réserve retirée de la liste d'entrée",
+                  event.target.checked ? "liste d'attente ajoutée à la liste d'entrée" : "liste d'attente retirée de la liste d'entrée",
                 )
               }
             />
-            <span>Les bénévoles en réserve sont dans la liste d'entrée</span>
+            <span>Les bénévoles en liste d'attente sont dans la liste d'entrée</span>
           </span>
           <span className="rule-hint">
-            Une personne en réserve ne fait aucune heure et n'est normalement pas sur place:
+            Une personne en liste d'attente ne fait aucune heure et n'est normalement pas sur place:
             décoché, elle n'est pas dans le fichier exporté pour la porte. Cochez si elle peut
             tout de même venir, au montage par exemple. L'onglet Personnes la liste à part dans
             les deux cas.

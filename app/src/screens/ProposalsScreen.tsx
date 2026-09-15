@@ -32,8 +32,8 @@ import type { SolveMode } from '../solver/solver.worker.ts';
 type Verdict = 'accepted' | 'rejected';
 
 const KIND_LABEL: Record<ProposalKind, string> = {
-  reserve: 'Mise en réserve',
-  unreserve: 'Rappel de réserve',
+  reserve: "Mise en liste d'attente",
+  unreserve: "Rappel de la liste d'attente",
   move: 'Déplacement',
   remove: 'Retrait',
   add: 'Ajout',

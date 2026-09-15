@@ -52,6 +52,7 @@ import {
 } from './constraints.js';
 import { Rng } from './rng.js';
 import {
+  statusOf,
   type Artist,
   type EventSlot,
   type PreferenceSlot,
@@ -717,6 +718,12 @@ export class SolverState implements LegalityContext {
     const w = this.weights;
     const { volunteer, hours } = state;
     let penalty = 0;
+
+    // Cancelled: nobody is owed anything, so no floor, no volume, no waiting list. Every placement
+    // is already illegal through `isLegal`, which is what makes a re-solve propose their removal.
+    if (statusOf(volunteer) === 'annule') {
+      return this.anchored ? w.stability * state.changed : 0;
+    }
 
     // On reserve: no shift, and therefore none of the terms below apply. The cost of the
     // decision itself replaces them, so the search can weigh "hold them back" against "find
@@ -1497,6 +1504,7 @@ function reserveDescent(state: SolverState): boolean {
 
   for (const volunteer of state.base.plan.volunteers) {
     if (state.isReserve(volunteer.key)) continue;
+    if (statusOf(volunteer) === 'annule') continue;
     if (state.hoursOf(volunteer.key) > 0) continue;
 
     const somewhereToGo = (state.shiftsForVolunteer.get(volunteer.key) ?? []).some((shift) =>

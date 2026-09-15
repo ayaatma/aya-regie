@@ -216,7 +216,7 @@ export const CRITERIA: readonly CriterionDefinition[] = [
     id: 'floor',
     group: 'volume',
     label: 'Sous le plancher par personne',
-    hint: 'En dessous, le déplacement ne vaut pas la peine: mieux vaut la réserve, et le dire. Ne peut pas être bloquant, un planning vide le serait.',
+    hint: "En dessous, le déplacement ne vaut pas la peine: mieux vaut la liste d'attente, et le dire. Ne peut pas être bloquant, un planning vide le serait.",
     modes: WO,
     defaultMode: 'weight',
     defaultWeight: 30000,
@@ -226,8 +226,8 @@ export const CRITERIA: readonly CriterionDefinition[] = [
   {
     id: 'reserve',
     group: 'volume',
-    label: 'Mise en réserve',
-    hint: 'Garder quelqu\'un sans créneau, en le lui disant. Doit rester moins cher que le plancher manqué, sinon la réserve ne sert plus.',
+    label: "Mise en liste d'attente",
+    hint: "Garder quelqu'un sans créneau, en le lui disant. Doit rester moins cher que le plancher manqué, sinon la liste d'attente ne sert plus.",
     // Weight only: at zero, holding everybody back would be free and the solver would do it.
     modes: ['weight'],
     defaultMode: 'weight',

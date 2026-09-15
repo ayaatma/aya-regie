@@ -99,7 +99,7 @@ export function exploitPoolRows(index: PlanIndex, report: ValidationResult): Poo
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
   const benevoles = report.volunteers
-    .filter((v) => !v.reserve && (v.assignedHours < v.requestedTotalHours || v.assignedHours === 0))
+    .filter((v) => !v.reserve && v.status !== 'annule' && (v.assignedHours < v.requestedTotalHours || v.assignedHours === 0))
     .sort(
       (a, b) =>
         b.requestedTotalHours - b.assignedHours - (a.requestedTotalHours - a.assignedHours) ||

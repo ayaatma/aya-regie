@@ -72,7 +72,7 @@ export function RecruitmentScreen() {
           <span className="toolbar-note">
             sur {gaps.length} créneaux
             {callable > 0 &&
-              `, dont ${callable} qu'une personne en réserve pourrait prendre dès maintenant`}
+              `, dont ${callable} qu'une personne en liste d'attente pourrait prendre dès maintenant`}
           </span>
           <div className="toolbar-sep" />
           <label className="checkline">
@@ -92,7 +92,7 @@ export function RecruitmentScreen() {
               checked={reserveOnly}
               onChange={(event) => setReserveOnly(event.target.checked)}
             />
-            Seulement ce que la réserve peut couvrir
+            Seulement ce que la liste d'attente peut couvrir
           </label>
         </div>
 
@@ -128,7 +128,10 @@ export function RecruitmentScreen() {
                         {gap.disponibles} disponible{gap.disponibles > 1 ? 's' : ''}
                       </span>
                       {gap.enReserve > 0 && (
-                        <span className="chip is-ok">{gap.enReserve} en réserve</span>
+                        <span className="chip is-ok">{gap.enReserve} en liste d'attente</span>
+                      )}
+                      {gap.enRenfort > 0 && (
+                        <span className="chip is-ok">{gap.enRenfort} en renfort possible</span>
                       )}
                       {gap.satures > 0 && <span className="chip">{gap.satures} déjà pleins</span>}
                       {gap.refusentLePole > 0 && (

@@ -405,7 +405,7 @@ export function ImportScreen() {
                             ? `${entry.assignments} créneau(x), ${fmtHours(entry.hours)}`
                             : 'aucune affectation'}
                         </span>
-                        {entry.onReserve && <span className="chip">en réserve</span>}
+                        {entry.onReserve && <span className="chip">en liste d'attente</span>}
                         {entry.volunteer.enteredByHand && (
                           <span
                             className="chip"

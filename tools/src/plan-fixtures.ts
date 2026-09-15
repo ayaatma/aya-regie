@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  DEFAULT_APPLICATION_STEPS,
   DEFAULT_CATERING,
   DEFAULT_TICKETING,
   DEFAULT_TRAVEL_RATES,
@@ -92,6 +93,7 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     poleChoicesRanked: true,
     volume: DEFAULT_VOLUME,
     formMapping: { columns: {}, answers: {} },
+    applicationSteps: DEFAULT_APPLICATION_STEPS,
     dismissedBuddies: [],
     slots: DEFAULT_SLOTS,
     preferenceSlots: DEFAULT_PREFERENCE_SLOTS,

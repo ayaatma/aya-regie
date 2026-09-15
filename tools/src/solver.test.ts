@@ -70,6 +70,7 @@ function makePlan(parts: {
     poleChoicesRanked: true,
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
+    applicationSteps: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     slots: DEFAULT_SLOTS,
@@ -911,4 +912,16 @@ test('a locked pole covers its sub-poles', () => {
     1,
     'verrouiller Bar verrouille Bar / Service avec lui, donc b n\'est pas ajouté',
   );
+});
+
+test('a re-solve hands back the places of somebody who cancelled, and gives them nothing', () => {
+  const plan = makePlan({
+    shifts: [shift('s1', 'alpha', 0, 4, 2)],
+    volunteers: [volunteer('v1', { status: 'annule' }), volunteer('v2')],
+    assignments: [assign('v1', 's1')],
+  });
+  const result = solve(plan, { seed: 1, iterations: 200 });
+  strictEqual(result.dropped.length, 1, 'la place est proposée au retrait, pas effacée');
+  ok(!result.plan.assignments.some((a) => a.volunteerKey === 'v1'));
+  ok(!result.plan.reserve.includes('v1'), "pas de liste d'attente pour une annulation");
 });

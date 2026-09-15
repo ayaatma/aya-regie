@@ -331,3 +331,14 @@ export {
 } from '@engine/ticketing.ts';
 export type { StatusTag, TicketingReport, TicketingRow } from '@engine/ticketing.ts';
 export { artistGuests } from '@engine/artists.ts';
+
+// Application tracking, 2026-09-15: status, steps, Réserve and stamina.
+export {
+  APPLICATION_STATUSES,
+  APPLICATION_STATUS_LABEL,
+  DEFAULT_APPLICATION_STEPS,
+  ENERGY_LABEL,
+  ENERGY_PROFILES,
+  statusOf,
+} from '@engine/model.ts';
+export type { ApplicationStatus, ApplicationStep, EnergyProfile } from '@engine/model.ts';

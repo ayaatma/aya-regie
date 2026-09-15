@@ -18,7 +18,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  APPLICATION_STATUSES,
+  APPLICATION_STATUS_LABEL,
+  ENERGY_LABEL,
   PERSON_STATUS_LABEL,
+  statusOf,
+  type ApplicationStatus,
   ticketingCsv,
   ticketingReport,
   type ExtraPerson,
@@ -50,13 +55,18 @@ import { samePerson, type PersonRef } from '../components/personNav.ts';
 const ALL = 'tous';
 
 /** Which columns the list shows. The fiche shows everything whichever is picked. */
-export type PeopleView = 'accueil' | 'contact' | 'repas';
+export type PeopleView = 'accueil' | 'contact' | 'repas' | 'candidature';
 
 const VIEW_LABEL: Record<PeopleView, string> = {
   accueil: 'Accueil',
   contact: 'Contact',
   repas: 'Repas',
+  // 2026-09-15: where each application stands, the steps ticked, the Réserve and the stamina.
+  candidature: 'Candidature',
 };
+
+/** The application filter: a status, the Réserve, or everybody. Only bénévoles have one. */
+type FollowUp = ApplicationStatus | 'reserve' | typeof ALL;
 
 const flatten = (text: string): string =>
   text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
@@ -78,11 +88,16 @@ export function PeopleScreen({
   const [status, setStatus] = useState<PersonStatus | typeof ALL>(ALL);
   const [view, setView] = useState<PeopleView>('accueil');
   const [withPhones, setWithPhones] = useState(false);
+  const [followUp, setFollowUp] = useState<FollowUp>(ALL);
 
   const report = ticketingReport(plan, index);
   const needle = flatten(search);
   const matching = report.rows.filter((row) => {
     if (status !== ALL && !row.statuses.some((s) => s.status === status)) return false;
+    if (followUp !== ALL) {
+      if (row.kind !== 'benevole') return false;
+      if (followUp === 'reserve' ? index.volunteerByKey.get(row.key)?.backup !== true : row.applicationStatus !== followUp) return false;
+    }
     if (needle === '') return true;
     return flatten(`${row.lastName} ${row.firstName} ${row.firstName} ${row.lastName}`).includes(needle);
   });
@@ -152,7 +167,7 @@ export function PeopleScreen({
           </strong>
           {reserveTotal > 0 && (
             <span className="people-meta" title="Listées à part, sous les autres">
-              + {reserveTotal} en réserve
+              + {reserveTotal} en liste d'attente
             </span>
           )}
           {issues > 0 && (
@@ -186,6 +201,23 @@ export function PeopleScreen({
                   {PERSON_STATUS_LABEL[s]} ({report.byStatus[s] ?? 0})
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="checkline">
+            Suivi
+            <select
+              className="select"
+              value={followUp}
+              aria-label="Filtrer par suivi de candidature"
+              onChange={(event) => setFollowUp(event.target.value as FollowUp)}
+            >
+              <option value={ALL}>Tous</option>
+              {APPLICATION_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {APPLICATION_STATUS_LABEL[s]} ({report.rows.filter((r) => r.applicationStatus === s).length})
+                </option>
+              ))}
+              <option value="reserve">Réserve ({plan.volunteers.filter((v) => v.backup === true).length})</option>
             </select>
           </label>
           <label className="checkline">
@@ -270,7 +302,7 @@ export function PeopleScreen({
           {reserveTotal > 0 && (
             <section className="screen-card people-reserve">
               <div className="setup-group-head">
-                <span className="setup-group-title">Réserve ({reserveTotal})</span>
+                <span className="setup-group-title">Liste d'attente ({reserveTotal})</span>
                 <span className="people-meta">
                   zéro heure sur l'exploit, volontairement: ces personnes ne sont normalement pas
                   sur place, on les appelle si quelqu'un manque.{' '}
@@ -292,7 +324,7 @@ export function PeopleScreen({
                   onFocus={onFocus}
                 />
               ) : (
-                <p className="panel-sub catering-empty">Personne en réserve ne correspond à cette recherche.</p>
+                <p className="panel-sub catering-empty">Personne en liste d'attente ne correspond à cette recherche.</p>
               )}
             </section>
           )}
@@ -345,6 +377,15 @@ function PeopleTable({
               <>
                 <th>Téléphone</th>
                 <th>E-mail</th>
+              </>
+            )}
+            {view === 'candidature' && (
+              <>
+                <th>Candidature</th>
+                <th>Étapes</th>
+                <th>Inscription</th>
+                <th>Énergie</th>
+                <th>Note</th>
               </>
             )}
             {view === 'repas' && (
@@ -501,6 +542,8 @@ function PersonLine({
         </>
       )}
 
+      {view === 'candidature' && <ApplicationCells row={row} />}
+
       {view === 'repas' && (
         <>
           <td>{row.diet}</td>
@@ -510,5 +553,46 @@ function PersonLine({
         </>
       )}
     </tr>
+  );
+}
+
+/** The « Candidature » columns of one line. Empty cells for anybody who is not a bénévole. */
+function ApplicationCells({ row }: { row: TicketingRow }) {
+  const { plan, index } = useLoadedPlan();
+  const volunteer = row.kind === 'benevole' ? index.volunteerByKey.get(row.key) : undefined;
+  if (!volunteer) return <><td /><td /><td /><td /><td /></>;
+  const status = statusOf(volunteer);
+  const ticked = new Set(volunteer.statusSteps ?? []);
+  const waiting = plan.reserve.includes(volunteer.key);
+  return (
+    <>
+      <td>
+        <span className={`chip ${status === 'annule' ? 'is-bad' : status === 'valide' ? 'is-ok' : ''}`}>
+          {APPLICATION_STATUS_LABEL[status]}
+        </span>
+        {waiting && <span className="chip">Liste d'attente</span>}
+        {volunteer.backup && <span className="chip is-ok">Réserve</span>}
+      </td>
+      <td>
+        {plan.applicationSteps.length > 0 && (
+          <span
+            className={`chip ${plan.applicationSteps.every((s) => ticked.has(s.key)) ? 'is-ok' : 'is-muted'}`}
+            title={plan.applicationSteps.map((s) => `${ticked.has(s.key) ? '✓' : '·'} ${s.label}`).join('\n')}
+          >
+            {plan.applicationSteps.filter((s) => ticked.has(s.key)).length}/{plan.applicationSteps.length}
+          </span>
+        )}
+        {plan.applicationSteps
+          .filter((step) => ticked.has(step.key))
+          .map((step) => (
+            <span key={step.key} className="chip is-ok" title={step.label}>
+              ✓ {step.label}
+            </span>
+          ))}
+      </td>
+      <td>{volunteer.registeredAt}</td>
+      <td>{volunteer.energy ? ENERGY_LABEL[volunteer.energy] : ''}</td>
+      <td>{volunteer.regieNote}</td>
+    </>
   );
 }

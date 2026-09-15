@@ -296,7 +296,7 @@ test('the dashboard names people rather than only counting them', () => {
   for (const entry of report.summary.horsChoix.slice(0, 5)) {
     assert.ok(shows(html, entry.name), `nom manquant: ${entry.name}`);
   }
-  assert.ok(html.includes('Réserve'));
+  assert.ok(shows(html, "Liste d'attente"));
   assert.ok(html.includes('Binômes'));
   assert.ok(html.includes('Recrutement'));
 });
@@ -754,7 +754,7 @@ test('the three moments draw the same pool pane, with the same tabs', () => {
     const html = poolOf(withPhase, 'disponibles', moment);
     assert.ok(shows(html, 'Disponibles ('), `${moment}: l'onglet Disponibles`);
     // The reserve left this pane for Personnes on 2026-09-15.
-    assert.ok(!shows(html, 'Réserve ('), `${moment}: plus d'onglet Réserve`);
+    assert.ok(!shows(html, "Liste d'attente ("), `${moment}: plus d'onglet Réserve`);
     // The one piece of markup the montage used to lack entirely: the panel's own frame.
     assert.ok(html.includes('class="panel is-pool"'), `${moment}: le volet a le même cadre`);
     assert.ok(html.includes('class="panel-tabs"'), `${moment}: les mêmes onglets`);
@@ -967,7 +967,7 @@ test('the printable page carries one sheet per pole, plus the volunteers and the
     assert.ok(shows(html, root.name), `pôle absent de l'impression: ${root.name}`);
   }
   assert.ok(shows(html, 'Planning de chaque bénévole'));
-  assert.ok(shows(html, 'Réserve'));
+  assert.ok(shows(html, "Liste d'attente"));
 
   // One printed page per pole, plus the volunteer sheet and the reserve sheet.
   assert.equal((html.match(/class="print-page"/g) ?? []).length, roots.length + 2);
@@ -2291,8 +2291,8 @@ test('the Personnes tab lists the reserve apart, under everybody else', () => {
   const html = peopleOf(withReserve);
   const card = html.indexOf('people-reserve');
   assert.ok(card > 0, 'une carte Réserve à part');
-  assert.ok(shows(html, 'Réserve (1)'));
-  assert.ok(shows(html, '+ 1 en réserve'), 'annoncée dans la barre');
+  assert.ok(shows(html, "Liste d'attente (1)"));
+  assert.ok(shows(html, "+ 1 en liste d'attente"), 'annoncée dans la barre');
   const row = html.indexOf(`data-person="benevole|${held.key}"`);
   assert.ok(row > card, 'la ligne de la personne en réserve est dans la carte Réserve, pas avant');
   assert.equal(html.split(`data-person="benevole|${held.key}"`).length, 2, 'et une seule fois');
@@ -2443,4 +2443,23 @@ test("the fiche names an act's guests per member, and flags a member past the ev
   assert.ok(shows(html, 'Invitations supplémentaires du groupe (3)'));
   assert.ok(shows(html, 'Ajouter un invité'));
   assert.ok(!html.includes('name="member-invited-'), 'the tick is gone');
+});
+
+test('a fiche carries the application, and a cancelled person still placed is offered to be freed', () => {
+  const held = plan.assignments[0]!.volunteerKey;
+  const cancelled: Plan = {
+    ...plan,
+    applicationSteps: [{ key: 'confirmation', label: 'Mail de confirmation envoyé' }],
+    volunteers: plan.volunteers.map((v) =>
+      v.key === held ? { ...v, status: 'annule' as const, statusSteps: ['confirmation'], energy: 'fatigable' as const } : v),
+  };
+  const html = infoOf(cancelled, { kind: 'benevole', volunteerKey: held });
+  assert.ok(shows(html, 'Candidature'));
+  assert.ok(html.includes('>Libérer ses places</button>'), 'le bouton explicite, rien de retiré tout seul');
+  assert.ok(shows(html, 'Mail de confirmation envoyé'));
+  assert.ok(shows(html, 'Fatigue vite'));
+
+  const reading = infoOf(cancelled, { kind: 'benevole', volunteerKey: held }, true);
+  assert.ok(shows(reading, 'Annulée'));
+  assert.ok(!reading.includes('>Libérer ses places</button>'), 'rien à modifier en lecture seule');
 });

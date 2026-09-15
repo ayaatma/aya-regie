@@ -123,7 +123,7 @@ export function describeAccepted(accepted: readonly Proposal[]): string {
     add: ['ajout', 'ajouts'],
     move: ['déplacement', 'déplacements'],
     remove: ['retrait', 'retraits'],
-    reserve: ['mise en réserve', 'mises en réserve'],
+    reserve: ["mise en liste d'attente", "mises en liste d'attente"],
     unreserve: ['rappel', 'rappels'],
   };
   const counts = new Map<Proposal['kind'], number>();

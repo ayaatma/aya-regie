@@ -169,7 +169,7 @@ export function PrintScreen() {
           </label>
           <label className="checkline">
             <input type="checkbox" checked={options.reserve} onChange={() => toggle('reserve')} />
-            Liste de réserve
+            Liste d'attente
           </label>
           <label className="checkline" title="Données personnelles: à n'imprimer que si la feuille reste entre les mains des responsables.">
             <input type="checkbox" checked={options.phones} onChange={() => toggle('phones')} />
@@ -393,7 +393,7 @@ function ReserveSheet({
 }) {
   return (
     <section className="print-page">
-      <h2>Réserve</h2>
+      <h2>Liste d'attente</h2>
       <p className="print-meta">
         {people.length} bénévoles sans créneau. Ce sont les gens à appeler quand il manque
         quelqu'un.

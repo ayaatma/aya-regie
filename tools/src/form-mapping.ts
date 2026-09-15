@@ -49,7 +49,9 @@ export type MappedField =
   | 'buddies'
   | 'phaseHelp'
   | 'montage'
-  | 'demontage';
+  | 'demontage'
+  | 'backup'
+  | 'energy';
 
 /** One pole choice as columns: the pole answer, and the level answer when the form asks one. */
 export interface ChoiceColumns {
@@ -101,13 +103,15 @@ export const MAPPED_FIELD_LABEL: Record<MappedField, string> = {
   phaseHelp: 'Montage et démontage (une question)',
   montage: 'Montage',
   demontage: 'Démontage',
+  backup: 'Renfort (Réserve)',
+  energy: "Profil d'énergie",
 };
 
 /** The order the screen lists the fields in: who, then what they can do, then the rest. */
 export const MAPPED_FIELDS: readonly MappedField[] = [
   'firstName', 'lastName', 'nickname', 'email', 'phone',
   'volume', 'halfPreference', 'refusedSlotChoice', 'availabilityNote', 'refusedPoles',
-  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'submittedAt',
+  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'submittedAt',
 ];
 
 /** Which answer map a field's answers go through, for the fields that have one. */

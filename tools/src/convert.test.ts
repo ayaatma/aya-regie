@@ -113,6 +113,7 @@ function makePlan(): Plan {
     poleChoicesRanked: true,
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
+    applicationSteps: [],
     constraints: DEFAULT_CONSTRAINTS,
   };
 }

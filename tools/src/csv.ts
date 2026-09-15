@@ -8,7 +8,7 @@
 
 import type { Artist, Pole, Shift, SkillLevel, Volunteer } from './model.js';
 import {
-  DEFAULT_SLOTS, toLabel } from './model.js';
+  DEFAULT_SLOTS, statusOf, toLabel } from './model.js';
 import type { Plan } from './plan.js';
 
 function escapeField(value: string): string {
@@ -396,6 +396,8 @@ export interface BrevoExport {
    * is said here.
    */
   sharedEmails: string[];
+  /** Cancelled bénévoles left out, by name: nobody mails a code to somebody who is not coming. */
+  cancelled: string[];
 }
 
 /**
@@ -413,10 +415,15 @@ export function brevoContactsCsv(plan: Plan): BrevoExport {
   }
 
   const withoutEmail: string[] = [];
+  const cancelled: string[] = [];
   const seen = new Map<string, number>();
   const rows: string[][] = [];
 
   for (const v of plan.volunteers) {
+    if (statusOf(v) === 'annule') {
+      cancelled.push(`${v.firstName} ${v.lastName}`.trim());
+      continue;
+    }
     const email = v.email.trim();
     if (email === '') {
       withoutEmail.push(`${v.firstName} ${v.lastName}`.trim());
@@ -437,6 +444,7 @@ export function brevoContactsCsv(plan: Plan): BrevoExport {
     csv: toCsv(BREVO_COLUMNS, rows),
     sent: rows.length,
     withoutEmail,
+    cancelled,
     sharedEmails: [...seen.entries()].filter(([, count]) => count > 1).map(([email]) => email),
   };
 }

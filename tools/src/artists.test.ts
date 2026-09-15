@@ -73,6 +73,7 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     poleChoicesRanked: true,
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
+    applicationSteps: [],
     dismissedBuddies: [],
     constraints: DEFAULT_CONSTRAINTS,
     catering: catering ?? {

@@ -23,6 +23,7 @@ import {
   type SchedulingRules,
   type Pole,
   type SkillLevel,
+  type EnergyProfile,
   type SlotId,
   type Volunteer,
 } from './model.js';
@@ -95,6 +96,8 @@ const FIELDS = [
   // which covers both at once; the two others exist for the day it asks them separately.
   // All three optional: an export without any of them must keep importing.
   'phaseHelp', 'montage', 'demontage',
+  // 2026-09-15, from a field test on another festival's form. Both optional.
+  'backup', 'energy',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -174,6 +177,10 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'diet',        test: (h) => /regime|alimentaire|vegetarien|vegan/.test(h), required: false },
   { field: 'artist',      test: (h) => /artiste/.test(h), required: false },
   { field: 'buddies',     test: (h) => /avec un e ami|avec qui|ensemble|binome/.test(h), required: false },
+  // « Il manque des bénévoles sur un roulement » / « tu viens en renfort ? ». Anchored on the
+  // shortage, not on « bénévole », which half the headers carry.
+  { field: 'backup',      test: (h) => /renfort|manque des benevoles|manque de benevoles/.test(h), required: false },
+  { field: 'energy',      test: (h) => /energie|comment te considere/.test(h), required: false },
 ];
 
 export type ColumnMap = Partial<Record<FormField, number>>;
@@ -390,6 +397,29 @@ function matchSlot<T extends { id: SlotId; label: string }>(v: string, slots: re
       normalise(s.label).includes(v) ||
       v.includes(normalise(s.label)),
   );
+}
+
+/**
+ * « Je viens en renfort si... » ticked is a yes; any other answer is a no; no answer is not asked.
+ * Several boxes may be ticked in one cell, so the whole cell is searched.
+ */
+export function parseBackup(value: string): boolean | undefined {
+  if (value.trim() === '') return undefined;
+  return /renfort/.test(normalise(value));
+}
+
+/**
+ * A stamina answer. Several ticked boxes keep the most cautious reading: somebody who says both
+ * « je fonce » and « je fatigue vite » is planned as somebody who tires.
+ */
+export function parseEnergy(value: string): EnergyProfile | null {
+  const v = normalise(value);
+  if (v === '') return null;
+  if (/fatigu/.test(v)) return 'fatigable';
+  if (/premiere|je ne sais pas/.test(v)) return 'premiere';
+  if (/maitrise|rythme|habitude/.test(v)) return 'regulier';
+  if (/fonce|donne tout/.test(v)) return 'fonce';
+  return null;
 }
 
 function parseLevel(value: string): SkillLevel | null {
@@ -852,6 +882,17 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     submittedAt: (row) => cell(row, 'submittedAt'),
   });
   for (const entry of superseded.values()) issues.push(entry.issue);
+  // Their place in the queue: the earliest of the answers one address sent, not the kept one.
+  const firstAnswer = new Map<string, { at: number | null; raw: string }>();
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]!;
+    const raw = cell(row, 'submittedAt');
+    if (raw === '') continue;
+    const identity = volunteerIdentity(cell(row, 'firstName'), cell(row, 'lastName'), cell(row, 'email'));
+    const at = parseSubmittedAt(raw);
+    const seen = firstAnswer.get(identity);
+    if (!seen || (at !== null && (seen.at === null || at < seen.at))) firstAnswer.set(identity, { at, raw });
+  }
 
   for (let i = 1; i < rows.length; i++) {
     if (superseded.has(i)) continue;
@@ -1138,6 +1179,9 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       reviewReasons,
       montage: phasePresence.montage,
       demontage: phasePresence.demontage,
+      registeredAt: firstAnswer.get(identity)?.raw ?? '',
+      backup: parseBackup(cell(row, 'backup')) ?? false,
+      energy: parseEnergy(cell(row, 'energy')),
     });
 
     rawBuddies.push({ fromKey: key, mentions: buddyMentions, row: rowNumber, person });

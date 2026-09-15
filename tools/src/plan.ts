@@ -26,8 +26,9 @@ import {
   type OrganiserShift,
   type Volunteer,
   type Window,
+  type ApplicationStep,
 } from './model.js';
-import { DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
+import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
 import { type Phase, alignPhase, defaultPhase, defaultPhaseStart } from './phase.js';
 import { refusedWindows, usableWindows } from './availability.js';
 import { shortNames } from './display.js';
@@ -111,8 +112,11 @@ import {
  *    and the next import ticks them for removal like somebody who withdrew.
  * 15: 2026-09-15, `TicketingSettings.reserveOnDoorList`: whether the bénévoles in reserve are on
  *    the door's export. A build that predates this writes the setting back as off.
+ * 16: 2026-09-15, application tracking. `Volunteer.status`, `statusSteps`, `regieNote`,
+ *    `registeredAt`, `backup` (the new Réserve) and `energy`, and `Plan.applicationSteps`. A build
+ *    that predates this writes every bénévole back as a fresh candidature with nothing ticked.
  */
-export const PLAN_FORMAT = 15;
+export const PLAN_FORMAT = 16;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -238,8 +242,17 @@ export interface Plan {
    *
    * This is validated state, like an assignment: the solver proposes a reserve list, the
    * régisseur accepts it. Never a silent demotion.
+   *
+   * « LISTE D'ATTENTE » ON EVERY SCREEN SINCE 2026-09-15. The régisseur found it used for people
+   * with no créneau who will probably not be taken, which is a waiting list; « Réserve » now names
+   * `Volunteer.backup`, validated people ready to do more. The identifier stayed, the words moved.
    */
   reserve: readonly string[];
+  /**
+   * The messages and checks ticked per bénévole, in order (« Mail de confirmation envoyé »...).
+   * The event's own sequence; see `ApplicationStep`.
+   */
+  applicationSteps: readonly ApplicationStep[];
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *
@@ -807,6 +820,7 @@ export function emptyPlan(
     | 'volume'
     | 'formMapping'
     | 'dismissedBuddies'
+    | 'applicationSteps'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -837,5 +851,6 @@ export function emptyPlan(
     poleChoicesRanked: true,
     volume: DEFAULT_VOLUME,
     formMapping: EMPTY_FORM_MAPPING,
+    applicationSteps: DEFAULT_APPLICATION_STEPS,
   };
 }

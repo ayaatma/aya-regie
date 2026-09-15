@@ -128,6 +128,11 @@ create table event (
   -- for the reason constraint_settings is one: sparse, and never queried inside.
   form_mapping          jsonb not null default '{}'::jsonb
     check (jsonb_typeof(form_mapping) = 'object'),
+  -- The messages and checks ticked per benevole (« Mail de confirmation envoyé »...), in order,
+  -- as [{key, label}]. Since 2026-09-15. A document for the reason form_mapping is one.
+  application_steps     jsonb not null default
+    '[{"key":"confirmation","label":"Mail de confirmation envoyé"},{"key":"reconfirmee","label":"Présence reconfirmée"},{"key":"infos","label":"Infos pratiques envoyées"}]'::jsonb
+    check (jsonb_typeof(application_steps) = 'array'),
 
   -- THE OPTIMISTIC LOCK. Every save states the version it was built on; a save against a stale
   -- version is refused and hands back what the database holds. This is the "quelqu'un a modifie
@@ -483,6 +488,19 @@ create table volunteer (
   -- a benevole on the Personnes tab. The import screen keeps such a person by default when the
   -- export has no row for them, since they never had one to lose.
   entered_by_hand boolean not null default false,
+  -- The regisseur's tracking of the application, since 2026-09-15, never read from a form: where
+  -- it stands, the steps ticked (event.application_steps keys) and a note. The waiting list is
+  -- NOT a status, it is on_reserve above.
+  status          text not null default 'candidature'
+    check (status in ('candidature', 'valide', 'annule')),
+  status_steps    text[] not null default '{}',
+  regie_note      text not null default '',
+  -- The form's timestamp of the first answer, as the export writes it. Their place in the queue.
+  registered_at   text not null default '',
+  -- Two answers of the same date: ready to reinforce beyond their volume (the Reserve on every
+  -- screen), and how they describe their stamina.
+  backup          boolean not null default false,
+  energy          text check (energy in ('fonce', 'regulier', 'fatigable', 'premiere')),
   sort_order      int not null default 0,
   unique (event_id, key),
   unique (event_id, access_code)
@@ -1009,7 +1027,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 15,
+values ('min_plan_format', 16,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1338,6 +1356,12 @@ as $fn$
              'needsReview',     v.needs_review,
              'reviewReasons',   to_jsonb(v.review_reasons),
              'enteredByHand',   v.entered_by_hand,
+             'status',          v.status,
+             'statusSteps',     to_jsonb(v.status_steps),
+             'regieNote',       v.regie_note,
+             'registeredAt',    v.registered_at,
+             'backup',          v.backup,
+             'energy',          v.energy,
              -- The two phase answers. The windows are the régisseur's reading of the sentence,
              -- ordered so the same database always produces the same JSON.
              'montage', jsonb_build_object(
@@ -1607,6 +1631,7 @@ as $fn$
         'dayStartHour', e.day_start_hour,
         'options',      to_jsonb(e.volume_options)),
       'formMapping', e.form_mapping,
+      'applicationSteps', e.application_steps,
       'dismissedBuddies', dismissed_buddies.j))
   from event e, slots, preference_slots, poles, shifts, artists, organisers, leader_roles, volunteers, buddies,
        dismissed_buddies, assignments, reserve, organiser_shifts, catering, ticketing, travel
@@ -1690,7 +1715,10 @@ begin
                                                                      then p_plan#>'{volume,options}' else '[]'::jsonb end) as vo(o)),
                                      '{4,6,8}'),
     form_mapping          = case when jsonb_typeof(p_plan->'formMapping') = 'object'
-                                 then p_plan->'formMapping' else '{}'::jsonb end
+                                 then p_plan->'formMapping' else '{}'::jsonb end,
+    -- Absent from anything written before PLAN_FORMAT 16: the column keeps what it holds.
+    application_steps     = case when jsonb_typeof(p_plan->'applicationSteps') = 'array'
+                                 then p_plan->'applicationSteps' else application_steps end
   where id = p_event_id;
 
   insert into ticket_type (event_id, key, label, start_hours, end_hours, sort_order)
@@ -1836,7 +1864,9 @@ begin
                          requested_hours, preferred_slot_key, availability_note,
                          buddy_raw_names, manual_fields, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
-                         on_reserve, entered_by_hand, sort_order)
+                         on_reserve, entered_by_hand,
+                         status, status_steps, regie_note, registered_at, backup, energy,
+                         sort_order)
   select p_event_id, x->>'key', x->>'firstName', x->>'lastName',
          coalesce(x->>'nickname', ''),
          -- The short label, computed over the whole roster by the browser that is saving. The
@@ -1870,6 +1900,16 @@ begin
          coalesce(x#>>'{demontage,note}', ''),
          held.k is not null,
          coalesce((x->>'enteredByHand')::boolean, false),
+         case when x->>'status' in ('candidature', 'valide', 'annule') then x->>'status' else 'candidature' end,
+         coalesce((select array_agg(step #>> '{}')
+                   from jsonb_array_elements(case when jsonb_typeof(x->'statusSteps') = 'array'
+                                                  then x->'statusSteps' else '[]'::jsonb end)
+                        as ss(step)),
+                  '{}'::text[]),
+         coalesce(x->>'regieNote', ''),
+         coalesce(x->>'registeredAt', ''),
+         coalesce((x->>'backup')::boolean, false),
+         case when x->>'energy' in ('fonce', 'regulier', 'fatigable', 'premiere') then x->>'energy' end,
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'volunteers', '[]'::jsonb))
        with ordinality as t(x, ord)

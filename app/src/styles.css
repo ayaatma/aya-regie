@@ -4844,3 +4844,29 @@ textarea.select,
 .convert-list li + li {
   margin-top: 3px;
 }
+
+/* La section Candidature d'une fiche (2026-09-15): les étapes cochées et la note de la régie. */
+.fiche-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.fiche-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.fiche-edit textarea.select {
+  max-width: none;
+  width: 100%;
+  min-height: 44px;
+}
+
+/* Une étape de candidature pas encore cochée, dans la vue Candidature de Personnes. */
+.chip.is-muted {
+  opacity: 0.55;
+}

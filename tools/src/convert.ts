@@ -248,7 +248,7 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
     "Son code d'accès bénévole ne fonctionnera plus. Un code orga se donne depuis la carte Orgas des Réglages.",
     'Aucune règle d\'heures ne s\'applique plus: volume, préférence, refus et choix de pôles ne comptent plus.',
     ...(buddyNames.length > 0 ? [`${plural(buddyNames.length, 'Binôme retiré', 'Binômes retirés')}: ${buddyNames.join(', ')}.`] : []),
-    ...(plan.reserve.includes(key) ? ["N'est plus en réserve."] : []),
+    ...(plan.reserve.includes(key) ? ["N'est plus en liste d'attente."] : []),
   ];
 
   const moved = rekey(plan, 'benevole', key, 'orga', newKey);
@@ -337,6 +337,9 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
     montage,
     demontage,
     enteredByHand: true,
+    // An orga was already part of the event: turning them into a bénévole does not put them back
+    // among the undecided candidatures.
+    status: 'valide',
   };
 
   const assignments: Assignment[] = [

@@ -498,3 +498,19 @@ test('an absent bénévole entered by hand is kept by default, an absent one fro
   const kept = keptByDefault(r);
   deepStrictEqual([...kept].map((key) => byHand.volunteers.find((v) => v.key === key)!.firstName), ['Bruno']);
 });
+
+test("a re-import never touches the régisseur's tracking of an application", () => {
+  const plan = planWith(BASE);
+  const tracked: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v, i) =>
+      i === 0 ? { ...v, status: 'annule' as const, statusSteps: ['confirmation'], regieNote: 'mail du 3' } : v),
+  };
+  const next = importOf([{ ...BASE[0]!, volume: VOLUME_8 }, ...BASE.slice(1)]);
+  const applied = applyReconciliation(tracked, next, reconcileVolunteers(tracked, next));
+  const alice = applied.volunteers.find((v) => v.firstName === 'Alice')!;
+  strictEqual(alice.requestedHours, 8, 'la réponse est mise à jour');
+  strictEqual(alice.status, 'annule');
+  deepStrictEqual(alice.statusSteps, ['confirmation']);
+  strictEqual(alice.regieNote, 'mail du 3');
+});

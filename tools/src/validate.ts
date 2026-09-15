@@ -32,6 +32,8 @@
 import {
   demandHours,
   shiftHours,
+  statusOf,
+  type ApplicationStatus,
   type Artist,
   type EventSlot,
   type PreferenceSlot,
@@ -87,6 +89,11 @@ export const TIER1 = {
   pasChoix1: 'pas-choix-1',
   /** Only while the event blocks "hors de tous les choix". Tier 1 then, never otherwise. */
   horsChoix: 'hors-choix',
+  /**
+   * The person cancelled (`Volunteer.status`). Always tier 1 and never a Réglages criterion: no
+   * event wants somebody who is not coming to hold a place.
+   */
+  candidatureAnnulee: 'candidature-annulee',
 } as const;
 
 /** Tier 2: a real problem, shown in red, that never stops the solver from returning a plan. */
@@ -262,6 +269,11 @@ function violationsFor(
 
   if (current.some((s) => s.key === shift.key)) return level === 'block' ? [{ code: TIER1.dejaAffecte }] : [];
 
+  if (level === 'block' && statusOf(volunteer) === 'annule') {
+    found.push({ code: TIER1.candidatureAnnulee });
+    if (stopEarly) return found;
+  }
+
   if (level === 'block' && ctx.assigneeCount(shift.key) >= ctx.headcountOf(shift)) {
     found.push({ code: TIER1.sureffectif });
     if (stopEarly) return found;
@@ -435,6 +447,8 @@ function describe(
   switch (violation.code) {
     case TIER1.dejaAffecte:
       return 'Ce bénévole occupe déjà ce créneau.';
+    case TIER1.candidatureAnnulee:
+      return 'Candidature annulée: cette personne ne vient plus.';
     case TIER1.sureffectif:
       return `Le créneau est déjà complet (${shift ? ctx.headcountOf(shift) : 0} place(s) pour les bénévoles).`;
     case TIER1.poleRefuse:
@@ -541,8 +555,12 @@ export interface BuddyOutcome {
 export interface VolunteerReport {
   key: string;
   name: string;
-  /** Held in reserve: no shift, on purpose, and not an error. */
+  /** On the waiting list (`Plan.reserve`): no shift, on purpose, and not an error. */
   reserve: boolean;
+  /** Where the application stands. A cancelled person is in no count of the summary. */
+  status: ApplicationStatus;
+  /** In the Réserve: ready to reinforce beyond their volume. */
+  backup: boolean;
   /** The volume asked for, as answered: per day in day mode. */
   requestedHours: number;
   /** What the plan owes: `requestedHours`, times the days the person can work in day mode. */
@@ -597,8 +615,14 @@ export interface GapDiagnosis {
   satures: number;
   /** Among the available ones, those who would then miss an artist they named. */
   artisteEnJeu: number;
-  /** Volunteers on reserve who could take it. Filling this gap means calling one of them up. */
+  /** Volunteers on the waiting list (`Plan.reserve`) who could take it. Filling this gap means calling one of them up. */
   enReserve: number;
+  /**
+   * Bénévoles of the Réserve (`Volunteer.backup`) held back by their own volume only: they said
+   * they would come and reinforce, so this gap closes by asking them for more hours. Counted inside
+   * `satures` too, since that is what they are by the rules.
+   */
+  enRenfort: number;
   /** One French sentence, dominant reason first. This is what the recruitment view shows. */
   raison: string;
 }
@@ -671,7 +695,9 @@ export interface PlanSummary {
   shiftsPartial: number;
   shiftsEmpty: number;
 
+  /** Everybody but the cancelled, who are counted apart. */
   volunteersTotal: number;
+  volunteersCancelled: number;
   /** At zero hours without being on reserve, which is the number that needs acting on. */
   volunteersUnassigned: number;
   volunteersOnReserve: number;
@@ -764,6 +790,17 @@ export function validate(plan: Plan): ValidationResult {
     const hours = index.hoursOf(volunteer.key);
     const name = index.volunteerName(volunteer.key);
     const blocks = buildBlocks(shifts);
+
+    // Somebody who is not coming raises one thing only: the places still held in their name. Not
+    // « sans affectation », not a floor, not a preference: none of that concerns them any more.
+    if (statusOf(volunteer) === 'annule') {
+      if (shifts.length > 0) {
+        add(1, TIER1.candidatureAnnulee,
+          `${name} a annulé sa venue mais occupe encore ${shifts.length} créneau(x). Libérer ses places depuis sa fiche.`,
+          { volunteers: [volunteer.key], shifts: shifts.map((s) => s.key) });
+      }
+      continue;
+    }
 
     for (const shift of shifts) {
       const refusedRoot = tierOf(c.refusedPole) === null ? null : refusedRootOf(index, volunteer, shift.poleKey);
@@ -861,12 +898,12 @@ export function validate(plan: Plan): ValidationResult {
       // Holding a shift while on reserve is, because the two states contradict each other.
       if (shifts.length > 0) {
         add(2, TIER2.reserveAffectee,
-          `${name} est en réserve mais occupe ${shifts.length} créneau(x). À sortir de la réserve.`,
+          `${name} est en liste d'attente mais occupe ${shifts.length} créneau(x). À sortir de la liste d'attente.`,
           { volunteers: [volunteer.key], shifts: shifts.map((s) => s.key) });
       }
     } else if (shifts.length === 0) {
       add(2, TIER2.sansAffectation,
-        `${name} n'a aucun créneau et n'est pas en réserve. Personne ne doit finir à 0h par accident.`,
+        `${name} n'a aucun créneau et n'est pas en liste d'attente. Personne ne doit finir à 0h par accident.`,
         { volunteers: [volunteer.key] });
     } else if (c.floor.mode !== 'off' && !index.dayMode && hours < rules.minHoursPerPerson - 1e-9) {
       add(2, TIER2.plancherNonAtteint,
@@ -950,7 +987,7 @@ export function validate(plan: Plan): ValidationResult {
     );
     if (opening) {
       add(2, TIER2.reserveInjustifiee,
-        `${index.volunteerName(volunteer.key)} est en réserve alors que ` +
+        `${index.volunteerName(volunteer.key)} est en liste d'attente alors que ` +
         `"${index.shiftLabel(opening)}" manque de monde et lui conviendrait. À rappeler.`,
         { volunteers: [volunteer.key], shifts: [opening.key], pole: opening.poleKey });
     }
@@ -970,12 +1007,18 @@ function diagnoseGap(index: PlanIndex, shift: Shift, missing: number): GapDiagno
   let satures = 0;
   let artisteEnJeu = 0;
   let enReserve = 0;
+  let enRenfort = 0;
 
   const assigned = new Set(index.assigneesOf(shift.key).map((v) => v.key));
 
   for (const volunteer of index.plan.volunteers) {
     if (assigned.has(volunteer.key)) continue;
+    // Nobody who cancelled is part of any answer about who could come.
+    if (statusOf(volunteer) === 'annule') continue;
     const codes = new Set(blockersFor(index, volunteer, shift).map((b) => b.code));
+    if (volunteer.backup === true && codes.size > 0 && [...codes].every((c) => c === TIER1.volumeDepasse)) {
+      enRenfort++;
+    }
 
     // Priority is deliberate and is what makes the answer useful for recruitment: "nobody is
     // available at that hour" is a different problem from "everybody available vetoed the pole",
@@ -1001,7 +1044,8 @@ function diagnoseGap(index: PlanIndex, shift: Shift, missing: number): GapDiagno
     satures,
     artisteEnJeu,
     enReserve,
-    raison: gapReason({ disponibles, indisponibles, refusentLePole, satures, artisteEnJeu, enReserve, detail }),
+    enRenfort,
+    raison: gapReason({ disponibles, indisponibles, refusentLePole, satures, artisteEnJeu, enReserve, enRenfort, detail }),
   };
 }
 
@@ -1028,14 +1072,15 @@ function gapReason(parts: {
   satures: number;
   artisteEnJeu: number;
   enReserve: number;
+  enRenfort: number;
   detail: string;
 }): string {
-  const { disponibles, indisponibles, refusentLePole, satures, artisteEnJeu, enReserve, detail } = parts;
+  const { disponibles, indisponibles, refusentLePole, satures, artisteEnJeu, enReserve, enRenfort, detail } = parts;
 
   // The reserve comes first whatever else is true: it is the one gap with a phone number
   // attached to it, and the régisseur can close it this afternoon.
   if (enReserve > 0) {
-    return `${enReserve} bénévole(s) en réserve peuvent le prendre: c'est le moment de les rappeler. ` +
+    return `${enReserve} bénévole(s) en liste d'attente peuvent le prendre: c'est le moment de les rappeler. ` +
            `Par ailleurs ${detail}.`;
   }
 
@@ -1045,6 +1090,12 @@ function gapReason(parts: {
       : '';
     return `${disponibles} bénévole(s) pourraient le prendre: la contrainte est ailleurs dans le plan. ` +
            `Par ailleurs ${detail}.${extra}`;
+  }
+
+  // After anybody who could simply take it: asking for more hours is the second lever, not the first.
+  if (enRenfort > 0) {
+    return `${enRenfort} bénévole(s) de la réserve pourraient venir en renfort, au-delà du volume demandé. ` +
+           `Par ailleurs ${detail}.`;
   }
 
   const blocked = indisponibles + refusentLePole + satures;
@@ -1168,6 +1219,8 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
       key: volunteer.key,
       name: index.volunteerName(volunteer.key),
       reserve: index.isReserve(volunteer.key),
+      status: statusOf(volunteer),
+      backup: volunteer.backup === true,
       requestedHours: volunteer.requestedHours,
       requestedTotalHours: index.requestedTotalOf(volunteer),
       assignedHours,
@@ -1261,7 +1314,9 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
   }
 
   const demand = demandHours(plan.shifts);
-  const offered = volunteers.reduce((total, v) => total + v.requestedTotalHours, 0);
+  // The cancelled are out of every figure below: they offer nothing and nobody is owed to them.
+  const coming = volunteers.filter((v) => v.status !== 'annule');
+  const offered = coming.reduce((total, v) => total + v.requestedTotalHours, 0);
   const assignedHours = volunteers.reduce((total, v) => total + v.assignedHours, 0);
   const buddyOutcomes = volunteers.flatMap((v) => v.buddies);
   const ceiling = Math.floor(demand / rules.minHoursPerPerson);
@@ -1277,13 +1332,14 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
     shiftsPartial: shifts.filter((s) => s.missing > 0 && s.assigned > 0).length,
     shiftsEmpty: shifts.filter((s) => s.assigned === 0).length,
 
-    volunteersTotal: volunteers.length,
-    volunteersUnassigned: volunteers.filter((v) => v.assignedHours === 0 && !v.reserve).length,
-    volunteersOnReserve: volunteers.filter((v) => v.reserve).length,
-    volunteersBelowFloor: volunteers.filter(
+    volunteersTotal: coming.length,
+    volunteersCancelled: volunteers.length - coming.length,
+    volunteersUnassigned: coming.filter((v) => v.assignedHours === 0 && !v.reserve).length,
+    volunteersOnReserve: coming.filter((v) => v.reserve).length,
+    volunteersBelowFloor: coming.filter(
       (v) => !v.reserve && v.assignedHours < rules.minHoursPerPerson,
     ).length,
-    volunteersAtRequested: volunteers.filter((v) => v.assignedHours >= v.requestedTotalHours - 1e-9).length,
+    volunteersAtRequested: coming.filter((v) => v.assignedHours >= v.requestedTotalHours - 1e-9).length,
 
     hoursByRank: volunteers.reduce<number[]>((sum, v) => {
       v.hoursByRank.forEach((h, i) => { sum[i] = (sum[i] ?? 0) + h; });
@@ -1309,7 +1365,7 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
       .sort((a, b) => a.tier - b.tier || b.count - a.count),
 
     volunteerCeiling: ceiling,
-    overRecruited: plan.volunteers.length > ceiling,
+    overRecruited: coming.length > ceiling,
   };
 
   return { issues, volunteers, shifts, artists, summary };
