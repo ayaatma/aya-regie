@@ -109,6 +109,7 @@ where its `feature_*.md` is.
   together with the hours given to them, notably when drawing someone from the Réserve.
 
 ### 12. Teams (équipes)
+- **BUILT 2026-09-15, see [[feature-teams]].**
 - The festival keeps groups of 4 to 6 volunteers together across a pole's créneaux (letter
   codes in their sheet). Decision: an **event setting "fonctionnement en équipe"**, never
   blocking: a créneau may hold a partial team plus someone else when people are unavailable.
