@@ -136,8 +136,10 @@ import {
  *    orgas. A build that predates this empties every list on its next save.
  * 24: 2026-09-15, le Magasin: `Plan.equipment` and `Volunteer.equipmentNote`. A build that
  *    predates this empties the store on its next save.
+ * 25: 2026-09-17, `Plan.defaultShiftHours`, the event's default length of a créneau, which a
+ *    pole follows unless it was set by hand. A build that predates this forgets it on its next save.
  */
-export const PLAN_FORMAT = 24;
+export const PLAN_FORMAT = 25;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -286,6 +288,12 @@ export interface Plan {
   sideActivities: readonly SideActivity[];
   /** « Magasin »: the equipment, lent or owned, and where each piece is. Since 2026-09-15. */
   equipment: readonly EquipmentItem[];
+  /**
+   * How long a new créneau lasts, in hours, for every pole that was not given its own length by
+   * hand (`Pole.defaultShiftHours`). Since 2026-09-17: changing it here moves every pole that
+   * follows it, and none that the régisseur set. Two hours, as every pole had before.
+   */
+  defaultShiftHours: number;
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *
@@ -885,6 +893,7 @@ export function emptyPlan(
     | 'teams'
     | 'sideActivities'
     | 'equipment'
+    | 'defaultShiftHours'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -921,5 +930,6 @@ export function emptyPlan(
     teams: [],
     sideActivities: [],
     equipment: [],
+    defaultShiftHours: 2,
   };
 }

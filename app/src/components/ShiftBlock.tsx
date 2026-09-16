@@ -131,6 +131,14 @@ export interface ShiftBlockProps {
   onBeginRetime?(shift: Shift, edge: 'start' | 'end', event: React.PointerEvent<HTMLElement>): void;
   /** The « + » under the places: one more person needed on this créneau. */
   onAddPlace?(shiftKey: string): void;
+  /**
+   * The « − » beside it: one place fewer, the last one drawn.
+   *
+   * `last` is who stands in it, or null when the créneau still has an empty place, which then goes
+   * first: taking a person off while a hole is left elsewhere would be the one removal nobody
+   * needed. The grid does the edit and says out loud who was taken off.
+   */
+  onRemovePlace?(shiftKey: string, last: { kind: 'orga' | 'benevole'; key: string } | null): void;
 }
 
 function ShiftBlockImpl(props: ShiftBlockProps) {
@@ -170,6 +178,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     editing = false,
     onBeginRetime,
     onAddPlace,
+    onRemovePlace,
   } = props;
 
   /*
@@ -487,16 +496,53 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
 
       {editing && !readOnly && (
         <>
-          <div
-            className="box is-add"
-            role="button"
-            title="Ajouter une place à ce créneau"
-            onClick={(event) => {
-              event.stopPropagation();
-              onAddPlace?.(shift.key);
-            }}
-          >
-            +
+          <div className="edit-place-row">
+            <div
+              className="box is-add"
+              role="button"
+              title="Ajouter une place à ce créneau"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddPlace?.(shift.key);
+              }}
+            >
+              +
+            </div>
+            {(() => {
+              const drawn = places.length + report.orgas.length;
+              const cases = Math.max(shift.headcount, drawn);
+              const hasEmpty = places.includes(null) || shift.headcount > drawn;
+              const lastBenevole = [...places].reverse().find((who): who is string => who !== null);
+              const lastOrga = report.orgas[report.orgas.length - 1];
+              const last = hasEmpty
+                ? null
+                : lastBenevole
+                  ? { kind: 'benevole' as const, key: lastBenevole, name: report.stars.find((s) => s.volunteerKey === lastBenevole)?.name ?? '' }
+                  : lastOrga
+                    ? { kind: 'orga' as const, key: lastOrga.key, name: lastOrga.name }
+                    : null;
+              return (
+                <div
+                  className={`box is-add is-remove${cases === 0 ? ' is-disabled' : ''}`}
+                  role="button"
+                  aria-disabled={cases === 0}
+                  title={
+                    cases === 0
+                      ? 'Plus aucune place à retirer'
+                      : last
+                        ? `Retirer la dernière place, et ${last.name} qui l'occupe`
+                        : 'Retirer une place vide'
+                  }
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (cases === 0) return;
+                    onRemovePlace?.(shift.key, last && { kind: last.kind, key: last.key });
+                  }}
+                >
+                  −
+                </div>
+              );
+            })()}
           </div>
           <span
             className="shift-grip is-start"

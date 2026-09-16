@@ -107,6 +107,7 @@ function makePlan(ticketing: Partial<TicketingSettings> = {}): Plan {
     applicationSteps: [],
     skills: [],
     teamsEnabled: false,
+    defaultShiftHours: 2,
     teams: [],
     sideActivities: [],
     equipment: [],

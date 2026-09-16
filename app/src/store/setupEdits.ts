@@ -34,14 +34,55 @@ const slug = (value: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-/** What a pole's shifts last when nothing says otherwise. Two hours, as they always did. */
+/** What a créneau lasts when nothing says otherwise. Two hours, as they always did. */
 export const FALLBACK_SHIFT_HOURS = 2;
 
-/** The length a new shift of this pole gets. Read at creation only, never afterwards. */
-export const defaultShiftHours = (pole: Pole): number =>
-  pole.defaultShiftHours && pole.defaultShiftHours > 0
-    ? pole.defaultShiftHours
-    : FALLBACK_SHIFT_HOURS;
+/** The event's default length of a créneau, which every pole not set by hand follows. */
+export const eventShiftHours = (plan: Plan): number =>
+  plan.defaultShiftHours > 0 ? plan.defaultShiftHours : FALLBACK_SHIFT_HOURS;
+
+/** Whether this pole's length was set by hand, rather than following the event's. */
+export const shiftHoursByHand = (pole: Pole): boolean =>
+  pole.defaultShiftHours !== undefined && pole.defaultShiftHours > 0;
+
+/**
+ * The length a new shift of this pole gets: its own when the régisseur set one, the event's
+ * otherwise. Read at creation only, never afterwards.
+ */
+export const defaultShiftHours = (plan: Plan, pole: Pole): number =>
+  shiftHoursByHand(pole) ? pole.defaultShiftHours! : eventShiftHours(plan);
+
+/** The shortest default a pole or the event may carry: a quarter of an hour, like a créneau. */
+const MIN_DEFAULT_HOURS = 0.25;
+
+/**
+ * The event's default length of a créneau, since 2026-09-17. Every pole that follows it moves
+ * with it; a pole set by hand keeps its own. No existing créneau is touched.
+ */
+export function setEventShiftHours(plan: Plan, hours: number): Plan {
+  if (!Number.isFinite(hours)) return plan;
+  return { ...plan, defaultShiftHours: Math.max(MIN_DEFAULT_HOURS, hours) };
+}
+
+/**
+ * A pole's own length, set by hand, or null to follow the event again.
+ *
+ * Setting it to the event's own value is following the event: the key is removed rather than
+ * stored, so the pole does not stay green for a value nobody changed, and moves with the event
+ * next time. The key is REMOVED, never set undefined (see decision 25's bug in feature_admin_ui).
+ */
+export function setPoleShiftHours(plan: Plan, poleKey: string, hours: number | null): Plan {
+  if (hours !== null && !Number.isFinite(hours)) return plan;
+  const follows = hours === null || Math.max(MIN_DEFAULT_HOURS, hours) === eventShiftHours(plan);
+  return {
+    ...plan,
+    poles: plan.poles.map((p) => {
+      if (p.key !== poleKey) return p;
+      const { defaultShiftHours: _dropped, ...rest } = p;
+      return follows ? rest : { ...rest, defaultShiftHours: Math.max(MIN_DEFAULT_HOURS, hours!) };
+    }),
+  };
+}
 
 /** A key nothing else in the plan uses, however many poles share a name. */
 function freeKey(taken: ReadonlySet<string>, base: string): string {
@@ -102,7 +143,9 @@ export function addPole(plan: Plan, name: string, parentKey: string | null): Pla
     allowAllDebutants: parent?.allowAllDebutants ?? false,
     minExperienced: parent?.minExperienced ?? 0,
     defaultHeadcount: parent?.defaultHeadcount ?? 2,
-    defaultShiftHours: parent ? defaultShiftHours(parent) : FALLBACK_SHIFT_HOURS,
+    // A sub-pole takes its parent's length only when the parent was set by hand: otherwise both
+    // follow the event, and copying the value would turn it into a choice nobody made.
+    ...(parent && shiftHoursByHand(parent) ? { defaultShiftHours: parent.defaultShiftHours } : {}),
   };
 
   return { ...plan, poles: [...plan.poles, created] };
@@ -142,7 +185,6 @@ export function setPoleDefaults(
       | 'defaultHeadcount'
       | 'allowAllDebutants'
       | 'minExperienced'
-      | 'defaultShiftHours'
       | 'leaderSupportOnly'
     >
   >,
@@ -156,10 +198,6 @@ export function setPoleDefaults(
             ...over,
             defaultHeadcount: Math.max(0, Math.round(over.defaultHeadcount ?? p.defaultHeadcount)),
             minExperienced: Math.max(0, Math.round(over.minExperienced ?? p.minExperienced)),
-            defaultShiftHours: Math.max(
-              0.5,
-              over.defaultShiftHours ?? p.defaultShiftHours ?? FALLBACK_SHIFT_HOURS,
-            ),
           }
         : p,
     ),
@@ -424,7 +462,7 @@ export function movePole(plan: Plan, poleKey: string, direction: -1 | 1): Plan {
 export function addShift(plan: Plan, poleKey: string, start: number, end?: number): Plan {
   const pole = plan.poles.find((p) => p.key === poleKey);
   if (!pole) return plan;
-  const finish = end ?? start + defaultShiftHours(pole);
+  const finish = end ?? start + defaultShiftHours(plan, pole);
   if (!(finish > start)) return plan;
 
   const taken = new Set(plan.shifts.map((s) => s.key));

@@ -56,7 +56,7 @@ import {
   setPhaseAssignment,
   setPhaseEvent,
 } from '../store/phaseEdits.ts';
-import { FALLBACK_SHIFT_HOURS } from '../store/setupEdits.ts';
+import { eventShiftHours } from '../store/setupEdits.ts';
 import { EditModeButton, MIN_WINDOW_HOURS, edgeLimits, ghostWindow } from '../components/EditModeButton.tsx';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from '../components/labels.ts';
@@ -651,6 +651,35 @@ export function PhaseGrid({
       `une place de plus sur ${event.label}`,
     );
 
+  /**
+   * « − » on an événement: one place fewer. An empty place goes first; when all are taken, the last
+   * person in it leaves the événement with the place, as the pane's « Retirer » does (back to their
+   * declared presence), and the toolbar says who.
+   */
+  const removeEventPlace = (event: PhaseEvent, taken: number) => {
+    const cases = Math.max(event.headcount, taken);
+    if (cases === 0) return;
+    if (taken < cases) {
+      edit((p) => setPhaseEvent(p, id, event.key, { headcount: Math.max(0, event.headcount - 1) }), `une place de moins sur ${event.label}`);
+      return;
+    }
+    const inside = boxes.filter((b) => b.eventKey === event.key);
+    const box = inside[inside.length - 1];
+    if (!box) return;
+    const who = nameOf(box.personKind, box.personKey);
+    edit(
+      (p) =>
+        setPhaseEvent(
+          assignWindow(p, id, { kind: box.personKind, key: box.personKey }, null, box.start, box.end),
+          id,
+          event.key,
+          { headcount: cases - 1 },
+        ),
+      `place de ${who} retirée de ${event.label}`,
+    );
+    setKeyNote(`${who} retiré·e de ${event.label} avec sa place. Ctrl+Z annule.`);
+  };
+
   /** The pointer over the événements lane: where a click would create one, on that day. */
   const hoverEvents = (moved: React.MouseEvent<HTMLDivElement>) => {
     const target = moved.target as HTMLElement;
@@ -665,7 +694,7 @@ export function PhaseGrid({
       ? ghostWindow(
           phase.events,
           segment.start + (x - segment.x) / axis.pxPerHour,
-          FALLBACK_SHIFT_HOURS,
+          eventShiftHours(plan),
           segment.start,
           segment.end,
         )
@@ -772,7 +801,7 @@ export function PhaseGrid({
           )}
 
           <span className="toolbar-note">
-            {editing ? (
+            {editing && keyNote === null ? (
               <strong className="edit-mode-note">
                 Mode édition: tirer un bord d'un événement, « + » pour une place de plus, cliquer dans
                 le vide de la ligne Événements pour en créer un. Échap pour sortir.
@@ -1051,16 +1080,34 @@ export function PhaseGrid({
                               </span>
                             ))}
                             {editing && !readOnly && (
-                              <span
-                                className="box is-add is-mini"
-                                role="button"
-                                title="Ajouter une place à cet événement"
-                                onClick={(clicked) => {
-                                  clicked.stopPropagation();
-                                  addEventPlace(stored, taken);
-                                }}
-                              >
-                                +
+                              <span className="edit-place-row is-mini">
+                                <span
+                                  className="box is-add is-mini"
+                                  role="button"
+                                  title="Ajouter une place à cet événement"
+                                  onClick={(clicked) => {
+                                    clicked.stopPropagation();
+                                    addEventPlace(stored, taken);
+                                  }}
+                                >
+                                  +
+                                </span>
+                                <span
+                                  className={`box is-add is-remove is-mini${Math.max(stored.headcount, taken) === 0 ? ' is-disabled' : ''}`}
+                                  role="button"
+                                  aria-disabled={Math.max(stored.headcount, taken) === 0}
+                                  title={
+                                    taken >= Math.max(stored.headcount, taken) && taken > 0
+                                      ? "Retirer la dernière place, et la personne qui l'occupe"
+                                      : 'Retirer une place vide'
+                                  }
+                                  onClick={(clicked) => {
+                                    clicked.stopPropagation();
+                                    removeEventPlace(stored, taken);
+                                  }}
+                                >
+                                  −
+                                </span>
                               </span>
                             )}
                           </div>

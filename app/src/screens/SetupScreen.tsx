@@ -41,6 +41,9 @@ import {
   regenerateShifts,
   renamePole,
   defaultShiftHours,
+  eventShiftHours,
+  setPoleShiftHours,
+  shiftHoursByHand,
   setPoleDefaults,
   setOrganiserWindow,
   setShiftWindow,
@@ -429,31 +432,54 @@ export function PoleRow({
               </span>
             </label>
 
+            {/*
+              FOLLOWS THE EVENT UNLESS SET HERE, since 2026-09-17. Green when set by hand, like
+              every other choice of the régisseur that overrides a default, with the way back.
+            */}
             <label className="rule is-inline">
               <span className="rule-label">Durée par défaut d'un créneau</span>
               <span className="rule-input">
                 <input
                   type="number"
-                  min={0.5}
+                  className={shiftHoursByHand(pole) ? 'is-manual' : undefined}
+                  min={0.25}
                   max={12}
-                  step={0.5}
-                  value={defaultShiftHours(pole)}
+                  step={0.25}
+                  value={defaultShiftHours(plan, pole)}
+                  title={
+                    shiftHoursByHand(pole)
+                      ? "Réglée à la main pour ce pôle: la durée de l'événement ne la change plus"
+                      : "Celle de l'événement (Réglages, Événement)"
+                  }
                   onChange={(event) =>
                     edit(
-                      (p) =>
-                        setPoleDefaults(p, pole.key, {
-                          defaultShiftHours: Number(event.target.value),
-                        }),
+                      (p) => setPoleShiftHours(p, pole.key, Number(event.target.value)),
                       `durée par défaut de ${pole.name}`,
                     )
                   }
                 />
                 <span className="rule-suffix">h</span>
+                {shiftHoursByHand(pole) && (
+                  <button
+                    type="button"
+                    className="btn is-small"
+                    title={`Revenir à la durée de l'événement (${fmtHours(eventShiftHours(plan))})`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      edit((p) => setPoleShiftHours(p, pole.key, null), `durée de ${pole.name} rendue à l'événement`);
+                    }}
+                  >
+                    Revenir à l'événement
+                  </button>
+                )}
               </span>
               <span className="rule-hint">
-                Appliquée au prochain créneau ajouté à ce pôle. Elle ne touche aucun créneau
-                existant: c'est le levier principal pour que les bénévoles fassent 4 h d'affilée
-                plutôt que deux fois 2 h.
+                {shiftHoursByHand(pole)
+                  ? "Réglée à la main pour ce pôle. "
+                  : "Celle de l'événement, tant qu'elle n'est pas changée ici. "}
+                Appliquée au prochain créneau ajouté à ce pôle, y compris depuis le mode édition de
+                la grille. Elle ne touche aucun créneau existant: c'est le levier principal pour
+                que les bénévoles fassent 4 h d'affilée plutôt que deux fois 2 h.
               </span>
             </label>
 
@@ -696,7 +722,7 @@ function Regenerate({
   const [to, setTo] = useState(shifts[shifts.length - 1]?.end ?? eventHours);
   // Seeded from the pole's own default, which is the setting this tool is really about.
   const [block, setBlock] = useState(
-    shifts[0] ? shifts[0].end - shifts[0].start : defaultShiftHours(pole),
+    shifts[0] ? shifts[0].end - shifts[0].start : defaultShiftHours(plan, pole),
   );
 
   const cost = regenerateCost(plan, pole.key);

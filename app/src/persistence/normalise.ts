@@ -1006,6 +1006,11 @@ export function normalisePlan(raw: unknown): Plan {
       .filter((a) => a !== null && typeof a === 'object')
       .map((a) => ({ key: text(a.key), label: text(a.label), when: text(a.when) }))
       .filter((a) => a.key !== ''),
+    // Absent from anything written before 2026-09-17: two hours, what every pole had before.
+    defaultShiftHours: (() => {
+      const hours = (loose as Record<string, unknown>).defaultShiftHours;
+      return typeof hours === 'number' && Number.isFinite(hours) && hours > 0 ? hours : 2;
+    })(),
     // Absent from anything written before 2026-09-15: no team, and the mode off.
     teamsEnabled: (loose as Record<string, unknown>).teamsEnabled === true,
     teams: array<Record<string, unknown>>((loose as Record<string, unknown>).teams)

@@ -96,6 +96,7 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     applicationSteps: DEFAULT_APPLICATION_STEPS,
     skills: [],
     teamsEnabled: false,
+    defaultShiftHours: 2,
     teams: [],
     sideActivities: [],
     equipment: [],

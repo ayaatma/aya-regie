@@ -431,14 +431,16 @@ export interface Pole {
    */
   defaultHeadcount: number;
   /**
-   * How long a new shift of this pole lasts, in hours. Same doctrine as `defaultHeadcount`.
+   * How long a new shift of this pole lasts, in hours, WHEN THE RÉGISSEUR SET IT BY HAND.
    *
-   * Copied once, at creation, and never read again: changing it must not touch a single existing
+   * Read when a créneau is created, and never again: changing it must not touch a single existing
    * shift. It is per pole because shift length is a property of the job. Propreté goes round
    * every two hours; Accueil artistes is a four-hour post, and that difference is the main lever
    * on whether a volunteer works four hours in one place or two here and two there.
    *
-   * Absent means two hours, which is what every pole used before this was configurable.
+   * ABSENT MEANS « FOLLOWS THE EVENT » since 2026-09-17: `Plan.defaultShiftHours` decides, and
+   * changing the event's value moves this pole with it. Present is a choice made for this pole,
+   * drawn in green in Réglages, and the event's value no longer reaches it.
    */
   defaultShiftHours?: number;
   /**

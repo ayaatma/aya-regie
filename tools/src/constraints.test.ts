@@ -77,6 +77,7 @@ function makePlan(parts: {
     applicationSteps: [],
     skills: [],
     teamsEnabled: false,
+    defaultShiftHours: 2,
     teams: [],
     sideActivities: [],
     equipment: [],

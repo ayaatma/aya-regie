@@ -134,6 +134,8 @@ create table event (
   -- lenderKey, status, holder, note}]. A ledger typed by hand, never queried inside. 2026-09-15.
   equipment             jsonb not null default '[]'::jsonb
     check (jsonb_typeof(equipment) = 'array'),
+  -- How long a new creneau lasts for every pole not given its own length by hand. 2026-09-17.
+  default_shift_hours   numeric not null default 2 check (default_shift_hours > 0),
   -- Pre-montage, weekends: activities with a list and no grid, [{key, label, when}]. 2026-09-15.
   side_activities       jsonb not null default '[]'::jsonb
     check (jsonb_typeof(side_activities) = 'array'),
@@ -1080,7 +1082,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 24,
+values ('min_plan_format', 25,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1706,6 +1708,7 @@ as $fn$
       'skills', e.skills,
       'sideActivities', e.side_activities,
       'equipment', e.equipment,
+      'defaultShiftHours', e.default_shift_hours,
       'teamsEnabled', e.teams_enabled,
       'teams', e.teams,
       'dismissedBuddies', dismissed_buddies.j))
@@ -1801,6 +1804,8 @@ begin
                                  then p_plan->'sideActivities' else '[]'::jsonb end,
     equipment             = case when jsonb_typeof(p_plan->'equipment') = 'array'
                                  then p_plan->'equipment' else '[]'::jsonb end,
+    default_shift_hours   = case when (p_plan->>'defaultShiftHours')::numeric > 0
+                                 then (p_plan->>'defaultShiftHours')::numeric else 2 end,
     teams_enabled         = coalesce((p_plan->>'teamsEnabled')::boolean, false),
     teams                 = case when jsonb_typeof(p_plan->'teams') = 'array'
                                  then p_plan->'teams' else '[]'::jsonb end

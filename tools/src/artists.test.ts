@@ -76,6 +76,7 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     applicationSteps: [],
     skills: [],
     teamsEnabled: false,
+    defaultShiftHours: 2,
     teams: [],
     sideActivities: [],
     equipment: [],

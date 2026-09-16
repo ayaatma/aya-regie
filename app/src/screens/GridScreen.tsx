@@ -861,6 +861,45 @@ export function GridScreen({
     [edit, index],
   );
 
+  /**
+   * « − »: one place fewer. An empty place goes first; when every place is taken, the last person
+   * drawn is taken off the créneau with it, in one edit, and the toolbar says who. A locked place
+   * refuses, like Suppr does, since the lock is exactly a promise that nothing moves that box.
+   */
+  const removePlace = useCallback(
+    (shiftKey: string, last: { kind: 'orga' | 'benevole'; key: string } | null) => {
+      const shift = index.shiftByKey.get(shiftKey);
+      const shiftReport = shiftReports.get(shiftKey);
+      if (!shift || !shiftReport) return;
+      const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
+      const cases = Math.max(shift.headcount, shiftReport.stars.length + shiftReport.orgas.length);
+      const headcount = Math.max(0, Math.min(shift.headcount, cases - 1));
+
+      if (last === null) {
+        edit((p) => setHeadcount(p, shiftKey, Math.max(0, shift.headcount - 1)), `une place de moins sur un créneau de ${where}`);
+        return;
+      }
+      if (last.kind === 'benevole') {
+        const name = index.volunteerName(last.key);
+        if (lockedKeys.has(`${last.key}|${shiftKey}`)) {
+          setKeyNote(`La place de ${name} est verrouillée. Déverrouillez-la pour la retirer.`);
+          return;
+        }
+        edit((p) => setHeadcount(unassign(p, last.key, shiftKey), shiftKey, headcount), `place de ${name} retirée d'un créneau de ${where}`);
+        setKeyNote(`${name} retiré·e du créneau avec sa place. Ctrl+Z annule.`);
+        return;
+      }
+      const orga = plan.organisers.find((o) => o.key === last.key);
+      const name = orga ? organiserName(orga) : 'orga';
+      edit(
+        (p) => setHeadcount(removeOrganiserFromShift(p, last.key, shiftKey), shiftKey, headcount),
+        `place de ${name} retirée d'un créneau de ${where}`,
+      );
+      setKeyNote(`${name} retiré·e du créneau avec sa place. Ctrl+Z annule.`);
+    },
+    [edit, index, lockedKeys, plan.organisers, shiftReports],
+  );
+
   /** The pointer moving over a lane: where a click would create a créneau, if anywhere. */
   const hoverLane = useCallback(
     (pole: Pole, shifts: readonly Shift[], event: React.MouseEvent<HTMLDivElement>) => {
@@ -871,7 +910,7 @@ export function GridScreen({
         return;
       }
       const hour = (event.clientX - event.currentTarget.getBoundingClientRect().left) / pxPerHour;
-      const found = ghostWindow(shifts, hour, defaultShiftHours(pole), 0, eventHours);
+      const found = ghostWindow(shifts, hour, defaultShiftHours(plan, pole), 0, eventHours);
       setGhost((current) =>
         found === null
           ? null
@@ -880,7 +919,7 @@ export function GridScreen({
             : { poleKey: pole.key, ...found },
       );
     },
-    [eventHours, pxPerHour],
+    [eventHours, plan, pxPerHour],
   );
 
   /* The cursor may land on a box three screens down, so the grid follows it. */
@@ -1010,7 +1049,7 @@ export function GridScreen({
           )}
 
           <span className="toolbar-note">
-            {editing ? (
+            {editing && keyNote === null ? (
               <strong className="edit-mode-note">
                 Mode édition: tirer un bord d'un créneau, « + » pour une place de plus, cliquer dans
                 le vide d'un pôle pour créer un créneau. Échap pour sortir.
@@ -1323,6 +1362,7 @@ export function GridScreen({
                                   editing={editing}
                                   onBeginRetime={beginRetime}
                                   onAddPlace={addPlace}
+                                  onRemovePlace={removePlace}
                                 />
                               );
                               });

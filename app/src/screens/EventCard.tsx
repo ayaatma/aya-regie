@@ -24,6 +24,8 @@ import {
   setVolumeSettings,
   shiftsCutByBoundary,
   setEventLength,
+  setEventShiftHours,
+  shiftHoursByHand,
   setEventName,
   setEventStart,
 } from '../store/setupEdits.ts';
@@ -89,6 +91,8 @@ function VolumeOptionsField({ options, onCommit }: { options: readonly number[];
 
 export function EventCard() {
   const { plan, edit } = useLoadedPlan();
+  /** Poles whose créneau length was set by hand, which the event's default no longer reaches. */
+  const byHand = plan.poles.filter(shiftHoursByHand).length;
 
   const start = new Date(plan.startISO);
   const ends = new Date(start.getTime() + plan.lengthHours * 3600_000);
@@ -205,6 +209,37 @@ export function EventCard() {
             Jusqu'à une semaine. Raccourcir ne supprime rien: les créneaux et les sets qui
             dépassent restent, et la grille va assez loin pour les montrer. Le montage se termine
             à ce début et le démontage commence à cette fin, tous les deux suivent.
+          </span>
+        </label>
+
+        {/*
+          THE EVENT'S DEFAULT LENGTH OF A CRÉNEAU, since 2026-09-17. Every pole follows it unless
+          its own length was set by hand (green in the pole's settings), and the événements
+          created from the montage or démontage grid take it too.
+        */}
+        <label className="rule">
+          <span className="rule-label">Durée par défaut d'un créneau</span>
+          <span className="rule-input">
+            <input
+              type="number"
+              min={0.25}
+              max={12}
+              step={0.25}
+              name="event-default-shift-hours"
+              value={plan.defaultShiftHours}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (Number.isFinite(value) && value > 0) {
+                  edit((p) => setEventShiftHours(p, value), "durée par défaut d'un créneau");
+                }
+              }}
+            />
+            <span className="rule-suffix">h</span>
+          </span>
+          <span className="rule-hint">
+            Celle de chaque pôle qui n'a pas la sienne
+            {byHand > 0 ? ` (${byHand} pôle${byHand > 1 ? 's ont' : ' a'} une durée réglée à la main, en vert)` : ''}.
+            Appliquée aux prochains créneaux créés, jamais aux créneaux existants.
           </span>
         </label>
 

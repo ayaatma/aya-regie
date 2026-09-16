@@ -203,6 +203,20 @@ async function main() {
         await sleep(300);
         console.log('edition plus', JSON.stringify(before[0]), '->', JSON.stringify((await laneTitles())[0]));
 
+        // « − » on the same créneau, which is full: the last person leaves with the place.
+        // Twice: the first takes the empty place the « + » made, the second the last person.
+        await page.evaluate(() => document.querySelector('.lane-track .box.is-remove')?.click());
+        await sleep(300);
+        await page.evaluate(() => document.querySelector('.lane-track .box.is-remove')?.click());
+        await sleep(300);
+        console.log('edition moins', JSON.stringify((await laneTitles())[0]),
+          await page.evaluate(() => document.querySelector('.toolbar-note')?.textContent));
+        await shot('23b-grille-edition-moins');
+        await page.click('button[title^="Annuler"]');
+        await sleep(300);
+        await page.click('button[title^="Annuler"]');
+        await sleep(300);
+
         const grip = await page.$('.lane-track .shift .shift-grip.is-end');
         const gb = await grip.boundingBox();
         await page.mouse.move(gb.x + 3, gb.y + gb.height / 2);
@@ -276,6 +290,36 @@ async function main() {
         console.log('edition montage échap', JSON.stringify(await state()));
         await clickButton(/^Exploit$/);
         await sleep(500);
+      }
+      if (want('durees')) {
+        // The event's default length of a créneau, a pole set by hand in green, and the grid's
+        // ghost following the pole's value.
+        await tab('Réglages');
+        await page.evaluate(() => document.querySelector('.setup-event .setup-group-toggle')?.click());
+        await sleep(300);
+        const field = await page.$('input[name="event-default-shift-hours"]');
+        await field.click({ clickCount: 3 });
+        await field.type('3');
+        await sleep(300);
+        await page.evaluate(() => document.querySelector('input[name="event-default-shift-hours"]')?.scrollIntoView({ block: 'center' }));
+        await shot('60-reglages-duree-evenement');
+        // Open the first pole group and set its length by hand.
+        await page.evaluate(() => document.querySelector('button[aria-label^="Déplier le pôle"]')?.click());
+        await sleep(400);
+        await page.evaluate(() => document.querySelector('.setup-pole-head')?.click());
+        await sleep(400);
+        const poleInputs = 'input[type="number"][step="0.25"]:not([name="event-default-shift-hours"])';
+        const values = await page.$$eval(poleInputs, (els) => els.filter((el) => el.offsetParent).map((el) => el.value + (el.className ? ' ' + el.className : '')));
+        console.log('durees pôles suivent', JSON.stringify(values.slice(0, 4)));
+        const poleField = (await page.$$(poleInputs)).find(Boolean);
+        if (poleField) {
+          await poleField.click({ clickCount: 3 });
+          await poleField.type('4');
+          await sleep(300);
+          await page.evaluate(() => document.querySelector('input.is-manual')?.scrollIntoView({ block: 'center' }));
+          await shot('61-reglages-duree-pole-main');
+          console.log('durees pôle main', await page.$$eval(poleInputs, (els) => els.filter((el) => el.offsetParent).slice(0, 3).map((el) => el.value + ' ' + el.className).join(' | ')));
+        }
       }
       if (want('tableau')) {
         await tab('Tableau de bord');

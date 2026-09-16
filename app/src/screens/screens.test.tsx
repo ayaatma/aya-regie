@@ -2665,5 +2665,12 @@ test('in mode édition a créneau offers two grips and a « + », and none of it
   const on = block(true);
   assert.ok(on.includes('shift-grip is-start') && on.includes('shift-grip is-end'), 'deux bords à tirer');
   assert.ok(on.includes('box is-add'), 'une place en plus à ajouter');
+  assert.ok(on.includes('box is-add is-remove'), 'et une place en moins à retirer, à côté');
+  // Every place of this créneau is taken, or it has a hole that would go first: the tooltip says which.
+  const full = shiftReport.missing === 0 && shiftReport.stars.length >= shift.headcount;
+  assert.ok(
+    full ? on.includes('Retirer la dernière place, et ') : on.includes('Retirer une place vide'),
+    'le « − » dit ce qu’il retire',
+  );
   assert.ok(!on.includes('draggable="true"'), 'plus aucune case ne se glisse');
 });

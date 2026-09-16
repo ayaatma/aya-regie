@@ -29,6 +29,10 @@ import {
   canMovePole,
   deleteArtist,
   FALLBACK_SHIFT_HOURS,
+  defaultShiftHours,
+  setEventShiftHours,
+  setPoleShiftHours,
+  shiftHoursByHand,
   deleteOrganiser,
   deletePole,
   deleteShift,
@@ -490,7 +494,7 @@ test('locking a pole leaves every box flag exactly as it was', () => {
 test('a new shift takes its length from the pole, and existing shifts never move', () => {
   const before = plan.shifts.filter((s) => s.poleKey === aLeaf.key).map((s) => s.end - s.start);
 
-  const configured = setPoleDefaults(plan, aLeaf.key, { defaultShiftHours: 4 });
+  const configured = setPoleShiftHours(plan, aLeaf.key, 4);
   assert.deepEqual(
     configured.shifts.filter((s) => s.poleKey === aLeaf.key).map((s) => s.end - s.start),
     before,
@@ -507,16 +511,48 @@ test('a new shift takes its length from the pole, and existing shifts never move
   assert.equal(last.end - last.start, 3);
 });
 
-test('a pole with no default length falls back to two hours, as it always did', () => {
+test('a pole with no length of its own follows the event, two hours by default', () => {
   const bare: Plan = {
     ...plan,
-    poles: plan.poles.map((p) =>
-      p.key === aLeaf.key ? { ...p, defaultShiftHours: undefined } : p,
-    ),
+    poles: plan.poles.map((p) => {
+      if (p.key !== aLeaf.key) return p;
+      const { defaultShiftHours: _gone, ...rest } = p;
+      return rest;
+    }),
   };
   const added = addShift(bare, aLeaf.key, 0);
   const created = added.shifts[added.shifts.length - 1]!;
   assert.equal(created.end - created.start, FALLBACK_SHIFT_HOURS);
+});
+
+test('changing the event’s length moves every pole that follows it, and none set by hand', () => {
+  const leaves = plan.poles.filter((p) => p.key !== aLeaf.key).slice(0, 1);
+  const other = leaves[0]!;
+  const follows = (p: Plan): Plan => ({
+    ...p,
+    poles: p.poles.map((pole) => {
+      const { defaultShiftHours: _gone, ...rest } = pole;
+      return rest;
+    }),
+  });
+
+  // The leaf is set by hand to 4 h, the other pole follows the event.
+  const start = setPoleShiftHours(follows(plan), aLeaf.key, 4);
+  assert.equal(shiftHoursByHand(start.poles.find((p) => p.key === aLeaf.key)!), true, 'réglé à la main');
+  assert.equal(shiftHoursByHand(start.poles.find((p) => p.key === other.key)!), false);
+
+  const moved = setEventShiftHours(start, 3);
+  const pole = (key: string) => moved.poles.find((p) => p.key === key)!;
+  assert.equal(defaultShiftHours(moved, pole(other.key)), 3, "le pôle qui suit prend la durée de l'événement");
+  assert.equal(defaultShiftHours(moved, pole(aLeaf.key)), 4, 'le pôle réglé à la main garde la sienne');
+  assert.deepEqual(moved.shifts, start.shifts, 'aucun créneau existant ne bouge');
+
+  // Setting the event's own value, or going back, is following the event again: no key left.
+  const same = setPoleShiftHours(moved, aLeaf.key, 3);
+  assert.equal('defaultShiftHours' in same.poles.find((p) => p.key === aLeaf.key)!, false);
+  const back = setPoleShiftHours(moved, aLeaf.key, null);
+  assert.equal('defaultShiftHours' in back.poles.find((p) => p.key === aLeaf.key)!, false);
+  assert.equal(defaultShiftHours(back, back.poles.find((p) => p.key === aLeaf.key)!), 3);
 });
 
 // ---------------------------------------------------------------------------

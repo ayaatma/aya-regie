@@ -38,3 +38,26 @@ in them.
 - Tests: `components/editMode.test.ts` (limits, glue, ghost), `screens.test.tsx` (button in both
   corners, grips and « + » on a ShiftBlock, nothing draggable). `npm run shots -- edition` walks
   the whole thing and prints each check.
+
+## 2026-09-17, second round: « − », and the event's default length
+
+**MIGRATION 33 WRITTEN AND NOT APPLIED** (`2026-09-17_event_default_shift_hours.sql`, after 32,
+`min_plan_format` 25, `PLAN_FORMAT` 25). Migration first, then deploy.
+
+- **« − » beside « + »** (`.edit-place-row`, both on one box height). One place fewer, the last
+  drawn. AN EMPTY PLACE GOES FIRST: when the créneau still has a hole, only the headcount drops;
+  when every place is taken, the last person drawn (a bénévole, else the last orga) is taken off
+  WITH the place, in one edit, and the toolbar says who (« X retiré·e du créneau avec sa place.
+  Ctrl+Z annule. »), the edit mode's note giving way to it. A locked place refuses, like Suppr.
+  Same on an événement, where the person goes back to their declared presence as the pane's
+  « Retirer » does. The régisseur asked « même si occupée »; the hole-first rule was my reading,
+  stated to them.
+- **`Plan.defaultShiftHours`**, the event's default length of a créneau, field in Réglages >
+  L'événement. **`Pole.defaultShiftHours` now means « set by hand »**: absent follows the event.
+  `defaultShiftHours(plan, pole)` resolves, `shiftHoursByHand(pole)` says which,
+  `setPoleShiftHours(plan, key, hours | null)` REMOVES the key when given null or the event's own
+  value, `setEventShiftHours` moves every following pole and no existing créneau. The pole field
+  is green (`.rule-input input.is-manual`) with « Revenir à l'événement » when set by hand. A new
+  sub-pole copies its parent's length only if the parent was set by hand. The migration nulls
+  every pole holding exactly the event's value (2), so only poles at another length stay green.
+  The phase grid's new événements take the event's value.

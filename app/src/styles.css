@@ -5265,3 +5265,42 @@ textarea.select,
 .phase-event-grip:hover {
   background: var(--ok);
 }
+
+/* « + » et « − » côte à côte, sur la hauteur d'une case, depuis 2026-09-17. */
+.edit-place-row {
+  display: flex;
+  gap: 2px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.edit-place-row.is-mini {
+  height: 22px;
+  flex: 0 0 22px;
+}
+
+.edit-place-row > .box {
+  flex: 1 1 0;
+  height: 100%;
+}
+
+.box.is-add.is-remove {
+  border-color: var(--rouge);
+  color: var(--rouge);
+}
+
+.box.is-add.is-remove:hover {
+  background: var(--rouge-bg);
+}
+
+.box.is-add.is-disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Une durée réglée à la main, qui ne suit plus la valeur de l'événement: en vert, comme les cases cochées à la main. */
+.rule-input input.is-manual {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 1px var(--ok);
+  background: var(--ok-bg);
+}
