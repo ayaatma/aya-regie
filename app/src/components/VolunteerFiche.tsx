@@ -22,6 +22,7 @@ import {
   addBuddy,
   correctVolunteer,
   markReviewed,
+  markToReview,
   removeBuddy,
   setReserve,
 } from '../store/edits.ts';
@@ -100,6 +101,13 @@ export function VolunteerFiche({
     edit((p) => markReviewed(p, key), `fiche de ${index.volunteerName(key)} relue`);
   };
 
+  const onToReview = (key: string) => {
+    edit(
+      (p) => markToReview(p, key, 'Remise à relire à la main par la régie.'),
+      `fiche de ${index.volunteerName(key)} remise à relire`,
+    );
+  };
+
   return (
     <VolunteerDetail
       index={index}
@@ -108,6 +116,7 @@ export function VolunteerFiche({
       onSetReserve={onSetReserve}
       onCorrect={onCorrect}
       onReviewed={onReviewed}
+      onToReview={onToReview}
       readOnly={readOnly}
     />
   );
@@ -123,6 +132,8 @@ interface VolunteerDetailProps {
   onCorrect(volunteerKey: string, patch: Partial<Pick<Volunteer, EditableField>>): void;
   /** "J’ai relu cette fiche": clears the review tag and its reasons. */
   onReviewed(volunteerKey: string): void;
+  /** Sends the fiche back to « à relire », since 2026-09-16: one click, from the fiche itself. */
+  onToReview(volunteerKey: string): void;
   readOnly?: boolean;
 }
 
@@ -133,6 +144,7 @@ function VolunteerDetail({
   onSetReserve,
   onCorrect,
   onReviewed,
+  onToReview,
   readOnly = false,
 }: VolunteerDetailProps) {
   const { edit } = useLoadedPlan();
@@ -208,6 +220,17 @@ function VolunteerDetail({
             </button>
           )}
         </div>
+      )}
+      {!volunteer.needsReview && !readOnly && (
+        <p className="fiche-back-to-review">
+          <button
+            className="btn is-small"
+            onClick={() => onToReview(volunteer.key)}
+            title="La fiche repasse en rouge dans Personnes et dans l'onglet « À relire », jusqu'à ce qu'on la valide"
+          >
+            Remettre à relire
+          </button>
+        </p>
       )}
 
       <RawAnswers volunteer={volunteer} />

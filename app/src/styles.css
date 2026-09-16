@@ -4960,6 +4960,56 @@ textarea.select,
   background: var(--surface-sunken);
 }
 
+/* 2026-09-16: red for a fiche still to read, orange (`.has-issue`) for something to watch. */
+.people-table tbody tr.is-review td {
+  background: var(--rouge-bg);
+}
+
+.people-table tbody tr.is-review td:first-child {
+  box-shadow: inset 3px 0 0 var(--rouge);
+}
+
+.people-table tbody tr.has-issue td:first-child {
+  box-shadow: inset 3px 0 0 var(--orange-clair);
+}
+
+.people-table tbody tr.is-review:hover td,
+.people-table tbody tr.has-issue:hover td {
+  filter: brightness(0.97);
+}
+
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.th-sort:hover,
+.th-sort.is-on {
+  color: var(--accent);
+}
+
+.th-sort-arrow {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.th-sort.is-on .th-sort-arrow {
+  opacity: 1;
+}
+
+.fiche-back-to-review {
+  margin: 8px 0 0;
+}
+
 /* After the hover and after `.has-issue`, so the open fiche's row always reads as the open one. */
 .people-table tbody tr.is-selected td {
   background: var(--accent-soft);

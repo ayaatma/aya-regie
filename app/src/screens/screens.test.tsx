@@ -2363,7 +2363,7 @@ test('clicking a person opens a fiche beside the list, whatever kind of person i
   const benevole = peopleOf(current, { kind: 'benevole', key: volunteer.key });
   assert.ok(benevole.includes('class="screen has-person"'));
   assert.ok(benevole.includes('aria-label="Fiche de la personne"'));
-  assert.ok(benevole.includes(`data-person="benevole|${volunteer.key}"`) && benevole.includes('class="is-selected"'));
+  assert.ok(benevole.includes(`data-person="benevole|${volunteer.key}"`) && /class="[^"]*\bis-selected\b/.test(benevole));
   assert.ok(shows(benevole, 'Modifier la fiche'), "the bénévole's own fiche, not a copy");
   assert.ok(benevole.includes(`name="fiche-ticket-benevole-${volunteer.key}"`), "the door's fields, a second time");
   assert.ok(benevole.includes(`name="ticket-benevole-${volunteer.key}"`), 'and still on the row');

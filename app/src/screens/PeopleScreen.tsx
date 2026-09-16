@@ -73,6 +73,31 @@ const flatten = (text: string): string =>
 
 const refOf = (row: TicketingRow): PersonRef => ({ kind: row.kind, key: row.key });
 
+/** A click on « Nom » or « Prénom » sorts by it, a second click reverses, since 2026-09-16. */
+type SortKey = 'lastName' | 'firstName';
+interface Sort {
+  key: SortKey;
+  descending: boolean;
+}
+
+const byName = (sort: Sort) => (a: TicketingRow, b: TicketingRow): number => {
+  const other: SortKey = sort.key === 'lastName' ? 'firstName' : 'lastName';
+  const order =
+    a[sort.key].localeCompare(b[sort.key], 'fr', { sensitivity: 'base' }) ||
+    a[other].localeCompare(b[other], 'fr', { sensitivity: 'base' });
+  return sort.descending ? -order : order;
+};
+
+/**
+ * What the line's colour says, since 2026-09-16. Red: a bénévole's fiche still « à relire ».
+ * Orange: something to keep an eye on, whether the grid flags it (a rule broken or a point to
+ * watch on their shifts) or the door's list does (an incoherence). The reasons go in the tooltip.
+ */
+interface Flags {
+  review: boolean;
+  watch: string[];
+}
+
 export function PeopleScreen({
   focus,
   onFocus,
@@ -89,6 +114,23 @@ export function PeopleScreen({
   const [view, setView] = useState<PeopleView>('accueil');
   const [withPhones, setWithPhones] = useState(false);
   const [followUp, setFollowUp] = useState<FollowUp>(ALL);
+  const [sort, setSort] = useState<Sort | null>(null);
+  const { report: validation } = useLoadedPlan();
+  const onSort = (key: SortKey): void =>
+    setSort((now) => (now?.key === key ? { key, descending: !now.descending } : { key, descending: false }));
+
+  const watchByVolunteer = new Map<string, string[]>();
+  for (const issue of validation.issues) {
+    for (const key of new Set(issue.volunteerKeys)) {
+      const list = watchByVolunteer.get(key) ?? [];
+      if (!list.includes(issue.message)) list.push(issue.message);
+      watchByVolunteer.set(key, list);
+    }
+  }
+  const flagsOf = (row: TicketingRow): Flags => ({
+    review: row.kind === 'benevole' && index.volunteerByKey.get(row.key)?.needsReview === true,
+    watch: [...(row.kind === 'benevole' ? (watchByVolunteer.get(row.key) ?? []) : []), ...row.issues],
+  });
 
   const report = ticketingReport(plan, index);
   const needle = flatten(search);
@@ -112,8 +154,11 @@ export function PeopleScreen({
    */
   const reserveKeys = new Set(plan.reserve);
   const inReserve = (row: TicketingRow): boolean => row.kind === 'benevole' && reserveKeys.has(row.key);
-  const rows = matching.filter((row) => !inReserve(row));
-  const reserveRows = matching.filter(inReserve);
+  const sorted = sort ? [...matching].sort(byName(sort)) : matching;
+  const rows = sorted.filter((row) => !inReserve(row));
+  const reserveRows = sorted.filter(inReserve);
+  const toReview = report.rows.filter((row) => flagsOf(row).review).length;
+  const toWatch = report.rows.filter((row) => { const f = flagsOf(row); return !f.review && f.watch.length > 0; }).length;
   const reserveTotal = report.rows.filter(inReserve).length;
   /** What the arrow keys walk: the main list, then the reserve, as drawn. */
   const walk = [...rows, ...reserveRows];
@@ -168,6 +213,16 @@ export function PeopleScreen({
           {reserveTotal > 0 && (
             <span className="people-meta" title="Listées à part, sous les autres">
               + {reserveTotal} en liste d'attente
+            </span>
+          )}
+          {toReview > 0 && (
+            <span className="chip is-bad" title="Lignes en rouge: fiches à relire, à valider depuis la fiche">
+              {toReview} à relire
+            </span>
+          )}
+          {toWatch > 0 && (
+            <span className="chip is-warn" title="Lignes en orange: le détail s'affiche au survol de la ligne">
+              {toWatch} à surveiller
             </span>
           )}
           {issues > 0 && (
@@ -289,6 +344,9 @@ export function PeopleScreen({
               withPhones={withPhones}
               focus={focus}
               onFocus={onFocus}
+              sort={sort}
+              onSort={onSort}
+              flagsOf={flagsOf}
             />
             {rows.length === 0 && (
               <p className="panel-sub catering-empty">
@@ -322,6 +380,9 @@ export function PeopleScreen({
                   withPhones={withPhones}
                   focus={focus}
                   onFocus={onFocus}
+                  sort={sort}
+                  onSort={onSort}
+                  flagsOf={flagsOf}
                 />
               ) : (
                 <p className="panel-sub catering-empty">Personne en liste d'attente ne correspond à cette recherche.</p>
@@ -346,6 +407,9 @@ function PeopleTable({
   withPhones,
   focus,
   onFocus,
+  sort,
+  onSort,
+  flagsOf,
 }: {
   rows: readonly TicketingRow[];
   report: TicketingReport;
@@ -353,14 +417,32 @@ function PeopleTable({
   withPhones: boolean;
   focus: PersonRef | null;
   onFocus(person: PersonRef | null): void;
+  sort: Sort | null;
+  onSort(key: SortKey): void;
+  flagsOf(row: TicketingRow): Flags;
 }) {
+  const sortHead = (key: SortKey, label: string) => {
+    const on = sort?.key === key;
+    return (
+      <th aria-sort={on ? (sort.descending ? 'descending' : 'ascending') : undefined}>
+        <button
+          className={`th-sort${on ? ' is-on' : ''}`}
+          onClick={() => onSort(key)}
+          title={`Trier par ${label.toLowerCase()}${on && !sort.descending ? ', de Z à A' : ', de A à Z'}`}
+        >
+          {label}
+          <span className="th-sort-arrow">{on ? (sort.descending ? '▼' : '▲') : '↕'}</span>
+        </button>
+      </th>
+    );
+  };
   return (
     <div className="screen-scroll">
       <table className="setup-table catering-table ticketing-table people-table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>Prénom</th>
+            {sortHead('lastName', 'Nom')}
+            {sortHead('firstName', 'Prénom')}
             <th>Statut</th>
             {view === 'accueil' && (
               <>
@@ -410,6 +492,7 @@ function PeopleTable({
               withPhones={withPhones}
               selected={samePerson(refOf(row), focus)}
               onOpen={() => onFocus(refOf(row))}
+              flags={flagsOf(row)}
             />
           ))}
         </tbody>
@@ -430,6 +513,7 @@ function PersonLine({
   withPhones,
   selected,
   onOpen,
+  flags,
 }: {
   row: TicketingRow;
   report: TicketingReport;
@@ -437,6 +521,7 @@ function PersonLine({
   withPhones: boolean;
   selected: boolean;
   onOpen(): void;
+  flags: Flags;
 }) {
   const { plan, edit } = useLoadedPlan();
   const who = personLabel(row);
@@ -445,11 +530,18 @@ function PersonLine({
   const changeExtra = (over: Partial<Omit<ExtraPerson, 'key'>>, what: string): void =>
     edit((p) => setExtraPerson(p, row.key, over), `${what} de ${who}`);
 
-  const classes = [row.issues.length > 0 ? 'has-issue' : '', selected ? 'is-selected' : ''].filter(Boolean).join(' ');
+  const classes = [
+    flags.review ? 'is-review' : flags.watch.length > 0 ? 'has-issue' : '',
+    selected ? 'is-selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const hint = [flags.review ? 'À relire' : '', ...flags.watch].filter(Boolean).join('\n');
 
   return (
     <tr
       className={classes || undefined}
+      title={hint || undefined}
       data-person={`${row.kind}|${row.key}`}
       aria-selected={selected}
       onClick={(event) => {
