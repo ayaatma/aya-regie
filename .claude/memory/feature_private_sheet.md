@@ -37,6 +37,13 @@ automatic periodic sync and the confirmation form are NOT built.
    before any commit. Never put a real sheet id, the service account key, or the project ref in a
    tracked file.
 
+## Bug fixed 2026-09-16 (commit 504da76)
+
+First real call answered « Connexion régisseur requise » for a signed-in régisseur: the token was
+forwarded as a lowercase `authorization` global header, and supabase-js builds its auth client with
+its own `Authorization: Bearer <anon key>`, which won. Now `auth.getUser(token)` with the token read
+from the request (the pattern Supabase documents). Needs `functions deploy sheet-csv` again.
+
 ## To finish (developer)
 
 Create the Google Cloud project / service account / JSON key, set the secret
