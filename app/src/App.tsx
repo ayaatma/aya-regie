@@ -87,14 +87,22 @@ const GROUPS: Array<{ id: Group; label: string; screens: Screen[] }> = [
 const groupOf = (screen: Screen): Group => GROUPS.find((g) => g.screens.includes(screen))!.id;
 const labelOf = (screen: Screen): string => TABS.find((t) => t.id === screen)!.label;
 
+/*
+ * Short since 2026-09-16, at the régisseur's request: the top bar had no room for sentences. The
+ * long reading stays in the tooltip, from `saveTitle`.
+ */
 const saveLabel = (dirty: boolean, saving: boolean, savedAt: string | null): string => {
-  if (saving) return 'Enregistrement…';
-  if (dirty) return 'Modifications non enregistrées';
-  if (!savedAt) return 'Aucune modification';
+  if (saving || dirty) return '⌛ ...';
+  if (!savedAt) return '';
   const when = new Date(savedAt);
-  return `Enregistré à ${String(when.getHours()).padStart(2, '0')}:${String(
-    when.getMinutes(),
-  ).padStart(2, '0')}`;
+  return `🔗 à ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`;
+};
+
+const saveTitle = (dirty: boolean, saving: boolean, savedAt: string | null): string => {
+  if (saving) return 'Enregistrement en cours';
+  if (dirty) return 'Modifications pas encore enregistrées: elles le seront dans un instant';
+  if (!savedAt) return "Aucune modification depuis l'ouverture";
+  return 'Tout est enregistré';
 };
 
 /**
@@ -290,19 +298,23 @@ export function App({
           >
             ↷
           </button>
-          <span className={`save-state ${state.dirty ? 'is-dirty' : ''}`}>
+          <span
+            className={`save-state ${state.dirty ? 'is-dirty' : ''}`}
+            title={saveTitle(state.dirty, state.saving, state.savedAt)}
+          >
             {saveLabel(state.dirty, state.saving, state.savedAt)}
           </span>
           <button
-            className="btn"
+            className="btn-emoji"
             onClick={() => {
               setNaming(true);
               setAccount(false);
             }}
             disabled={naming}
-            title="Conserver cette version du planning sous un nom, définitivement"
+            aria-label="Point de sauvegarde"
+            title="Point de sauvegarde: conserver cette version du planning sous un nom, définitivement"
           >
-            Point de sauvegarde
+            💾
           </button>
           <div className="topbar-menu" ref={menuRef}>
             <button

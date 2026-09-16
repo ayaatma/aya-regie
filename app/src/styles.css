@@ -283,8 +283,32 @@ button {
 .save-state {
   color: var(--ink-faint);
   font-size: 12px;
-  min-width: 108px;
+  min-width: 64px;
   text-align: right;
+  cursor: default;
+}
+
+/* An emoji as a button, since 2026-09-16 (💾 for the checkpoint): no frame, lit and grown on hover. */
+.btn-emoji {
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.btn-emoji:hover:not(:disabled),
+.btn-emoji:focus-visible {
+  transform: scale(1.2);
+  filter: brightness(1.15) drop-shadow(0 0 5px var(--accent));
+}
+
+.btn-emoji:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .save-state.is-dirty {
