@@ -117,6 +117,9 @@ function parseMoment(
 
   if (hours.length === 0) {
     if (NO_CONSTRAINT.test(v)) return sure(null);
+    // « Lundi », « je dois partir le mercredi 23 »: leaving on another day than the event's last is
+    // leaving after it. Only for a departure; an arrival on a named day stays a question.
+    if (kind === 'departure' && /\b(lundi|mardi|mercredi|jeudi|lendemain|semaine)\b/.test(v)) return sure(null);
     return unsure(null, `${what}: « ${answer.trim()} » ne donne pas d'heure. Aucune contrainte retenue, à vérifier sur la fiche.`);
   }
 

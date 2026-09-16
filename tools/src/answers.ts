@@ -351,6 +351,12 @@ export function parsePhaseAnswer(
   if (value === '') return sure(false);
   if (NOT_COMING.test(value)) return sure(false);
   if (PLAIN_YES.test(value)) return sure(true);
+  /*
+   * « Oui sur l'intégralité du montage ET du démontage » and « Oui mais pas l'intégralité... »,
+   * a festival's two yeses, since 2026-09-16. The second says « pas » and was read as a refusal:
+   * a yes that is only partial is still a yes, and the days ticked in the next question say which.
+   */
+  if (/^oui\b/.test(value) && /integralite|pas tout|en partie|quelques jours/.test(value)) return sure(true);
 
   /*
    * ONE QUESTION, TWO PHASES. The real form asks "serais-tu prêt à faire du montage /

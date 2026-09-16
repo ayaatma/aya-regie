@@ -185,10 +185,11 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
    */
   // A QUESTION naming both phases, since 2026-09-16: a column the orga added to the sheet, titled
   // « Equipe Montage/Démontage », names both too and is no answer at all.
-  { field: 'phaseHelp',   test: (h) => /montage/.test(h) && /demontage/.test(h) && /(dispo|pret|motive|faire du|aider)/.test(h), required: false },
+  // « montage » as a word: « démontage » contains it, and « jours dispo sur le démontage » is not both.
+  { field: 'phaseHelp',   test: (h) => /\bmontage/.test(h) && /demontage/.test(h) && /(dispo|pret|motive|faire du|aider)/.test(h), required: false },
   { field: 'demontage',   test: (h) => /demontage/.test(h), required: false },
   // Never « pré-montage »: a weekend before the event is a side activity, not the montage.
-  { field: 'montage',     test: (h) => /montage/.test(h) && !/pre montage/.test(h), required: false },
+  { field: 'montage',     test: (h) => /\bmontage/.test(h) && !/pre montage/.test(h), required: false },
   /*
    * THE ALLERGY BEFORE THE DIET, and that order is the whole of the care needed here. It is the
    * same pair of matchers the orgas' form uses, for the same reason, written down in
@@ -1317,7 +1318,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
           blocking,
         )))
       : maxAchievableHours(usable, rules, blocking);
-    if (effectiveVolume > ceiling + 1e-9) {
+    // Somebody who said they do not come to the exploit has no hours on purpose: not an error.
+    if (!notOnExploit && effectiveVolume > ceiling + 1e-9) {
       issues.push({
         severity: 'error',
         code: 'volume-impossible',
