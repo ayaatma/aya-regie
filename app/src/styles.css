@@ -124,6 +124,11 @@ button {
   overflow: hidden;
 }
 
+/* The régisseur's shell has a second line under the top bar: the screens of the open group. */
+.app.has-subtabs {
+  grid-template-rows: var(--header-h) auto auto 1fr;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -138,6 +143,10 @@ button {
   font-weight: 650;
   letter-spacing: -0.01em;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
 }
 
 .topbar-brand span {
@@ -150,6 +159,77 @@ button {
   display: flex;
   gap: 2px;
   margin-left: 6px;
+  flex: 0 0 auto;
+}
+
+.subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 14px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.subtabs .tab {
+  font-size: 12px;
+  padding: 4px 11px;
+}
+
+.subtabs .tab[aria-current='true'] {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.topbar-menu {
+  position: relative;
+}
+
+.topbar-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  min-width: 230px;
+  padding: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.topbar-menu-list button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.topbar-menu-list button:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.topbar-menu-list button:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.topbar-menu-list hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 5px 0;
+}
+
+.topbar-menu-who {
+  padding: 6px 10px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .tab {
@@ -2933,6 +3013,7 @@ button {
 @media print {
   .no-print,
   .topbar,
+  .subtabs,
   .banner {
     display: none !important;
   }

@@ -5,7 +5,7 @@
  * with a batch of proposals to read on another screen, and the run must survive that move.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useSession } from './auth/useSession.ts';
 import { useSolver } from './solver/useSolver.ts';
@@ -68,6 +68,25 @@ const TABS: Array<{ id: Screen; label: string }> = [
   { id: 'historique', label: 'Historique' },
 ];
 
+type Group = 'planning' | 'personnes' | 'logistique' | 'suivi' | 'reglages';
+
+/*
+ * FIVE GROUPS SINCE 2026-09-16. Ten tabs and seven buttons on one line ran off the régisseur's
+ * window, so the tabs are grouped (the régisseur chose this out of three mock-ups) and the
+ * buttons used less often went into the « ⋯ » menu. A group of several screens shows them on a
+ * second line; a group of one does not.
+ */
+const GROUPS: Array<{ id: Group; label: string; screens: Screen[] }> = [
+  { id: 'planning', label: 'Planning', screens: ['grille', 'propositions'] },
+  { id: 'personnes', label: 'Personnes', screens: ['personnes'] },
+  { id: 'logistique', label: 'Logistique', screens: ['artistes', 'catering', 'magasin'] },
+  { id: 'suivi', label: 'Suivi', screens: ['tableau', 'historique'] },
+  { id: 'reglages', label: 'Réglages', screens: ['reglages', 'import'] },
+];
+
+const groupOf = (screen: Screen): Group => GROUPS.find((g) => g.screens.includes(screen))!.id;
+const labelOf = (screen: Screen): string => TABS.find((t) => t.id === screen)!.label;
+
 const saveLabel = (dirty: boolean, saving: boolean, savedAt: string | null): string => {
   if (saving) return 'Enregistrement…';
   if (dirty) return 'Modifications non enregistrées';
@@ -114,7 +133,30 @@ export function App({
   const [naming, setNaming] = useState(false);
   /** Set while the régisseur is choosing a password. Exclusive with `naming`: one banner slot. */
   const [account, setAccount] = useState(false);
+  /** The screen last shown in each group, so coming back to a group lands where one left it. */
+  const [lastInGroup, setLastInGroup] = useState<Partial<Record<Group, Screen>>>({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const phone = useIsPhone();
+
+  useEffect(() => setLastInGroup((last) => ({ ...last, [groupOf(screen)]: screen })), [screen]);
+
+  // The menu closes on a click anywhere else and on Escape, like any menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   const { plan, canUndo, canRedo, undo, redo } = state;
 
@@ -201,27 +243,37 @@ export function App({
 
   const pending = solver.outcome?.proposals.length ?? 0;
   const tier1 = state.report?.summary.tier1Count ?? 0;
+  const badges = (id: Screen) => (
+    <>
+      {id === 'propositions' && pending > 0 && <span className="tab-badge is-quiet">{pending}</span>}
+      {id === 'grille' && tier1 > 0 && <span className="tab-badge">{tier1}</span>}
+    </>
+  );
+  const current = GROUPS.find((g) => g.id === groupOf(screen))!;
+  const pick = (action: () => void) => () => {
+    setMenuOpen(false);
+    action();
+  };
 
   return (
-    <div className="app">
+    <div className="app has-subtabs">
       <header className="topbar">
-        <div className="topbar-brand">
+        <div className="topbar-brand" title={plan.name}>
           Planning bénévoles<span>{plan.name}</span>
         </div>
 
-        <nav className="tabs">
-          {TABS.map((tab) => (
+        <nav className="tabs" aria-label="Rubriques">
+          {GROUPS.map((group) => (
             <button
-              key={tab.id}
+              key={group.id}
               className="tab"
-              aria-current={screen === tab.id}
-              onClick={() => setScreen(tab.id)}
+              aria-current={current.id === group.id}
+              onClick={() => setScreen(lastInGroup[group.id] ?? group.screens[0]!)}
             >
-              {tab.label}
-              {tab.id === 'propositions' && pending > 0 && (
-                <span className="tab-badge is-quiet">{pending}</span>
-              )}
-              {tab.id === 'grille' && tier1 > 0 && <span className="tab-badge">{tier1}</span>}
+              {group.label}
+              {group.screens.map((id) => (
+                <span key={id}>{badges(id)}</span>
+              ))}
             </button>
           ))}
         </nav>
@@ -252,47 +304,79 @@ export function App({
           >
             Point de sauvegarde
           </button>
-          <button
-            className="btn"
-            onClick={onVolunteer}
-            title="Voir l'outil comme un bénévole le voit"
-          >
-            Vue bénévole
-          </button>
-          <button
-            className="btn"
-            onClick={onOrganiser}
-            title="Voir l'outil comme un responsable de pôle le voit"
-          >
-            Vue responsable
-          </button>
-          <button className="btn" onClick={() => window.location.reload()} title="Changer de plan">
-            Changer
-          </button>
-          {session && (
-            <>
-              <button
-                className="btn"
-                onClick={() => {
-                  setAccount(true);
-                  setNaming(false);
-                }}
-                disabled={account}
-                title="Choisir un mot de passe pour ne plus dépendre du lien envoyé par email"
-              >
-                Mon compte
-              </button>
-              <button
-                className="btn"
-                onClick={() => void signOut()}
-                title="Fermer la session sur ce navigateur"
-              >
-                Se déconnecter
-              </button>
-            </>
-          )}
+          <div className="topbar-menu" ref={menuRef}>
+            <button
+              className="btn is-icon"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+              title="Autres actions"
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="topbar-menu-list" role="menu">
+                {session?.user?.email && (
+                  <div className="topbar-menu-who">Connecté·e: {session.user.email}</div>
+                )}
+                <button
+                  role="menuitem"
+                  onClick={pick(onVolunteer)}
+                  title="Voir l'outil comme un bénévole le voit"
+                >
+                  Vue bénévole
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={pick(onOrganiser)}
+                  title="Voir l'outil comme un responsable de pôle le voit"
+                >
+                  Vue responsable
+                </button>
+                <button role="menuitem" onClick={pick(() => window.location.reload())}>
+                  Changer d'événement
+                </button>
+                {session && (
+                  <>
+                    <hr />
+                    <button
+                      role="menuitem"
+                      onClick={pick(() => {
+                        setAccount(true);
+                        setNaming(false);
+                      })}
+                      disabled={account}
+                      title="Choisir un mot de passe pour ne plus dépendre du lien envoyé par email"
+                    >
+                      Mon compte
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={pick(() => void signOut())}
+                      title="Fermer la session sur ce navigateur"
+                    >
+                      Se déconnecter
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </header>
+
+      {current.screens.length > 1 ? (
+        <nav className="subtabs" aria-label={current.label}>
+          {current.screens.map((id) => (
+            <button key={id} className="tab" aria-current={screen === id} onClick={() => setScreen(id)}>
+              {labelOf(id)}
+              {badges(id)}
+            </button>
+          ))}
+        </nav>
+      ) : (
+        <div />
+      )}
 
       {/*
         Five banners for one slot, and the order is the order of severity. An outdated page

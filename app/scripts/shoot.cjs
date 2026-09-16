@@ -115,7 +115,24 @@ async function main() {
         await el.click();
         await sleep(400);
       };
-      const tab = (label) => clickButton(new RegExp(`^${label}`));
+      // Since 2026-09-16 the screens sit in groups: open the group, then its sub-tab when it has some.
+      const GROUP_OF = {
+        Grille: 'Planning', Propositions: 'Planning', Personnes: 'Personnes',
+        Artistes: 'Logistique', Catering: 'Logistique', Magasin: 'Logistique',
+        'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', 'Import/Export': 'Réglages',
+      };
+      const tab = async (label) => {
+        const group = GROUP_OF[label];
+        if (!group) return clickButton(new RegExp(`^${label}`));
+        await page.evaluate((name) => {
+          [...document.querySelectorAll('.topbar .tabs .tab')].find((b) => (b.textContent || '').trim().startsWith(name))?.click();
+        }, group);
+        await sleep(300);
+        await page.evaluate((name) => {
+          [...document.querySelectorAll('.subtabs .tab')].find((b) => (b.textContent || '').trim().startsWith(name))?.click();
+        }, label);
+        await sleep(400);
+      };
 
       await shot('00-picker');
       await clickButton(/^Équilibré [(]montage/);
