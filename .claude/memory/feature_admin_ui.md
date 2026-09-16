@@ -907,6 +907,16 @@ about behaviour. The full account is in [[feature-montage-demontage]] under "Nin
 - **The « Réserve » tab is gone from the pool pane**, and with it the drop-to-reserve on the
   exploit (`onDropReserve`). The reserve is a card of its own in Personnes, see
   [[feature-people-tab]]; putting somebody in it is the fiche's button, as before.
+- **2026-09-16: an empty place reads « Vide »** (was « à pourvoir », too wide); tooltips and
+  totals keep « à pourvoir ». **An orga takes a bénévole's place on the grid too**: `laneRows` is
+  fed `headcount - orgas`, as the engine's `headcountOf` already was. Feeding it the raw headcount
+  drew the orga's place again as an empty box, so a créneau of 2 with 1 orga showed 2 holes and
+  went red (sureffectif) once they were filled.
+- **2026-09-16: Alt + molette zooms around the hour under the pointer**, on all three grids, via
+  `useWheelZoom`. On a phase the anchor is `AxisAnchor` (segment, hours, pixels into the night),
+  since `hoursAt` has no answer in a gap. Alt because plain and Shift wheel scroll, Ctrl is the
+  browser zoom. Verified in the browser on the exploit; the fixtures have no montage enabled, so
+  the phase side rests on `phaseAxis.test.ts`.
 
 ## Things that are decided and should not be reopened
 

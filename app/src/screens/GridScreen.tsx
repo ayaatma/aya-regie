@@ -51,6 +51,7 @@ import {
   volumeMark,
 } from '../components/layout.ts';
 import { ZoomSlider } from '../components/ZoomSlider.tsx';
+import { useWheelZoom } from '../components/useWheelZoom.ts';
 import { TrashTarget } from '../components/TrashTarget.tsx';
 import { poleColours } from '../components/poleColours.ts';
 import { laneRows } from '../components/laneRows.ts';
@@ -200,6 +201,12 @@ export function GridScreen({
     if (width <= 0) return;
     setPxPerHour(fitZoom(eventHours, width - LABEL_W - FIT_SLACK, EXPLOIT_ZOOM));
   }, [eventHours]);
+
+  // The exploit runs straight through, so the hour under the pointer is all the anchor there is.
+  useWheelZoom(scroll, pxPerHour, setPxPerHour, EXPLOIT_ZOOM, {
+    anchorAt: (x) => x / pxPerHour,
+    xOf: (hour, zoom) => hour * zoom,
+  });
 
   useLayoutEffect(() => {
     fit();
@@ -1087,7 +1094,16 @@ export function GridScreen({
                                 lane.shifts.map((shift) => ({
                                   key: shift.key,
                                   start: shift.start,
-                                  headcount: shift.headcount,
+                                  /*
+                                   * The places left for bénévoles, the orgas standing in the
+                                   * créneau taken out. The raw headcount drew an orga's place a
+                                   * second time as an empty box, so a créneau of two with one
+                                   * orga showed two holes and went red once both were filled.
+                                   */
+                                  headcount: Math.max(
+                                    0,
+                                    shift.headcount - (shiftReports.get(shift.key)?.orgas.length ?? 0),
+                                  ),
                                   assignees: (shiftReports.get(shift.key)?.stars ?? []).map(
                                     (star) => star.volunteerKey,
                                   ),

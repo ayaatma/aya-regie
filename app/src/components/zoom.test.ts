@@ -12,6 +12,7 @@ import { test } from 'node:test';
 
 import { EXPLOIT_ZOOM, PHASE_ZOOM, fitZoom } from './layout.ts';
 import { fromPosition, toPosition } from './ZoomSlider.tsx';
+import { wheelZoom } from './useWheelZoom.ts';
 
 test('the two ends of the track are the two bounds, and the middle is the geometric mean', () => {
   const { min, max } = PHASE_ZOOM;
@@ -51,4 +52,13 @@ test('fitting never leaves the bounds, and answers the fallback when there is no
   // Measured before the browser laid anything out, or a day the phase does not have.
   assert.equal(fitZoom(0, 1200, PHASE_ZOOM), PHASE_ZOOM.fallback);
   assert.equal(fitZoom(16, 0, PHASE_ZOOM), PHASE_ZOOM.fallback);
+});
+
+test('the wheel zooms in on a push away, out on a pull, and never past the bounds', () => {
+  assert.ok(wheelZoom(76, -100, EXPLOIT_ZOOM) > 76);
+  assert.ok(wheelZoom(76, 100, EXPLOIT_ZOOM) < 76);
+  // One notch out then one notch in is back where it started.
+  assert.ok(Math.abs(wheelZoom(wheelZoom(76, 100, EXPLOIT_ZOOM), -100, EXPLOIT_ZOOM) - 76) < 1e-9);
+  assert.equal(wheelZoom(EXPLOIT_ZOOM.max, -5000, EXPLOIT_ZOOM), EXPLOIT_ZOOM.max);
+  assert.equal(wheelZoom(EXPLOIT_ZOOM.min, 5000, EXPLOIT_ZOOM), EXPLOIT_ZOOM.min);
 });

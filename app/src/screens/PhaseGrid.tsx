@@ -63,9 +63,11 @@ import { stepBox, type NavBox, type NavRows } from '../components/phaseNav.ts';
 import { LABEL_W, PHASE_ZOOM, fitZoom } from '../components/layout.ts';
 import { TrashTarget } from '../components/TrashTarget.tsx';
 import { ZoomSlider } from '../components/ZoomSlider.tsx';
+import { useWheelZoom } from '../components/useWheelZoom.ts';
 import { ARTIST_ROW_H } from '../components/TimeRuler.tsx';
 import { selectedPerson, type Selection } from '../components/selection.ts';
 import {
+  anchorAt,
   axisSpan,
   buildPhaseAxis,
   hourOn,
@@ -73,6 +75,7 @@ import {
   piecesOf,
   segmentAt,
   trimTo,
+  xOfAnchor,
   type PhaseAxis,
   type PhaseSegment,
 } from '../components/phaseAxis.ts';
@@ -240,6 +243,12 @@ export function PhaseGrid({
     const span = axisSpan(phase, day);
     setPxPerHour(fitZoom(span.hours, width - LABEL_W - FIT_SLACK, PHASE_ZOOM, span.gaps));
   }, [phase, day]);
+
+  // Nights taken out, so the anchor is a segment and not an hour. See `AxisAnchor`.
+  useWheelZoom(scroll, pxPerHour, setPxPerHour, PHASE_ZOOM, {
+    anchorAt: (x) => anchorAt(axis, x),
+    xOf: (anchor, zoom) => xOfAnchor(buildPhaseAxis(phase, zoom, day), anchor),
+  });
 
   useLayoutEffect(() => {
     fit();
@@ -866,7 +875,7 @@ export function PhaseGrid({
                                       }
                                 }
                               >
-                                à pourvoir
+                                Vide
                               </span>
                             ))}
                           </div>

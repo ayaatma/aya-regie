@@ -326,7 +326,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
                     }
               }
             >
-              à pourvoir
+              Vide
             </div>
           );
         }

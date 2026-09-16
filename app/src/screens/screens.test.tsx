@@ -195,6 +195,26 @@ test('the grid renders one box per volunteer needed', () => {
   assert.ok(shows(html, 'à pourvoir'));
 });
 
+test('an orga in a créneau takes one of its places, and draws no empty box for it', () => {
+  // The report: a créneau of two with one orga showed two empty boxes, and went red once two
+  // bénévoles were put in it, because the lane drew the orga's place a second time.
+  const base = planWithMontage();
+  const target = validate(base).shifts.find((s) => s.assigned > 0)!;
+  const withOrga: Plan = {
+    ...base,
+    // Exactly the bénévoles already there, plus the orga: the créneau is full.
+    shifts: base.shifts.map((s) => (s.key === target.key ? { ...s, headcount: target.assigned + 1 } : s)),
+    organiserShifts: [{ key: 'os1', organiserKey: 'o1', shiftKey: target.key }],
+  };
+  const report = validate(withOrga);
+  assert.equal(report.shifts.find((s) => s.key === target.key)!.missing, 0);
+
+  const html = render(<GridScreen onSolve={noop} solving={false} solveMode={null} />, withOrga);
+  const empties = (html.match(/class="box is-empty"/g) ?? []).length;
+  assert.equal(empties, report.shifts.reduce((total, s) => total + s.missing, 0), 'pas de case vide en trop');
+  assert.ok(html.includes('>Vide<'), 'une place à tenir se lit Vide');
+});
+
 test('the grid draws a lane for every leaf pole and no lane for a parent', () => {
   const html = render(<GridScreen onSolve={noop} solving={false} solveMode={null} />);
   const index = new PlanIndex(plan);

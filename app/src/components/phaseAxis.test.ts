@@ -14,6 +14,7 @@ import { test } from 'node:test';
 
 import { defaultPhase, type Phase } from '../engine.ts';
 import {
+  anchorAt,
   axisSpan,
   buildPhaseAxis,
   hourOn,
@@ -22,6 +23,7 @@ import {
   piecesOf,
   segmentAt,
   trimTo,
+  xOfAnchor,
   DAY_GAP,
   type PhaseSegment,
 } from './phaseAxis.ts';
@@ -237,4 +239,20 @@ test('the axis span is the worked hours and the room the nights take, filter inc
     const span = axisSpan(montage(), day);
     assert.equal(buildPhaseAxis(montage(), PX, day).width, span.hours * PX + span.gaps);
   }
+});
+
+test('an anchor keeps its place in the day, and in the night, across a change of zoom', () => {
+  const phase = montage();
+  const narrow = buildPhaseAxis(phase, PX);
+  const wide = buildPhaseAxis(phase, PX * 3);
+  const second = narrow.segments[1]!;
+
+  // Two hours into the second day lands two hours into the second day, at the new width.
+  const inDay = anchorAt(narrow, second.x + 2 * PX);
+  assert.equal(xOfAnchor(wide, inDay), wide.segments[1]!.x + 2 * PX * 3);
+
+  // Five pixels into the night stays five pixels into the night: the gap does not grow.
+  const first = narrow.segments[0]!;
+  const inGap = anchorAt(narrow, first.x + first.width + 5);
+  assert.equal(xOfAnchor(wide, inGap), wide.segments[0]!.x + wide.segments[0]!.width + 5);
 });

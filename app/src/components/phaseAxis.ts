@@ -277,3 +277,39 @@ export function packRows<T extends Window>(
 
   return placed;
 }
+
+/**
+ * A point of the axis that survives a change of zoom: which segment, how many hours into it, and
+ * how many pixels past its end when the point is in the night that follows it.
+ *
+ * `hoursAt` has no answer in a gap, and the wheel zoom needs one: the pointer resting on a night
+ * must keep resting on that night while the days around it grow. The gap is a fixed width at
+ * every zoom, so the pixels into it are kept as pixels. See `useWheelZoom`.
+ */
+export interface AxisAnchor {
+  segment: number;
+  hours: number;
+  gapPx: number;
+}
+
+export function anchorAt(axis: PhaseAxis, x: number): AxisAnchor {
+  let index = 0;
+  axis.segments.forEach((segment, i) => {
+    if (segment.x <= x) index = i;
+  });
+  const segment = axis.segments[index];
+  if (!segment) return { segment: 0, hours: 0, gapPx: 0 };
+  const into = Math.max(0, x - segment.x);
+  return {
+    segment: index,
+    hours: Math.min(into, segment.width) / axis.pxPerHour,
+    gapPx: Math.max(0, into - segment.width),
+  };
+}
+
+/** Where an anchor lands on an axis, typically the same phase at another zoom. */
+export function xOfAnchor(axis: PhaseAxis, anchor: AxisAnchor): number {
+  const segment = axis.segments[anchor.segment];
+  if (!segment) return 0;
+  return segment.x + anchor.hours * axis.pxPerHour + anchor.gapPx;
+}
