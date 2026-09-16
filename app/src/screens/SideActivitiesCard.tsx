@@ -31,7 +31,7 @@ export function SideActivitiesCard() {
       ['Nom', 'Prénom', 'Statut', 'Téléphone', 'E-mail'],
       people.map((p) => [p.lastName, p.firstName, p.kind === 'orga' ? 'Orga' : 'Bénévole', p.phone, p.email]),
     );
-    const slug = activity.label.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = activity.label.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     downloadText(`${slug || 'activite'}-${today()}.csv`, csv);
   };
 

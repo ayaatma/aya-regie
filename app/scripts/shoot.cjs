@@ -171,6 +171,29 @@ async function main() {
         await tab('Import/Export');
         await shot('50-import');
       }
+      if (want('preparer')) {
+        // A festival-shaped export, invented answers, loaded as a file: the setup the form proposes.
+        await tab('Import/Export');
+        const q = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+        const rows = [
+          ['Horodateur', 'Adresse e-mail', 'Nom', 'Prénom', 'Peux-tu faire des shifts de nuit ? (entre 3h et 7h)', 'Quels jours es-tu dispo sur le montage ?', 'Est-ce que tu serais dispo pour le pré-montage aussi ?', 'A quelle heure peux-tu arriver vendredi 18 Septembre ?', 'A quelle heure dois-tu repartir dimanche 20 Septembre ?', "Où es-tu le plus à l'aise ? Ton premier choix.", "Où es-tu le plus à l'aise ? Ton deuxième choix."],
+          ['01/06/2026 10:00:00', 'a@exemple.org', 'Alpha', 'Ana', 'Oui', 'Mardi 15 septembre (montage)', 'Oui', 'Avant 14h', 'Après 18h', 'Bar', 'Maraude (Réduction des risques)'],
+          ['02/06/2026 10:00:00', 'b@exemple.org', 'Beta', 'Ben', 'Non je ne peux pas', 'Mercredi 16 septembre (montage)', 'Non', 'Entre 16h et 18h', 'Entre 14h et 16h', 'Maraude', 'Brigade verte (nettoyage site, toilettes sèches)'],
+          ['03/06/2026 10:00:00', 'c@exemple.org', 'Gamma', 'Cléo', 'Oui mais je préfère ne pas', '', 'Oui', 'Avant 14h', 'Après 18h', 'Bar', 'Brigade verte (nettoyage site, toilettes sèches)'],
+        ];
+        const file = path.join(require('node:os').tmpdir(), 'aya-regie-formulaire-exemple.csv');
+        require('node:fs').writeFileSync(file, rows.map((r) => r.map(q).join(',')).join('\n'));
+        const input = await page.$('input[type="file"][accept=".csv,text/csv"]');
+        await input.uploadFile(file);
+        await sleep(800);
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-from-form');
+          card?.querySelector('button')?.click();
+          card?.scrollIntoView();
+        });
+        await sleep(300);
+        await tall('105-import-preparer');
+      }
       if (want('historique')) {
         await tab('Historique');
         await page.evaluate(() => [...document.querySelectorAll('.stack-head button')].forEach((b) => b.click()));

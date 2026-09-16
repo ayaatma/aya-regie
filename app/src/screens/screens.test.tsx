@@ -2565,3 +2565,19 @@ test('le Magasin lists the equipment and turns a bénévole’s offer into an ex
   assert.ok(shows(html, 'au magasin') && !html.includes('>Ajouter au magasin</button>'));
   assert.ok(shows(html, '1 prêt à rendre'));
 });
+
+test('the form proposes an empty event its settings, ticked, and an event already planned keeps its dates', async () => {
+  const { SetupFromFormCard } = await import('./SetupFromFormCard.tsx');
+  const { newEventPlan } = await import('../engine.ts');
+  const csv = [
+    'Horodateur,Adresse e-mail,Nom,Prénom,A quelle heure peux-tu arriver vendredi 18 Septembre ?,A quelle heure dois-tu repartir dimanche 20 Septembre ?,Ton premier choix.,Ton deuxième choix.',
+    '01/06/2026 10:00:00,a@exemple.org,Alpha,Ana,Avant 14h,Après 18h,Bar,Maraude',
+    '02/06/2026 10:00:00,b@exemple.org,Beta,Ben,Avant 14h,Après 18h,Maraude,Bar',
+  ].join('\n');
+  const empty = newEventPlan('Essai');
+  const fresh = render(<SetupFromFormCard plan={empty} csv={csv} mapping={empty.formMapping} onApply={noop} />, empty);
+  assert.ok(fresh.includes('name="setup-event" checked=""'), 'un événement vide prend les dates');
+  assert.ok(fresh.includes('value="Maraude"'));
+  const planned = render(<SetupFromFormCard plan={plan} csv={csv} mapping={plan.formMapping} onApply={noop} />, plan);
+  assert.ok(!planned.includes('name="setup-event" checked=""'), 'un événement déjà planifié garde ses dates');
+});

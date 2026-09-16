@@ -9,7 +9,7 @@ export function addSideActivity(plan: Plan, label: string): Plan {
   const trimmed = label.trim();
   if (trimmed === '') return plan;
   const base =
-    trimmed.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) ||
+    trimmed.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) ||
     'activite';
   const taken = new Set(plan.sideActivities.map((a) => a.key));
   let key = base;

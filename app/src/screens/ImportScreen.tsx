@@ -12,7 +12,7 @@
  * turning up to a shift that no longer exists.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   existingCodes,
@@ -29,6 +29,7 @@ import {
   type ImportOptions,
   type ImportResult,
   type Reconciliation,
+  type Plan,
   type Volunteer,
 } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
@@ -37,6 +38,7 @@ import { downloadText, today } from '../components/download.ts';
 import { fetchSheetCsv } from '../import/sheet.ts';
 import { rememberSheet, setFormMapping } from '../store/edits.ts';
 import { FormMappingCard } from './FormMappingCard.tsx';
+import { SetupFromFormCard } from './SetupFromFormCard.tsx';
 import { OrganiserImportCard } from './OrganiserImportCard.tsx';
 
 type Source = { kind: 'sheet'; url: string } | { kind: 'file'; name: string };
@@ -68,6 +70,11 @@ export function ImportScreen() {
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
   /** Whose reading is being corrected, before any of it is applied. */
   const [correcting, setCorrecting] = useState<string | null>(null);
+  /**
+   * Set when settings proposed by the form were applied: the file is read again on the next render,
+   * once the plan the reading needs has arrived through the context.
+   */
+  const [rereadPending, setRereadPending] = useState(false);
 
   /**
    * Correcting a reading BEFORE the import is applied.
@@ -167,6 +174,20 @@ export function ImportScreen() {
   const changeMapping = (next: FormMapping): void => {
     setMapping(next);
     if (imported) read(imported.csv, imported.source, next);
+  };
+
+  useEffect(() => {
+    if (!rereadPending || !imported) return;
+    setRereadPending(false);
+    read(imported.csv, imported.source, mapping);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, rereadPending]);
+
+  /** The form's proposed settings, applied as one edit; the answers they cover join the mapping. */
+  const applyFormSetup = (next: Plan, summary: string): void => {
+    apply(next, summary);
+    setMapping({ ...mapping, answers: { ...mapping.answers, pole: next.formMapping.answers.pole } });
+    setRereadPending(true);
   };
 
   const read = (csv: string, source: Source, withMapping: FormMapping = mapping): void => {
@@ -316,6 +337,16 @@ export function ImportScreen() {
 
             {error && <p className="alert is-bad import-error">{error}</p>}
           </section>
+
+          {imported && (
+            <SetupFromFormCard
+              key={imported.csv.length + imported.source.kind}
+              plan={plan}
+              csv={imported.csv}
+              mapping={mapping}
+              onApply={applyFormSetup}
+            />
+          )}
 
           {survey && (
             <FormMappingCard plan={plan} survey={survey} mapping={mapping} onChange={changeMapping} />

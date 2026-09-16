@@ -267,7 +267,7 @@ export interface SetupChoice {
 }
 
 const slugOf = (label: string): string =>
-  label.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  label.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 
 const freeKey = (base: string, taken: Set<string>): string => {
   const root = base === '' ? 'item' : base;

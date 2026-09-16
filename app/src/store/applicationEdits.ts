@@ -78,7 +78,7 @@ function stepKey(label: string, taken: ReadonlySet<string>): string {
   const base =
     label
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/\p{M}/gu, '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')

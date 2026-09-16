@@ -332,6 +332,10 @@ export {
 export type { StatusTag, TicketingReport, TicketingRow } from '@engine/ticketing.ts';
 export { artistGuests } from '@engine/artists.ts';
 
+// Préparer l'événement depuis le formulaire, 2026-09-16.
+export { applySetup, inferSetup } from '@engine/setup-inference.ts';
+export type { SetupChoice, SetupProposal } from '@engine/setup-inference.ts';
+
 // Competences, 2026-09-15.
 export type { SkillTag } from '@engine/model.ts';
 // Teams, 2026-09-15.

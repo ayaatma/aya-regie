@@ -2099,6 +2099,23 @@ button {
   outline-offset: -1px;
 }
 
+/* Préparer l'événement depuis le formulaire (2026-09-16). */
+.setup-from-form-line {
+  align-items: flex-start;
+  margin: 4px 0;
+}
+
+.setup-from-form-pole {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.setup-from-form-pole .select {
+  max-width: 320px;
+}
+
 /* Le Magasin (2026-09-15). */
 .magasin-table .select {
   width: 100%;
