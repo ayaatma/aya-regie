@@ -226,7 +226,7 @@ function VolunteerDetail({
           <button
             className="btn is-small"
             onClick={() => onToReview(volunteer.key)}
-            title="La fiche repasse en rouge dans Personnes et dans l'onglet « À relire », jusqu'à ce qu'on la valide"
+            title="La fiche repasse en rouge dans Personnes, jusqu'à ce qu'on la valide"
           >
             Remettre à relire
           </button>

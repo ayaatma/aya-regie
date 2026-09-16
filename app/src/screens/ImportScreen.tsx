@@ -269,7 +269,7 @@ export function ImportScreen() {
         tone: 'ok',
         text:
           `Import appliqué: ${summary}.` +
-          (review > 0 ? ` ${review} fiche(s) à relire, listées dans Personnes et sur la grille.` : '') +
+          (review > 0 ? ` ${review} fiche(s) à relire, en rouge dans Personnes.` : '') +
           " L'enregistrement se fait tout seul (voir en haut à droite), et Ctrl+Z annule.",
       });
     } catch (cause) {

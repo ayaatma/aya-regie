@@ -93,7 +93,7 @@ export function TicketingCard() {
           </span>
           <span className="rule-hint">
             Une personne en liste d'attente ne fait aucune heure et n'est normalement pas sur place:
-            décoché, elle n'est pas dans le fichier exporté pour la porte. Cochez si elle peut
+            décoché, elle n'est pas dans la liste des entrées exportée. Cochez si elle peut
             tout de même venir, au montage par exemple. L'onglet Personnes la liste à part dans
             les deux cas.
           </span>

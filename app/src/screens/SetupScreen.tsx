@@ -53,14 +53,11 @@ import { organiserName } from '../components/labels.ts';
 import { slideEnd } from '../components/clock.ts';
 import { EventCard } from './EventCard.tsx';
 import { SlotsCard } from './SlotsCard.tsx';
-import { OrganisersCard } from './OrganisersCard.tsx';
 import { PhaseCard } from './PhaseCard.tsx';
 import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
 import { SkillsCard } from './SkillsCard.tsx';
-import { TeamsCard } from './TeamsCard.tsx';
-import { SideActivitiesCard } from './SideActivitiesCard.tsx';
 import { SkillPicker } from '../components/SkillPicker.tsx';
 import { setPoleSkills } from '../store/skillEdits.ts';
 import { AdvancedSettingsCard } from './AdvancedSettingsCard.tsx';
@@ -174,16 +171,13 @@ export function SetupScreen() {
 
           <SlotsCard />
 
-          {/* The people, before the poles they run: issuing codes is a list job, not a per-pole one. */}
-          <OrganisersCard />
-
+          {/*
+            No Orgas, Équipes or Activités annexes card since 2026-09-16: an orga's code is on their
+            fiche in Personnes, and the two others are tabs of Logistique.
+          */}
           <ApplicationStepsCard />
 
           <SkillsCard />
-
-          <TeamsCard />
-
-          <SideActivitiesCard />
 
           {/*
             The two phases, between the people and the poles of the exploit. They are settings of

@@ -2,7 +2,7 @@
  * One orga, whole and editable: who they are, how to reach them, and when they are on site.
  *
  * ONE COMPONENT, TWO PLACES. The régisseur reaches an orga from two directions: the list in
- * Réglages, when they are going through the imports, and the grid, when they are looking at the
+ * Personnes, when they are going through the imports, and the grid, when they are looking at the
  * night and want to know who this name is. Both need the same fiche, and two copies of it would
  * have drifted the first time a field was added.
  *
@@ -13,7 +13,8 @@
  * only fills a field the export actually carries an answer for.
  *
  * What is NOT editable here is the access code, which is a credential rather than an answer: it
- * is issued, revoked and reissued from the list in Réglages, one person at a time, on purpose.
+ * is issued, revoked and reissued from the person's fiche in Personnes (`AccessSection` in
+ * `PersonPanel`), one person at a time, on purpose.
  */
 
 import {

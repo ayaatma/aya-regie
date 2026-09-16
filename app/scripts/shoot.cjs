@@ -118,7 +118,7 @@ async function main() {
       // Since 2026-09-16 the screens sit in groups: open the group, then its sub-tab when it has some.
       const GROUP_OF = {
         Grille: 'Planning', Propositions: 'Planning', Personnes: 'Personnes',
-        Artistes: 'Logistique', Catering: 'Logistique', Magasin: 'Logistique',
+        Artistes: 'Logistique', Catering: 'Logistique', Magasin: 'Logistique', 'Équipes': 'Logistique', 'Activités annexes': 'Logistique',
         'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', 'Import/Export': 'Réglages',
       };
       const tab = async (label) => {
@@ -302,6 +302,12 @@ async function main() {
         await page.evaluate(() => document.querySelector('.people-reserve')?.scrollIntoView());
         await sleep(300);
         await shot('95-personnes-reserve');
+        // The same person in the grid's « Liste d'attente » tab, ready to drag onto a créneau.
+        await tab('Grille');
+        await clickButton(/^Liste d'attente/);
+        await shot('95b-grille-liste-attente');
+        await clickButton(/^Disponibles/);
+        await tab('Personnes');
         await clickButton(/^↶$/);
         await sleep(400);
       }
@@ -349,13 +355,7 @@ async function main() {
         await sleep(300);
         await shot('101-personnes-fiche-competences');
         // Teams: switch the mode on, make a team of three, then select one of them on the grid.
-        await tab('Réglages');
-        await page.evaluate(() => {
-          const card = document.querySelector('.setup-teams');
-          card?.querySelector('button')?.click();
-          card?.scrollIntoView();
-        });
-        await sleep(300);
+        await tab('Équipes');
         await page.click('input[name="teams-enabled"]');
         await clickButton(/^Ajouter une équipe$/);
         for (let i = 0; i < 3; i++) {
@@ -370,13 +370,9 @@ async function main() {
           });
           await sleep(300);
         }
-        await shot('102-reglages-equipes');
+        await shot('102-logistique-equipes');
         // Side activities: declare one, tick it on a fiche, read the list back.
-        await page.evaluate(() => {
-          const card = document.querySelector('.setup-side-activities');
-          card?.querySelector('button')?.click();
-        });
-        await sleep(300);
+        await tab('Activités annexes');
         await page.type('input[name="new-side-activity"]', 'Pré-montage');
         await page.keyboard.press('Enter');
         await sleep(300);
@@ -385,10 +381,8 @@ async function main() {
         await sleep(400);
         await page.evaluate(() => document.querySelector('input[name^="fiche-activity-"]')?.click());
         await sleep(300);
-        await tab('Réglages');
-        await page.evaluate(() => document.querySelector('.setup-side-activities')?.scrollIntoView());
-        await sleep(300);
-        await shot('103-reglages-activites');
+        await tab('Activités annexes');
+        await shot('103-logistique-activites');
       }
       if (want('magasin')) {
         // Le Magasin: two lines, one of them lent and out.

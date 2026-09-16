@@ -56,6 +56,7 @@ import { VolunteerShifts } from './VolunteerView.tsx';
 import { PhaseGrid } from './PhaseGrid.tsx';
 import { OrganiserFiche } from '../components/OrganiserFiche.tsx';
 import { placeDeclared } from '../store/phaseEdits.ts';
+import { assign, setReserve } from '../store/edits.ts';
 import { PlanningScreen } from './PlanningScreen.tsx';
 import { PoolPanel, type Moment, type PanelTab } from '../components/PoolPanel.tsx';
 import { poleMatchOf } from '../components/poolRows.ts';
@@ -537,7 +538,7 @@ test('a locked place is still legible to a reader, without a button to change it
   assert.ok(html.includes('🔒'), 'le fait est une information, pas une commande');
 });
 
-test('the settings screen lists the organisers as people, with their codes', () => {
+test('an orga’s code responsable is on their fiche in Personnes, and Réglages no longer lists orgas', () => {
   const withOrganisers: Plan = {
     ...plan,
     organisers: [
@@ -556,15 +557,17 @@ test('the settings screen lists the organisers as people, with their codes', () 
     ],
   };
 
-  const html = render(<SetupScreen />, withOrganisers);
-  assert.ok(shows(html, 'Camille Dubois'));
-  assert.ok(shows(html, 'ABCDEFGH234567'), 'le code se lit pour être recopié');
-  assert.ok(shows(html, 'Végétarien'), 'quelqu\'un doit commander à manger');
-  assert.ok(shows(html, 'Fruits à coque'));
-  // The one with no code is offered one, the one with a code is offered a replacement.
-  assert.ok(shows(html, 'Générer un code'));
-  assert.ok(shows(html, 'Révoquer'));
-  assert.ok(shows(html, 'aucun pôle attribué'), 'Dominique Roy ne tient aucun pôle');
+  const fiche = (key: string) =>
+    render(<PeopleScreen focus={{ kind: 'orga', key }} onFocus={noop} onGoToSetup={noop} />, withOrganisers);
+  const camille = fiche('l1');
+  assert.ok(shows(camille, 'Code responsable'));
+  assert.ok(shows(camille, 'ABCDEFGH234567'), 'le code se lit pour être recopié');
+  // The one with a code is offered a replacement, the one with none is offered one.
+  assert.ok(shows(camille, 'Révoquer'));
+  assert.ok(shows(fiche('l2'), 'Générer un code'));
+
+  const setup = render(<SetupScreen />, withOrganisers);
+  assert.ok(!shows(setup, 'ABCDEFGH234567'), 'plus de doublon dans Réglages');
 });
 
 test('no screen shows an em dash to the régisseur', () => {
@@ -773,8 +776,9 @@ test('the three moments draw the same pool pane, with the same tabs', () => {
   for (const moment of ['exploit', 'montage', 'demontage'] as const) {
     const html = poolOf(withPhase, 'disponibles', moment);
     assert.ok(shows(html, 'Disponibles ('), `${moment}: l'onglet Disponibles`);
-    // The reserve left this pane for Personnes on 2026-09-15.
-    assert.ok(!shows(html, "Liste d'attente ("), `${moment}: plus d'onglet Réserve`);
+    // The waiting list came back to this pane on 2026-09-16, on the exploit only.
+    assert.equal(shows(html, "Liste d'attente ("), moment === 'exploit', `${moment}: onglet Liste d'attente`);
+    assert.ok(!shows(html, 'À relire ('), `${moment}: plus d'onglet À relire`);
     // The one piece of markup the montage used to lack entirely: the panel's own frame.
     assert.ok(html.includes('class="panel is-pool"'), `${moment}: le volet a le même cadre`);
     assert.ok(html.includes('class="panel-tabs"'), `${moment}: les mêmes onglets`);
@@ -1437,23 +1441,20 @@ test('the fiche shows the sentence the volunteer typed, word for word', () => {
   assert.ok(shows(html, 'Valider la fiche'), 'et il doit y avoir un moyen de le lever');
 });
 
-test('a flagged fiche shows up in the review queue, and an unflagged one does not', () => {
-  const { plan: doubted, key } = withDoubt();
+test('the waiting list tab lists the reserve, and placing somebody takes them off it', () => {
+  const target = plan.volunteers.find((v) => !plan.reserve.includes(v.key))!;
+  const waiting = setReserve(plan, target.key, true);
+  const html = poolOf(waiting, 'attente');
+  assert.ok(shows(html, `Liste d'attente (${waiting.reserve.length})`), "l'onglet compte la liste d'attente");
+  assert.ok(shows(html, target.firstName), 'la personne y figure');
+  assert.ok(html.includes('draggable="true"'), 'et se glisse sur un créneau');
 
-  // The scenario already carries a few: the generator writes sentences the parser cannot read,
-  // on purpose, so the queue is exercised by a fixture rather than only by this test.
-  const rows = (html: string): number => html.split('pool-item is-review').length - 1;
-  const before = rows(poolOf(plan, 'relecture'));
-  const after = rows(poolOf(doubted, 'relecture'));
-  assert.equal(after, before + 1, 'la fiche signalée doit rejoindre la file');
+  // The drop on a créneau is `assign`, which must take the person off the list in the same edit.
+  const placed = assign(waiting, target.key, plan.shifts[0]!.key);
+  assert.ok(!placed.reserve.includes(target.key), "placée, elle sort de la liste d'attente");
+  assert.ok(!shows(poolOf(placed, 'attente'), target.firstName), "et quitte l'onglet");
 
-  const queue = poolOf(doubted, 'relecture');
-  const name = doubted.volunteers.find((v) => v.key === key)!.firstName;
-  assert.ok(shows(queue, name), 'et y figurer sous son nom');
-
-  // Somebody the importer read without hesitating carries no banner at all. Checked on the
-  // banner's own class rather than on the words: 'À relire' is also the name of the tab, which
-  // is drawn whatever fiche is open.
+  // Somebody the importer read without hesitating carries no banner at all.
   const calm = plan.volunteers.find((v) => !v.needsReview)!;
   assert.ok(!infoOf(plan, { kind: 'benevole', volunteerKey: calm.key }).includes('fiche-review'));
 });
@@ -2531,8 +2532,8 @@ test('a fiche names the pole a responsable imposed, and lets the régisseur chan
   assert.ok(shows(infoOf(imposed, { kind: 'benevole', volunteerKey: key }, true), `Pôle imposé: ${pole.path}`));
 });
 
-test('teams: the card shows who is in each, and the grid rings a selected bénévole’s teammates', async () => {
-  const { TeamsCard } = await import('./TeamsCard.tsx');
+test('teams: the Équipes tab shows who is in each, and the grid rings a selected bénévole’s teammates', async () => {
+  const { TeamsScreen } = await import('./TeamsScreen.tsx');
   const [first, second] = [plan.assignments[0]!.volunteerKey, plan.assignments.find((a) => a.volunteerKey !== plan.assignments[0]!.volunteerKey)!.volunteerKey];
   const teamed: Plan = {
     ...plan,
@@ -2541,7 +2542,7 @@ test('teams: the card shows who is in each, and the grid rings a selected béné
     volunteers: plan.volunteers.map((v) => (v.key === first || v.key === second ? { ...v, teamKey: 't1' } : v)),
   };
   const index = new PlanIndex(teamed);
-  const card = render(<TeamsCard />, teamed);
+  const card = render(<TeamsScreen />, teamed);
   assert.ok(card.includes('value="Équipe A"'));
   assert.ok(shows(card, index.volunteerName(first)) && shows(card, index.volunteerName(second)));
   const { teammatesOf } = await import('../components/relations.ts');
@@ -2550,7 +2551,7 @@ test('teams: the card shows who is in each, and the grid rings a selected béné
 });
 
 test('a side activity lists who is keen on it, without anybody cancelled', async () => {
-  const { SideActivitiesCard } = await import('./SideActivitiesCard.tsx');
+  const { SideActivitiesScreen } = await import('./SideActivitiesScreen.tsx');
   const [keen, gone] = [plan.volunteers[0]!, plan.volunteers[1]!];
   const withActivity: Plan = {
     ...plan,
@@ -2558,7 +2559,7 @@ test('a side activity lists who is keen on it, without anybody cancelled', async
     volunteers: plan.volunteers.map((v) =>
       v.key === keen.key ? { ...v, sideActivityKeys: ['pre'] } : v.key === gone.key ? { ...v, sideActivityKeys: ['pre'], status: 'annule' as const } : v),
   };
-  const html = render(<SideActivitiesCard />, withActivity);
+  const html = render(<SideActivitiesScreen />, withActivity);
   assert.ok(shows(html, `${keen.firstName} ${keen.lastName}`));
   assert.ok(!shows(html, `${gone.firstName} ${gone.lastName}`), 'une annulation sort de la liste');
   assert.ok(shows(html, 'Pré-montage (1)'));

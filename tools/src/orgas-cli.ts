@@ -131,7 +131,7 @@ function main(): void {
   const demontage = rows.filter((r) => r[8] !== '').length;
   console.log(`${rows.length} orgas écrits dans ${path}`);
   console.log(`  ${montage} au montage, ${demontage} au démontage`);
-  console.log("  à importer depuis Réglages, carte « Orgas », import du formulaire");
+  console.log("  à importer depuis l'onglet Import, formulaire des orgas");
   console.log("");
   // The arrivals are dates, and a date only becomes an hour if the phase covers it. Saying so
   // here is cheaper than a régisseur wondering why twenty fiches say "pas là".

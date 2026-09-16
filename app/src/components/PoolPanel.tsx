@@ -1,5 +1,5 @@
 /**
- * The pool pane: who is still to place, and which fiches are still to proofread.
+ * The pool pane: who is still to place, and who is on the waiting list.
  *
  * ONE PANE FOR THE THREE MOMENTS, since 2026-09-11, and the same tabs in each. The exploit
  * had `SidePanel` and the two phases had `PhasePool`, and they agreed on nothing: different tabs,
@@ -9,13 +9,14 @@
  *
  * WHAT DIFFERS BETWEEN THE MOMENTS IS THE CONTENT OF ONE TAB. "Disponibles" means "has hours
  * nobody has used yet", which on the exploit is the volume they asked for and on a phase is the
- * presence they declared. "À relire" is a fact about people rather than about a moment, so it
- * reads the same everywhere.
+ * presence they declared.
  *
- * NO "RÉSERVE" TAB ANY MORE, since 2026-09-15. The régisseur asked for a narrower pane and for the
- * reserve to live in Personnes, apart from everybody else: people in reserve are normally not on
- * site, so a list beside the grid of who is on site was the wrong place for them. Putting somebody
- * in reserve is still one button on their fiche (`VolunteerFiche`).
+ * "LISTE D'ATTENTE" REPLACED "À RELIRE", 2026-09-16, at the régisseur's request. Proofreading a
+ * fiche is done from Personnes now, where the lines to read are red; what the grid needed beside
+ * it was the people waiting for a place. A row drags onto a créneau like any other, and `assign`
+ * takes the person off `Plan.reserve` in the same edit, so nobody is ever both placed and waiting.
+ * The tab is the exploit's alone: the waiting list is about the exploit's volume, and a phase has
+ * no such list. Putting somebody on it is still one button on their fiche (`VolunteerFiche`).
  *
  * THE PANE IS NARROW ON PURPOSE (`--panel-w`), since the same day: every pixel given to it is taken
  * from the grid. The how-to sentence that used to open the list is the tab's tooltip, and a row's
@@ -48,14 +49,14 @@
 
 import { useMemo, useState } from 'react';
 
-import type { PersonKind, PhaseId } from '../engine.ts';
+import { fmtHours, type PersonKind, type PhaseId } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { DRAG_MIME, type DragPayload } from './drag.ts';
 import { PersonMark } from './PersonMark.tsx';
 import { exploitPoolRows, phasePoolRows, poleMatchOf, type PoleMatch, type PoolRow } from './poolRows.ts';
 import { sameSelection, type Selection } from './selection.ts';
 
-export type PanelTab = 'disponibles' | 'relecture';
+export type PanelTab = 'disponibles' | 'attente';
 
 /** Which planning is on screen. The exploit and the two phases, named as the régisseur names them. */
 export type Moment = 'exploit' | PhaseId;
@@ -144,56 +145,58 @@ export function PoolPanel(props: PoolPanelProps) {
   const poles = plan.poles;
 
   /*
-   * The review queue: every fiche the importer was not sure about.
-   *
-   * Sorted by name rather than by how many doubts each carries, because this list is walked from
-   * top to bottom until it is empty, and a list that reorders itself as fiches leave it is a list
-   * somebody loses their place in.
+   * The waiting list, by name: it is read from top to bottom, and its order must not move while
+   * somebody is being placed out of it.
    */
-  const toReview = useMemo(
-    () =>
-      report.volunteers
-        .filter((entry) => index.volunteerByKey.get(entry.key)?.needsReview === true)
-        .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
-        .map((entry): PoolRow => {
-          const doubts = index.volunteerByKey.get(entry.key)?.reviewReasons.length ?? 0;
-          return {
-            id: entry.key,
-            personKey: entry.key,
-            kind: 'benevole',
-            selection: { kind: 'benevole', volunteerKey: entry.key },
-            name: entry.name,
-            meta: `${doubts} doute${doubts > 1 ? 's' : ''}`,
-            zero: false,
-            review: true,
-            title: `${entry.name}\nUne réponse en texte libre a été interprétée sans certitude.`,
-          };
-        }),
-    [report.volunteers, index],
+  const waiting = useMemo(
+    (): PoolRow[] =>
+      isPhase
+        ? []
+        : report.volunteers
+            .filter((entry) => entry.reserve && index.volunteerByKey.get(entry.key)?.status !== 'annule')
+            .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+            .map((entry) => ({
+              id: entry.key,
+              personKey: entry.key,
+              kind: 'benevole',
+              selection: { kind: 'benevole', volunteerKey: entry.key },
+              name: entry.name,
+              meta: fmtHours(entry.requestedTotalHours),
+              zero: false,
+              review: index.volunteerByKey.get(entry.key)?.needsReview === true,
+              title:
+                `${entry.name}
+En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
+` +
+                "Glisser sur un créneau: la personne sort de la liste d'attente",
+            })),
+    [isPhase, report.volunteers, index],
   );
+  // A phase has no waiting list, so a tab left open on the exploit falls back to the pool there.
+  const shown: PanelTab = isPhase ? 'disponibles' : tab;
 
   /*
    * The one drop this panel accepts. "Disponibles" took over from the tab that used to be called
    * "À zéro": dropping a box there unplaces the person, which is exactly what putting them back in
    * the pool of available people means. It works on the three moments since 2026-09-12; the
    * screen decides what "unplace" means, since a créneau and a phase box are not removed the same
-   * way. The review queue is a list of fiches to read, not a place to put a person: dropping
-   * somebody on it would be an edit nobody asked for.
+   * way. Dropping a box on the waiting list does nothing: joining it gives up every place the
+   * person holds, which is the fiche's button and its warning, not a gesture a drag can miss.
    */
   const acceptDrop = (event: React.DragEvent): boolean =>
     !readOnly &&
     event.dataTransfer.types.includes(DRAG_MIME) &&
-    tab === 'disponibles' &&
+    shown === 'disponibles' &&
     onDropUnassign !== undefined;
 
-  const rows = tab === 'disponibles' ? available : toReview;
+  const rows = shown === 'disponibles' ? available : waiting;
 
   return (
     <aside className="panel is-pool">
       <div className="panel-tabs">
         <button
           className="panel-tab"
-          aria-current={tab === 'disponibles'}
+          aria-current={shown === 'disponibles'}
           onClick={() => onTabChange('disponibles')}
           title={
             isPhase
@@ -203,18 +206,14 @@ export function PoolPanel(props: PoolPanelProps) {
         >
           Disponibles ({available.length})
         </button>
-        {/*
-          Only there when there is something in it. An empty queue is not a job to do, and a
-          permanent "À relire (0)" teaches the régisseur to ignore the number.
-        */}
-        {toReview.length > 0 && (
+        {!isPhase && (
           <button
-            className="panel-tab is-review"
-            aria-current={tab === 'relecture'}
-            onClick={() => onTabChange('relecture')}
-            title="Fiches dont une réponse en texte libre a été interprétée sans certitude"
+            className="panel-tab"
+            aria-current={shown === 'attente'}
+            onClick={() => onTabChange('attente')}
+            title="Les bénévoles en liste d'attente. Glissez un nom sur un créneau: la personne y est placée et sort de la liste d'attente."
           >
-            À relire ({toReview.length})
+            Liste d'attente ({waiting.length})
           </button>
         )}
       </div>
@@ -235,7 +234,7 @@ export function PoolPanel(props: PoolPanelProps) {
           onDropUnassign?.();
         }}
       >
-        {tab === 'disponibles' && (
+        {shown === 'disponibles' && (
           /*
             THE SAME FILTER IN THE THREE MOMENTS, since the exploit's list gained the orgas on
             2026-09-12. It was a phase-only control while the exploit knew bénévoles alone, and
@@ -276,18 +275,11 @@ export function PoolPanel(props: PoolPanelProps) {
           </div>
         )}
 
-        {tab === 'relecture' && (
-          <p className="panel-sub">
-            L'import a interprété une réponse écrite en toutes lettres sans en être sûr. Ouvrez
-            chaque fiche, corrigez ce qui doit l'être, puis validez-la.
-          </p>
-        )}
-
         {rows.length === 0 && (
           <p className="pool-empty">
-            {tab === 'disponibles' && poleKey !== ALL_POLES
+            {shown === 'disponibles' && poleKey !== ALL_POLES
               ? "Personne n'a demandé ce pôle parmi les personnes disponibles."
-              : emptyWord(tab, isPhase, kind)}
+              : emptyWord(shown, isPhase, kind)}
           </p>
         )}
 
@@ -296,14 +288,13 @@ export function PoolPanel(props: PoolPanelProps) {
             key={row.id}
             className={
               'pool-item' +
-              (row.review && tab === 'relecture' ? ' is-review' : '') +
               (sameSelection(selection, row.selection) ? ' is-picked' : '')
             }
-            draggable={!readOnly && tab === 'disponibles'}
+            draggable={!readOnly}
             title={row.title}
             onClick={() => onSelect(row.selection)}
             onDragStart={(event) => {
-              if (readOnly || tab !== 'disponibles') return;
+              if (readOnly) return;
               if (isPhase) {
                 // Something has to be set or Firefox refuses to start the drag at all.
                 event.dataTransfer.effectAllowed = 'move';
@@ -325,10 +316,10 @@ export function PoolPanel(props: PoolPanelProps) {
               until 2026-09-15, a dot since, because on a montage nearly every row carries it and
               the words cost the names their width.
             */}
-            {row.zero && tab === 'disponibles' && (
+            {row.zero && shown === 'disponibles' && (
               <span className="pool-zero" role="img" aria-label="à zéro" title="À zéro: rien de placé pour l'instant" />
             )}
-            {tab === 'disponibles' && poleKey !== ALL_POLES && matchOf(row) !== null && (
+            {shown === 'disponibles' && poleKey !== ALL_POLES && matchOf(row) !== null && (
               <span
                 className={`chip is-choice ${
                   matchOf(row) === 'responsable' ? 'is-responsable'
@@ -355,7 +346,7 @@ export function PoolPanel(props: PoolPanelProps) {
 
 /** What an empty list says, which is never just "vide": it says why it is empty. */
 function emptyWord(tab: PanelTab, isPhase: boolean, kind: PersonKind | typeof ALL_KINDS): string {
-  if (tab === 'relecture') return 'Plus rien à relire.';
+  if (tab === 'attente') return "Personne en liste d'attente.";
   // The kind comes first, and on the exploit too since its list gained the orgas: "tout le monde a
   // déjà le volume proposé" is a sentence about bénévoles, and reading it under "Orgas" would say
   // an orga had a volume.

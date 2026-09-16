@@ -17,6 +17,7 @@
 import { useState } from 'react';
 
 import {
+  ORGANISER_CODE_LENGTH,
   PERSON_STATUS_LABEL,
   artistGuests,
   convertPerson,
@@ -28,6 +29,7 @@ import {
 } from '../engine.ts';
 import { setArtistMember, setGuest } from '../store/artistEdits.ts';
 import { clearChoices, deleteExtraPerson, setExtraPerson } from '../store/ticketingEdits.ts';
+import { clearOrganiserCode, deleteOrganiser, giveOrganiserCode } from '../store/setupEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import {
   BraceletSelect,
@@ -103,6 +105,7 @@ function PersonBody({
 
       {row.kind === 'benevole' && <VolunteerFiche volunteerKey={row.key} />}
       {row.kind === 'orga' && <OrganiserFiche organiserKey={row.key} />}
+      {row.kind === 'orga' && <AccessSection organiserKey={row.key} who={who} onDeleted={onClose} />}
       {row.kind === 'artiste' && <MemberFiche memberKey={row.key} />}
       {row.kind === 'invite' && <GuestFiche guestKey={row.key} />}
       {row.kind === 'extra' && <ExtraFiche extraKey={row.key} onDeleted={onClose} />}
@@ -115,6 +118,103 @@ function PersonBody({
         <StatusSection kind={row.kind} personKey={row.key} who={who} onFocus={onFocus} />
       )}
     </>
+  );
+}
+
+/**
+ * An orga's code responsable, and the way to take them off the plan.
+ *
+ * HERE SINCE 2026-09-16, out of the Orgas card of Réglages, which the régisseur found a duplicate
+ * of this tab. Issuing a code is still the only place in the tool that creates one, a button
+ * pressed per person, on purpose: the code opens the whole planning, every volunteer's contact
+ * details included. Regenerating and removing ask a second click, since both cannot be undone.
+ */
+function AccessSection({ organiserKey, who, onDeleted }: { organiserKey: string; who: string; onDeleted(): void }) {
+  const { plan, index, edit } = useLoadedPlan();
+  const [confirming, setConfirming] = useState<'code' | 'delete' | null>(null);
+  const person = plan.organisers.find((o) => o.key === organiserKey);
+  if (!person) return null;
+  const roles = index.polesLedBy(person.key);
+
+  return (
+    <div className="panel-section panel-divider">
+      <p className="panel-section-title">Code responsable</p>
+      <p className="people-meta">
+        Ouvre <strong>tout le planning en lecture seule</strong>, coordonnées des bénévoles
+        comprises. Personnel: en régénérer un annule immédiatement le précédent.
+      </p>
+      <p>
+        {person.accessCode === '' ? (
+          <span className="people-meta">Pas de code.</span>
+        ) : (
+          <code className="organiser-code">{person.accessCode}</code>
+        )}
+      </p>
+      {confirming === 'code' ? (
+        <div className="fiche-actions">
+          <span className="people-meta">Le code actuel cessera de fonctionner immédiatement.</span>
+          <button
+            className="btn is-danger"
+            onClick={() => {
+              edit((p) => giveOrganiserCode(p, person.key), `nouveau code pour ${who}`);
+              setConfirming(null);
+            }}
+          >
+            Régénérer
+          </button>
+          <button className="btn" onClick={() => setConfirming(null)}>
+            Annuler
+          </button>
+        </div>
+      ) : confirming === 'delete' ? (
+        <div className="fiche-actions">
+          <span className="people-meta">
+            {roles.length > 0 ? `Retire cette personne et ses ${roles.length} pôle(s).` : 'Retire cette personne du planning.'}
+          </span>
+          <button
+            className="btn is-danger"
+            onClick={() => {
+              edit((p) => deleteOrganiser(p, person.key), `retrait de ${who}`);
+              setConfirming(null);
+              onDeleted();
+            }}
+          >
+            Retirer
+          </button>
+          <button className="btn" onClick={() => setConfirming(null)}>
+            Annuler
+          </button>
+        </div>
+      ) : (
+        <div className="fiche-actions">
+          {person.accessCode === '' ? (
+            <button
+              className="btn is-primary"
+              title={`Tire un code de ${ORGANISER_CODE_LENGTH} caractères, à lui transmettre`}
+              onClick={() => edit((p) => giveOrganiserCode(p, person.key), `code d'accès pour ${who}`)}
+            >
+              Générer un code
+            </button>
+          ) : (
+            <>
+              <button className="btn" onClick={() => setConfirming('code')}>
+                Régénérer
+              </button>
+              <button
+                className="btn"
+                title="Retire son accès sans la retirer du planning"
+                onClick={() => edit((p) => clearOrganiserCode(p, person.key), `accès retiré à ${who}`)}
+              >
+                Révoquer
+              </button>
+            </>
+          )}
+          <button className="btn is-danger" title={`Retirer ${who} du planning`} onClick={() => setConfirming('delete')}>
+            Retirer du planning
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -229,7 +329,7 @@ function DoorSection({ row, report, who }: { row: TicketingRow; report: Ticketin
           </p>
         )}
         <label className="rule">
-          <span className="rule-label">Remarque pour la porte</span>
+          <span className="rule-label">Remarque pour l'entrée</span>
           <NoteField row={row} report={report} who={who} prefix="fiche-" />
         </label>
       </div>

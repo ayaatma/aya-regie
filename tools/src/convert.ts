@@ -245,7 +245,7 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
     ...commonCarried(plan, 'benevole', key),
   ];
   const lost = [
-    "Son code d'accès bénévole ne fonctionnera plus. Un code orga se donne depuis la carte Orgas des Réglages.",
+    "Son code d'accès bénévole ne fonctionnera plus. Un code responsable se donne depuis sa fiche, dans Personnes.",
     'Aucune règle d\'heures ne s\'applique plus: volume, préférence, refus et choix de pôles ne comptent plus.',
     ...(buddyNames.length > 0 ? [`${plural(buddyNames.length, 'Binôme retiré', 'Binômes retirés')}: ${buddyNames.join(', ')}.`] : []),
     ...(plan.reserve.includes(key) ? ["N'est plus en liste d'attente."] : []),

@@ -139,7 +139,7 @@ export function NoteField({ row, report, who, prefix = '' }: DoorFieldProps) {
       className="select"
       name={`${prefix}note-${row.kind}-${row.key}`}
       autoComplete="off"
-      placeholder="Remarque pour la porte"
+      placeholder="Remarque pour l'entrée"
       value={row.note}
       aria-label={`Remarque sur ${who}`}
       onChange={(event) =>

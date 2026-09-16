@@ -70,3 +70,20 @@ organiser view keeps three). Clicking a group reopens the screen last shown in i
 sauvegarde stay visible; Vue bénévole, Vue responsable, Changer d'événement, Mon compte and Se
 déconnecter are in the `.topbar-menu` (closes on outside click and Escape). `shoot.cjs`'s `tab()`
 opens the group then the sub-tab.
+
+## 2026-09-16: Liste d'attente on the grid, Réglages slimmed
+
+Four requests from the régisseur, one commit, no schema.
+
+- **The grid pane's « À relire » tab is « Liste d'attente ».** Proofreading moved to Personnes
+  (red lines). `PanelTab` = `'disponibles' | 'attente'`; the tab is the exploit's only (a phase
+  has no waiting list, `shown` falls back to Disponibles there). Rows drag like Disponibles, and
+  the drop is plain `assign`, which already takes the person off `Plan.reserve` in the same edit.
+  A box dropped on that tab does nothing: joining the list stays the fiche's button.
+- **Logistique gains « Équipes » and « Activités annexes »** (`TeamsScreen`,
+  `SideActivitiesScreen`), out of Réglages. Each team or activity is a `screen-card` with a table
+  of people, the name opening the fiche in Personnes through `useNavigation`.
+- **No Orgas card in Réglages.** The code responsable (generate, regenerate with confirm, revoke)
+  and « Retirer du planning » are `AccessSection` in `PersonPanel`, on an orga's fiche in
+  Personnes. Poles and their responsables stay in Réglages.
+- **« la porte » is « l'entrée » / « la liste des entrées »** in every visible string.

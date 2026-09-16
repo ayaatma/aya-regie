@@ -31,6 +31,8 @@ import { CheckpointBar } from './components/CheckpointBar.tsx';
 import { AccountBar } from './auth/AccountBar.tsx';
 import { JournalScreen } from './screens/JournalScreen.tsx';
 import { MagasinScreen } from './screens/MagasinScreen.tsx';
+import { SideActivitiesScreen } from './screens/SideActivitiesScreen.tsx';
+import { TeamsScreen } from './screens/TeamsScreen.tsx';
 import { StackedScreen, scrollToSection } from './screens/StackedScreen.tsx';
 import { log } from './log/logger.ts';
 
@@ -47,6 +49,8 @@ type Screen =
   | 'artistes'
   | 'catering'
   | 'magasin'
+  | 'equipes'
+  | 'annexes'
   | 'personnes'
   | 'reglages'
   | 'import'
@@ -63,6 +67,9 @@ const TABS: Array<{ id: Screen; label: string }> = [
   { id: 'catering', label: 'Catering' },
   // 2026-09-15: the equipment, lent or owned, and where each piece is.
   { id: 'magasin', label: 'Magasin' },
+  // 2026-09-16: out of Réglages, since both are lists of people rather than settings.
+  { id: 'equipes', label: 'Équipes' },
+  { id: 'annexes', label: 'Activités annexes' },
   { id: 'reglages', label: 'Réglages' },
   { id: 'import', label: 'Import/Export' },
   { id: 'historique', label: 'Historique' },
@@ -79,7 +86,7 @@ type Group = 'planning' | 'personnes' | 'logistique' | 'suivi' | 'reglages';
 const GROUPS: Array<{ id: Group; label: string; screens: Screen[] }> = [
   { id: 'planning', label: 'Planning', screens: ['grille', 'propositions'] },
   { id: 'personnes', label: 'Personnes', screens: ['personnes'] },
-  { id: 'logistique', label: 'Logistique', screens: ['artistes', 'catering', 'magasin'] },
+  { id: 'logistique', label: 'Logistique', screens: ['artistes', 'catering', 'magasin', 'equipes', 'annexes'] },
   { id: 'suivi', label: 'Suivi', screens: ['tableau', 'historique'] },
   { id: 'reglages', label: 'Réglages', screens: ['reglages', 'import'] },
 ];
@@ -494,6 +501,8 @@ export function App({
         {screen === 'artistes' && <ArtistsScreen />}
         {screen === 'catering' && <CateringScreen onGoToSetup={() => setScreen('reglages')} />}
         {screen === 'magasin' && <MagasinScreen />}
+        {screen === 'equipes' && <TeamsScreen />}
+        {screen === 'annexes' && <SideActivitiesScreen />}
         {screen === 'personnes' && (
           <PeopleScreen
             focus={personFocus}

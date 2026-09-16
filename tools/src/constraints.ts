@@ -204,7 +204,7 @@ export const CRITERIA: readonly CriterionDefinition[] = [
     id: 'teamSplit',
     group: 'poles',
     label: 'Un membre d’équipe sur un créneau sans personne de son équipe',
-    hint: "Seulement quand le fonctionnement en équipe est activé (Réglages > Équipes). Jamais bloquant: une équipe incomplète plus une autre personne reste un créneau possible.",
+    hint: "Seulement quand le fonctionnement en équipe est activé (Logistique > Équipes). Jamais bloquant: une équipe incomplète plus une autre personne reste un créneau possible.",
     modes: WO,
     defaultMode: 'weight',
     defaultWeight: 400,
