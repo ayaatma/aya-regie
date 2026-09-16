@@ -116,6 +116,9 @@ const FIELDS = [
   'assignedBy', 'leadsTeam',
   // « Peux-tu ramener du matos ? Si oui quoi ? », for the Magasin. Optional.
   'equipmentOffer',
+  // « Es-tu dispo pour l'exploit ? »: a no keeps somebody who only comes for the montage or the
+  // démontage off every créneau of the event. Optional.
+  'exploitHelp',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -154,8 +157,8 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'phone',       test: (h) => /^numero de telephone/.test(h), required: false },
   { field: 'choice1Level', test: (h) => /niveau/.test(h) && /choix principal|choix 1/.test(h), required: true },
   { field: 'choice2Level', test: (h) => /niveau/.test(h) && /deuxieme choix|choix 2/.test(h), required: true },
-  { field: 'choice1Pole',  test: (h) => /choix principal|choix 1/.test(h), required: true },
-  { field: 'choice2Pole',  test: (h) => /deuxieme choix|choix 2/.test(h), required: true },
+  { field: 'choice1Pole',  test: (h) => /choix principal|premier choix|choix 1/.test(h), required: true },
+  { field: 'choice2Pole',  test: (h) => /deuxieme choix|second choix|choix 2/.test(h), required: true },
   { field: 'refusedPoles', test: (h) => /poste|pole/.test(h) && /pas faire|pas travailler sur/.test(h), required: true },
   /*
    * TWO TIME QUESTIONS SINCE 2026-09-10, AND THE FORM KEPT BOTH. Column 25 is still the old
@@ -180,7 +183,9 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
    * `availabilityNote` would have taken it and read "oui, je peux aider au montage" as a
    * refusal of a créneau. It is bound on purpose now, and never by a time matcher.
    */
-  { field: 'phaseHelp',   test: (h) => /montage/.test(h) && /demontage/.test(h), required: false },
+  // A QUESTION naming both phases, since 2026-09-16: a column the orga added to the sheet, titled
+  // « Equipe Montage/Démontage », names both too and is no answer at all.
+  { field: 'phaseHelp',   test: (h) => /montage/.test(h) && /demontage/.test(h) && /(dispo|pret|motive|faire du|aider)/.test(h), required: false },
   { field: 'demontage',   test: (h) => /demontage/.test(h), required: false },
   // Never « pré-montage »: a weekend before the event is a side activity, not the montage.
   { field: 'montage',     test: (h) => /montage/.test(h) && !/pre montage/.test(h), required: false },
@@ -195,7 +200,9 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'allergies',   test: (h) => /allerg|intoleran/.test(h), required: false },
   { field: 'diet',        test: (h) => /regime|alimentaire|vegetarien|vegan/.test(h), required: false },
   { field: 'artist',      test: (h) => /artiste/.test(h), required: false },
-  { field: 'buddies',     test: (h) => /avec un e ami|avec qui|ensemble|binome/.test(h), required: false },
+  // Not « avec qui » alone since 2026-09-16: a festival asks « préférence pour le montage ? (on
+  // privilégiera les personnes avec qui on a déjà bossé) », which is not a buddy question.
+  { field: 'buddies',     test: (h) => /avec un e ami|ami e s benevole|avec qui tu (veux|voudrais|souhaites)|ensemble|binome/.test(h), required: false },
   // « Il manque des bénévoles sur un roulement » / « tu viens en renfort ? ». Anchored on the
   // shortage, not on « bénévole », which half the headers carry.
   { field: 'backup',      test: (h) => /renfort|manque des benevoles|manque de benevoles/.test(h), required: false },
@@ -206,6 +213,7 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'arrival',     test: (h) => /heure (peux|pourras) tu arriver|heure d arrivee|quand arrives tu/.test(h), required: false },
   { field: 'departure',   test: (h) => /heure (dois|peux) tu (re)?partir|heure de depart|quand (re)?pars tu/.test(h), required: false },
   { field: 'emergencyContact', test: (h) => /urgence/.test(h), required: false },
+  { field: 'exploitHelp', test: (h) => /(dispo|motive|pret).*(exploit|pendant le festival)/.test(h) && !/montage/.test(h), required: false },
   { field: 'equipmentOffer', test: (h) => /(ramener|apporter|preter) (du )?(matos|materiel)/.test(h), required: false },
   { field: 'leadsTeam',   test: (h) => /en tant que respo|equipe es tu (affecte|responsable)/.test(h), required: false },
   { field: 'assignedBy',  test: (h) => /deja affecte|envoye par un respo/.test(h), required: false },
@@ -226,9 +234,18 @@ export function bindColumns(headers: readonly string[]): { map: ColumnMap; missi
   const map: ColumnMap = {};
   const used = new Set<number>();
   const missing: FormField[] = [];
+  /*
+   * A Google Form's response sheet starts at « Horodateur ». Columns to its LEFT were added by
+   * the organisers (a status, a team, a note) and are not answers, so the detection never binds
+   * them; the correspondence screen still can. Found on a festival sheet on 2026-09-16, where
+   * « Equipe Montage/Démontage », typed by the orga, took the montage question's place.
+   */
+  const firstAnswer = Math.max(0, normalised.findIndex((h) => /horodat|timestamp/.test(h)));
 
   for (const matcher of MATCHERS) {
-    const index = normalised.findIndex((h, i) => !used.has(i) && matcher.test(h));
+    const index = normalised.findIndex(
+      (h, i) => !used.has(i) && (matcher.field === 'submittedAt' || i >= firstAnswer) && matcher.test(h),
+    );
     if (index >= 0) {
       map[matcher.field] = index;
       used.add(index);
@@ -319,6 +336,15 @@ export function bindForm(headers: readonly string[], mapping: FormMapping = EMPT
       choices.push({ pole: p, level: l === undefined || used.has(l) ? null : l });
       used.add(p);
       if (l !== undefined) used.add(l);
+    }
+    // A third to fifth choice, since 2026-09-16 (« Ton troisième choix. »), without a level
+    // question: the forms seen so far ask a level for the first two at most.
+    const firstAnswer = Math.max(0, normalised.findIndex((h) => /horodat|timestamp/.test(h)));
+    for (const rank of [/troisieme choix|choix 3/, /quatrieme choix|choix 4/, /cinquieme choix|choix 5/]) {
+      const at = normalised.findIndex((h, i) => i >= firstAnswer && !used.has(i) && rank.test(h) && !/niveau/.test(h));
+      if (at < 0) break;
+      choices.push({ pole: at, level: null });
+      used.add(at);
     }
   }
 
@@ -529,15 +555,21 @@ export function parseSlotComfort(header: string, answer: string, slots: readonly
   if (v === '') return null;
   const h = normalise(header);
   const words = (label: string) => normalise(label).split(' ').filter((w) => w.length >= 4);
-  const slot =
-    slots.find((s) => normalise(s.label) !== '' && (h.includes(normalise(s.label)) || v.includes(normalise(s.label)))) ??
-    slots.find((s) => words(s.label).some((w) => h.includes(w) || v.includes(w)));
+  /*
+   * EVERY tranche the question is about, since 2026-09-16: an event over three days has one
+   * « Nuit » tranche per night, and « shifts de nuit ? » is about all of them. A label named whole
+   * wins; otherwise every tranche sharing the word the question names.
+   */
+  const whole = slots.filter((s) => normalise(s.label) !== '' && (h.includes(normalise(s.label)) || v.includes(normalise(s.label))));
+  const word = whole.length > 0 ? null : slots.flatMap((s) => words(s.label)).find((w) => h.includes(w) || v.includes(w)) ?? null;
+  const matched = whole.length > 0 ? whole : word === null ? [] : slots.filter((s) => words(s.label).includes(word));
+  const ids = matched.map((s) => s.id);
   const avoided = /prefere\w* (ne )?pas|eviter|si possible|plutot pas/.test(v);
   const refused = !avoided && /^non\b|ne peux pas|pas possible|impossible/.test(v);
   const fine = !avoided && !refused && /^oui\b|volontiers|sans (souci|probleme)|avec plaisir/.test(v);
   if (fine) return { refused: [], avoided: [] };
-  if (!slot || (!avoided && !refused)) return 'inconnu';
-  return avoided ? { refused: [], avoided: [slot.id] } : { refused: [slot.id], avoided: [] };
+  if (ids.length === 0 || (!avoided && !refused)) return 'inconnu';
+  return avoided ? { refused: [], avoided: ids } : { refused: ids, avoided: [] };
 }
 
 /**
@@ -1103,12 +1135,17 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     for (const reading of [arrival, departure]) if (reading.reason) reviewReasons.push(reading.reason);
     readable.saw('arrival', arrivalCell === '' || arrival.value !== null || arrival.confident);
     readable.saw('departure', departureCell === '' || departure.value !== null || departure.confident);
-    const unavailable = unavailableFrom(arrival.value, departure.value, lengthHours);
+    // « Non, je ne veux pas de créneaux pendant l'exploit »: absent from the whole event.
+    const notOnExploit = map.exploitHelp !== undefined && yesNo(cell(row, 'exploitHelp')) === false;
+    const unavailable = notOnExploit
+      ? [{ start: 0, end: lengthHours }]
+      : unavailableFrom(arrival.value, departure.value, lengthHours);
     // Kept word for word with the other time answers: this is what a correction is checked against.
     const timeNote = [
       availabilityNote,
       arrivalCell === '' ? '' : `Arrivée: ${arrivalCell}`,
       departureCell === '' ? '' : `Départ: ${departureCell}`,
+      notOnExploit ? `Exploit: ${cell(row, 'exploitHelp')}` : '',
     ].filter((part) => part !== '').join('\n');
 
     // Merged, and deduplicated: naming the same tranche in both columns is one refusal.

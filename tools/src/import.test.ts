@@ -641,3 +641,40 @@ test('a yes to a question naming a side activity puts the person on its list, on
   ]);
   deepStrictEqual(columns, [{ key: 'pre', column: 1 }, { key: 'deco', column: 2 }, { key: 'site', column: 3 }]);
 });
+
+test('a festival-shaped sheet binds every question, and never a column the orga added before the timestamp', () => {
+  const headers = [
+    'Prénom/Nom', 'Statut', 'Equipe Montage/Démontage',
+    'Horodateur', 'Adresse e-mail', 'Nom', 'Prénom',
+    'Peux-tu faire des shifts de nuit ? (entre 3h et 7h)',
+    'Es-tu dispo & motivé.e pour le montage et le démontage ?',
+    'Quels jours es-tu dispo sur le montage ?',
+    'Quels jours es-tu dispo sur le démontage ?',
+    'As-tu une préférence sur ce que tu souhaites faire pendant le montage/démontage ? (on privilégiera les personnes avec qui on a déjà bossé)',
+    "Es-tu dispo & motivé.e pour l'exploit' (être bénévole pendant le festival) ?",
+    'A quelle heure peux-tu arriver vendredi 18 Septembre ?',
+    "Où es-tu le plus à l'aise ? Ton premier choix.",
+    "Où es-tu le plus à l'aise ? Ton deuxième choix.",
+    "Où es-tu le plus à l'aise ? Ton troisième choix.",
+    'Quel est le nom / prénom de ton ami.e.s bénévole avec qui tu veux travailler ?',
+  ];
+  const binding = bindForm(headers);
+  strictEqual(binding.map.phaseHelp, 8, 'la question, pas la colonne « Equipe Montage/Démontage » de l’orga');
+  strictEqual(binding.map.montage, 9);
+  strictEqual(binding.map.demontage, 10);
+  strictEqual(binding.map.exploitHelp, 12);
+  strictEqual(binding.map.buddies, 17, 'le nom de l’ami·e, pas la préférence de montage');
+  deepStrictEqual(binding.choices.map((c) => c.pole), [14, 15, 16], 'premier, deuxième et troisième choix');
+  ok(!Object.values(binding.map).some((i) => (i as number) < 3), 'rien avant l’horodateur');
+});
+
+test('the night question refuses or avoids every « Nuit » tranche of a multi-day event', async () => {
+  const { parseSlotComfort } = await import('./import.js');
+  const slots = [
+    { id: 'j1', label: 'Journée ven.', start: 0, end: 13 },
+    { id: 'n1', label: 'Nuit ven. (3h-7h)', start: 13, end: 17 },
+    { id: 'j2', label: 'Journée sam.', start: 17, end: 37 },
+    { id: 'n2', label: 'Nuit sam. (3h-7h)', start: 37, end: 41 },
+  ];
+  deepStrictEqual(parseSlotComfort('Peux-tu faire des shifts de nuit ?', 'Non je ne peux pas', slots), { refused: ['n1', 'n2'], avoided: [] });
+});

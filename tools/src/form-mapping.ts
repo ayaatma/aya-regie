@@ -64,7 +64,8 @@ export type MappedField =
   | 'nicknameMatters'
   | 'assignedBy'
   | 'leadsTeam'
-  | 'equipmentOffer';
+  | 'equipmentOffer'
+  | 'exploitHelp';
 
 /** One pole choice as columns: the pole answer, and the level answer when the form asks one. */
 export interface ChoiceColumns {
@@ -133,13 +134,14 @@ export const MAPPED_FIELD_LABEL: Record<MappedField, string> = {
   assignedBy: 'Déjà affecté·e (envoyé·e par un·e responsable, ou responsable)',
   leadsTeam: 'Équipe tenue en tant que responsable',
   equipmentOffer: 'Matériel proposé (Magasin)',
+  exploitHelp: "Présent·e sur l'exploit (oui / non)",
 };
 
 /** The order the screen lists the fields in: who, then what they can do, then the rest. */
 export const MAPPED_FIELDS: readonly MappedField[] = [
   'firstName', 'lastName', 'nickname', 'email', 'phone',
   'volume', 'halfPreference', 'refusedSlotChoice', 'availabilityNote', 'refusedPoles',
-  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'slotComfort', 'arrival', 'departure', 'skills', 'skillCheck', 'emergencyContact', 'healthCheck', 'healthNote', 'birthDate', 'nicknameMatters', 'assignedBy', 'leadsTeam', 'equipmentOffer', 'submittedAt',
+  'artist', 'buddies', 'diet', 'allergies', 'phaseHelp', 'montage', 'demontage', 'backup', 'energy', 'slotComfort', 'arrival', 'departure', 'skills', 'skillCheck', 'emergencyContact', 'healthCheck', 'healthNote', 'birthDate', 'nicknameMatters', 'assignedBy', 'leadsTeam', 'equipmentOffer', 'exploitHelp', 'submittedAt',
 ];
 
 /** Which answer map a field's answers go through, for the fields that have one. */
