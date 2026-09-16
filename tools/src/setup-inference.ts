@@ -28,7 +28,7 @@
 
 import type { EventSlot, Pole } from './model.js';
 import { alignPhases, type Plan } from './plan.js';
-import { bindForm, parseCsv, parseSubmittedAt, sideActivityColumns, yesNo } from './import.js';
+import { bindForm, fromHeaderRow, parseCsv, parseSubmittedAt, sideActivityColumns, yesNo } from './import.js';
 import type { FormMapping } from './form-mapping.js';
 import { datesIn } from './presence-days.js';
 import { normalise } from './text.js';
@@ -73,7 +73,7 @@ const capitalise = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 const KNOWN_SKILLS = ['Permis B', 'Permis C', 'Permis BE', 'CACES', 'Nacelle', 'Cariste', 'BAFA', 'PSC1', 'PSE1', 'SST', 'Électricien', 'Électricienne', 'Menuisier', 'Soudure', 'Plombier', 'Ingé son', 'Régisseur', 'Cuisinier', 'Barman', 'Infirmier', 'Infirmière'];
 
 export function inferSetup(csvText: string, mapping?: FormMapping): SetupProposal {
-  const rows = parseCsv(csvText);
+  const rows = fromHeaderRow(parseCsv(csvText));
   const headers = rows[0] ?? [];
   const body = rows.slice(1);
   const binding = bindForm(headers, mapping);

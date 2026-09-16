@@ -678,3 +678,13 @@ test('the night question refuses or avoids every « Nuit » tranche of a multi-d
   ];
   deepStrictEqual(parseSlotComfort('Peux-tu faire des shifts de nuit ?', 'Non je ne peux pas', slots), { refused: ['n1', 'n2'], avoided: [] });
 });
+
+test('the wrong tab says so once, and a title line above the headers is skipped', () => {
+  const wrongTab = importVolunteers('Équipe,Créneau\nBar,Vendredi\nBar,Samedi\n', { startISO: EVENT_START_ISO, poles, artists });
+  deepStrictEqual(wrongTab.issues.map((i) => i.code), ['intitules-introuvables']);
+  ok(wrongTab.issues[0]!.message.includes('« Équipe »'));
+
+  const titled = importVolunteers('Inscriptions 2026,,\nHorodateur,Nom,Prénom\n01/06/2026 10:00:00,Martin,Ana\n', { startISO: EVENT_START_ISO, poles, artists });
+  strictEqual(titled.volunteers.length, 1);
+  strictEqual(titled.volunteers[0]!.firstName, 'Ana');
+});

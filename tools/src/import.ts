@@ -230,6 +230,24 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
 
 export type ColumnMap = Partial<Record<FormField, number>>;
 
+/**
+ * The rows from the form's header row on, since 2026-09-16.
+ *
+ * A response sheet's first row is its headers, but a tab somebody arranged may carry a title or an
+ * empty-looking line above them. The first of the five top rows where the names (or the timestamp)
+ * bind is taken as the header row; when none does, the rows are returned untouched and the import
+ * says, once, that it found no form headers.
+ */
+export function fromHeaderRow(rows: readonly string[][]): string[][] {
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const { map } = bindColumns(rows[i]!);
+    if ((map.firstName !== undefined && map.lastName !== undefined) || map.submittedAt !== undefined) {
+      return rows.slice(i);
+    }
+  }
+  return [...rows];
+}
+
 export function bindColumns(headers: readonly string[]): { map: ColumnMap; missing: FormField[] } {
   const normalised = headers.map(normalise);
   const map: ColumnMap = {};
@@ -929,7 +947,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   const rules = options.rules ?? DEFAULT_RULES;
   const lengthHours = options.lengthHours ?? 18;
   const startISO = options.startISO;
-  const rows = parseCsv(csvText);
+  const rows = fromHeaderRow(parseCsv(csvText));
   const issues: ImportIssue[] = [];
 
   if (rows.length === 0) {
@@ -997,6 +1015,30 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
         'Aucune colonne de disponibilité: ni la question fermée sur les horaires, ni le champ ' +
         "d'impératif horaire. Vérifier les intitulés du formulaire.",
     });
+  }
+
+  /*
+   * NEITHER NAME FOUND is not a hundred people without a name: it is the wrong tab, or a sheet whose
+   * first rows are not the form's headers. Said once, with what was read, instead of one « prénom
+   * ou nom manquant » per row burying the one line that explains them all.
+   */
+  if (missing.length === 2) {
+    const seen = rows[0]!.map((h) => h.replace(/\s+/g, ' ').trim()).filter((h) => h !== '').slice(0, 6);
+    // The « aucune colonne pour... » warnings say the same thing again, field by field: dropped.
+    const kept = issues.filter((i) => i.code === 'colonne-memorisee-absente');
+    issues.length = 0;
+    issues.push(...kept);
+    issues.push({
+      severity: 'error',
+      code: 'intitules-introuvables',
+      row: null,
+      person: '',
+      message:
+        "Ni « Nom » ni « Prénom » dans les intitulés lus: ce n'est probablement pas l'onglet des réponses du formulaire. " +
+        `Premières colonnes lues: ${seen.map((h) => `« ${h.slice(0, 40)} »`).join(', ') || 'aucune'}. ` +
+        "Copiez le lien depuis l'onglet des réponses (l'adresse se termine par #gid=...), ou reliez les colonnes à la main dans la correspondance.",
+    });
+    return { volunteers: [], buddies: [], issues };
   }
 
   for (const field of missing) {
@@ -1661,7 +1703,7 @@ export interface FormSurvey {
  * with the automatic reading beside it. Pure; nothing is imported.
  */
 export function surveyForm(csvText: string, options: ImportOptions): FormSurvey {
-  const rows = parseCsv(csvText);
+  const rows = fromHeaderRow(parseCsv(csvText));
   const headers = rows[0] ?? [];
   const body = rows.slice(1);
   const binding = bindForm(headers, options.mapping ?? EMPTY_FORM_MAPPING);
