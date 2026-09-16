@@ -44,11 +44,21 @@ Deno.serve(async (request: Request) => {
     return json(503, { error: "Le compte de service n'est pas configuré (secret GOOGLE_SERVICE_ACCOUNT absent ou illisible)." });
   }
 
+  /*
+   * THE TOKEN IS PASSED TO getUser EXPLICITLY, fixed 2026-09-16 after « Connexion régisseur
+   * requise » for a signed-in régisseur. It used to ride in `global.headers` as `authorization`,
+   * lowercase; supabase-js builds the auth client's headers with its own `Authorization: Bearer
+   * <anon key>` beside it, so the anon key was what got checked, and it is nobody's session.
+   */
+  const token = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+  if (token === '') return json(401, { error: 'Connexion régisseur requise.' });
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { authorization: request.headers.get('authorization') ?? '' } },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return json(401, { error: 'Connexion régisseur requise.' });
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) {
+    return json(401, { error: 'Connexion régisseur requise: la session a expiré, reconnectez-vous puis réessayez.' });
+  }
 
   let url = '';
   try {
