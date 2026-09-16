@@ -75,6 +75,14 @@ export function ImportScreen() {
    * once the plan the reading needs has arrived through the context.
    */
   const [rereadPending, setRereadPending] = useState(false);
+  /**
+   * What the last action did, said on the screen, since 2026-09-16: « Appliquer ces réglages » used
+   * to change the plan without a word and leave the card as it was, which reads as nothing having
+   * happened. Cleared by the next fetch.
+   */
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  /** Bumped on each applied setup, so the card is rebuilt against the plan it just changed. */
+  const [setupRound, setSetupRound] = useState(0);
 
   /**
    * Correcting a reading BEFORE the import is applied.
@@ -185,9 +193,31 @@ export function ImportScreen() {
 
   /** The form's proposed settings, applied as one edit; the answers they cover join the mapping. */
   const applyFormSetup = (next: Plan, summary: string): void => {
-    apply(next, summary);
-    setMapping({ ...mapping, answers: { ...mapping.answers, pole: next.formMapping.answers.pole } });
-    setRereadPending(true);
+    const added = [
+      next.poles.length > plan.poles.length ? `${next.poles.length - plan.poles.length} pôle(s)` : '',
+      next.startISO !== plan.startISO || next.lengthHours !== plan.lengthHours ? "les dates de l'événement" : '',
+      next.montage.enabled && !plan.montage.enabled ? 'le montage' : '',
+      next.demontage.enabled && !plan.demontage.enabled ? 'le démontage' : '',
+      next.slots !== plan.slots ? 'les tranches' : '',
+      next.skills.length > plan.skills.length ? `${next.skills.length - plan.skills.length} compétence(s)` : '',
+      next.sideActivities.length > plan.sideActivities.length ? `${next.sideActivities.length - plan.sideActivities.length} activité(s)` : '',
+      next.applicationSteps.length > plan.applicationSteps.length ? `${next.applicationSteps.length - plan.applicationSteps.length} étape(s)` : '',
+    ].filter(Boolean);
+    try {
+      apply(next, summary);
+      setMapping({ ...mapping, answers: { ...mapping.answers, pole: next.formMapping.answers.pole } });
+      setRereadPending(true);
+      setSetupRound((n) => n + 1);
+      setNotice({
+        tone: 'ok',
+        text:
+          `Réglages appliqués${added.length > 0 ? `: ${added.join(', ')}` : ' (pôles déjà présents, réponses reliées)'}. ` +
+          "Le fichier a été relu avec ces réglages: vérifiez ce que l'import changerait ci-dessous, puis appliquez-le. " +
+          'Tout se corrige dans Réglages, et Ctrl+Z annule.',
+      });
+    } catch (cause) {
+      setNotice({ tone: 'bad', text: `Les réglages n'ont pas pu être appliqués: ${cause instanceof Error ? cause.message : String(cause)}` });
+    }
   };
 
   const read = (csv: string, source: Source, withMapping: FormMapping = mapping): void => {
@@ -205,6 +235,7 @@ export function ImportScreen() {
     setBusy(true);
     setError(null);
     try {
+      setNotice(null);
       const csv = await fetchSheetCsv(sheetUrl);
       read(csv, { kind: 'sheet', url: sheetUrl });
       /*
@@ -225,12 +256,25 @@ export function ImportScreen() {
 
   const onApply = (): void => {
     if (!imported || !reconciliation) return;
-    apply(
-      setFormMapping(applyReconciliation(plan, imported.result, reconciliation, { keep: kept }), mapping),
-      `import: ${summariseReconciliation(reconciliation)}`,
-    );
-    setImported(null);
-    setFlipped(new Set());
+    const summary = summariseReconciliation(reconciliation);
+    try {
+      apply(
+        setFormMapping(applyReconciliation(plan, imported.result, reconciliation, { keep: kept }), mapping),
+        `import: ${summary}`,
+      );
+      setImported(null);
+      setFlipped(new Set());
+      const review = imported.result.volunteers.filter((v) => v.needsReview).length;
+      setNotice({
+        tone: 'ok',
+        text:
+          `Import appliqué: ${summary}.` +
+          (review > 0 ? ` ${review} fiche(s) à relire, listées dans Personnes et sur la grille.` : '') +
+          " L'enregistrement se fait tout seul (voir en haut à droite), et Ctrl+Z annule.",
+      });
+    } catch (cause) {
+      setNotice({ tone: 'bad', text: `L'import n'a pas pu être appliqué: ${cause instanceof Error ? cause.message : String(cause)}` });
+    }
   };
 
   /** True when the field holds exactly the link this plan already imported from. */
@@ -276,13 +320,21 @@ export function ImportScreen() {
         </div>
 
         <div className="import-body">
+          {notice && (
+            <p className={`alert is-${notice.tone} import-notice`} role="status" ref={(el) => el?.scrollIntoView({ block: "nearest" })}>
+              {notice.text}{' '}
+              <button type="button" className="btn is-small" onClick={() => setNotice(null)}>
+                OK
+              </button>
+            </p>
+          )}
           <section className="setup-group">
             <div className="setup-group-head">
               <span className="setup-group-title">Depuis Google Sheets</span>
               <span className="people-meta">
                 {plan.sheetUrl !== ''
                   ? 'Lien mémorisé avec le planning. Rafraîchir relit la feuille et montre ce qui a changé.'
-                  : 'La feuille doit être partagée avec « tous les utilisateurs disposant du lien »'}
+                  : 'Feuille privée: partagez-la en lecture avec le compte de service de l’outil (voir la notice), ou par lien'}
               </span>
             </div>
 
@@ -340,7 +392,7 @@ export function ImportScreen() {
 
           {imported && (
             <SetupFromFormCard
-              key={imported.csv.length + imported.source.kind}
+              key={`${imported.csv.length}-${imported.source.kind}-${setupRound}`}
               plan={plan}
               csv={imported.csv}
               mapping={mapping}

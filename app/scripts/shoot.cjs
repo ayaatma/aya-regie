@@ -193,6 +193,9 @@ async function main() {
         });
         await sleep(300);
         await tall('105-import-preparer');
+        await clickButton(/^Appliquer ces réglages$/);
+        await sleep(800);
+        await shot('106-import-reglages-appliques');
       }
       if (want('historique')) {
         await tab('Historique');

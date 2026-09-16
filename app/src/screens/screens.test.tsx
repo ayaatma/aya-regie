@@ -1453,7 +1453,7 @@ test('the import screen asks for a link once, then offers to refresh it', () => 
   const fresh = render(<ImportScreen />, plan);
   assert.ok(shows(fresh, 'Récupérer'), 'sans lien mémorisé, on récupère');
   assert.ok(!shows(fresh, 'Rafraîchir'));
-  assert.ok(shows(fresh, 'tous les utilisateurs disposant du lien'));
+  assert.ok(shows(fresh, 'compte de service'));
 
   const known: Plan = {
     ...plan,
