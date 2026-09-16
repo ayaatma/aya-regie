@@ -39,7 +39,7 @@ import {
 } from '../engine.ts';
 import { addOrganiserToShift, removeOrganiserFromShift } from '../store/edits.ts';
 import { removeLeaderRole } from '../store/setupEdits.ts';
-import { assignWindow, setPhaseAssignment } from '../store/phaseEdits.ts';
+import { assignWindow, setPhaseAssignment, setPhaseEvent } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from './labels.ts';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
@@ -793,6 +793,29 @@ function EvenementBody({
         {fillState.taken} sur {event.headcount}
         {fillState.missing > 0 ? ` · ${fillState.missing} à pourvoir` : ' · complet'}
       </p>
+
+      {/*
+        Renamed here since 2026-09-16: the grid's « mode édition » creates an événement called
+        « Nouvel événement » and opens it in this pane, so the name has to be typable right here.
+      */}
+      {!readOnly && (
+        <label className="rule">
+          <span className="rule-label">Nom</span>
+          <input
+            className="select"
+            name={`evenement-label-${event.key}`}
+            autoComplete="off"
+            value={event.label}
+            aria-label="Nom de l'événement"
+            onChange={(changed) =>
+              edit(
+                (p) => setPhaseEvent(p, phaseId, event.key, { label: changed.target.value }),
+                `nom de l'événement ${event.label}`,
+              )
+            }
+          />
+        </label>
+      )}
 
       <div className="panel-section">
         <p className="panel-section-title">Qui y est</p>

@@ -42,17 +42,22 @@ import {
   toLabel,
   type PersonKind,
   type Phase,
+  type PhaseEvent,
   type PhaseId,
   type PhaseIssue,
   type PhasePlacement,
 } from '../engine.ts';
 import {
+  addPhaseEvent,
   assignWindow,
   declaredToPlace,
   removePhaseAssignment,
   placeDeclared,
   setPhaseAssignment,
+  setPhaseEvent,
 } from '../store/phaseEdits.ts';
+import { FALLBACK_SHIFT_HOURS } from '../store/setupEdits.ts';
+import { EditModeButton, MIN_WINDOW_HOURS, edgeLimits, ghostWindow } from '../components/EditModeButton.tsx';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from '../components/labels.ts';
 import { InfoPanel } from '../components/InfoPanel.tsx';
@@ -176,6 +181,12 @@ interface Resize extends Edges {
   assignmentKey: string;
 }
 
+/** An événement's edge pulled in « mode édition », and the glued événement that follows it. */
+interface EventRetime extends Edges {
+  eventKey: string;
+  neighbour: { key: string; start: number; end: number } | null;
+}
+
 export function PhaseGrid({
   id,
   switcher,
@@ -210,6 +221,15 @@ export function PhaseGrid({
   /** What the panes on the right are describing. The same type on all three grids. */
   const [selection, setSelection] = useState<Selection | null>(null);
   const [tab, setTab] = useState<PanelTab>('disponibles');
+  /**
+   * « Mode édition », since 2026-09-16. A phase has no créneaux: what it edits here are the
+   * événements, which are exactly a créneau (a window and a number of places). Local state, so
+   * changing tab or moment unmounts the grid and leaves the mode.
+   */
+  const [editing, setEditing] = useState(false);
+  const [eventRetime, setEventRetime] = useState<EventRetime | null>(null);
+  /** The événement a click would create, on an empty stretch of the événements lane. */
+  const [eventGhost, setEventGhost] = useState<Edges | null>(null);
   const [resize, setResize] = useState<Resize | null>(null);
   /**
    * Which day is on screen, or the whole phase.
@@ -427,6 +447,10 @@ export function PhaseGrid({
           deleteAtCursor();
           return;
         case 'Escape':
+          if (editing) {
+            setEditing(false);
+            return;
+          }
           setSelection(null);
           return;
         default:
@@ -434,7 +458,14 @@ export function PhaseGrid({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cursorKey, deleteAtCursor, moveCursor]);
+  }, [cursorKey, deleteAtCursor, editing, moveCursor]);
+
+  // Leaving the mode drops whatever it had under way.
+  useEffect(() => {
+    if (editing) return;
+    setEventRetime(null);
+    setEventGhost(null);
+  }, [editing]);
 
   /* The cursor may land on a box three screens along, so the grid follows it. */
   useEffect(() => {
@@ -555,6 +586,112 @@ export function PhaseGrid({
     );
   };
 
+  /**
+   * An événement's grip pressed, on the day `segment` it is drawn on. Same listeners on the window
+   * as `Bars`, same clamp to that day, and a touching événement follows the edge like a créneau.
+   */
+  const beginEventRetime =
+    (event: PhaseEvent, edge: 'start' | 'end', segment: PhaseSegment) =>
+    (down: React.PointerEvent<HTMLSpanElement>) => {
+      if (readOnly) return;
+      down.preventDefault();
+      down.stopPropagation();
+      const track = down.currentTarget.closest('.lane-track');
+      if (!track) return;
+      const left = track.getBoundingClientRect().left;
+      const limits = edgeLimits(event, phase.events, edge, segment.start, segment.end);
+      const lo =
+        edge === 'end'
+          ? Math.max(limits.min, Math.max(event.start, segment.start) + MIN_WINDOW_HOURS)
+          : Math.max(limits.min, segment.start);
+      const hi =
+        edge === 'start'
+          ? Math.min(limits.max, Math.min(event.end, segment.end) - MIN_WINDOW_HOURS)
+          : Math.min(limits.max, segment.end);
+      const glued = limits.glued;
+
+      let last: EventRetime | null = null;
+      const move = (moved: PointerEvent) => {
+        const hour = Math.min(Math.max(hourOn(axis, segment, moved.clientX - left, SNAP), lo), Math.max(lo, hi));
+        last = {
+          eventKey: event.key,
+          start: edge === 'start' ? hour : event.start,
+          end: edge === 'end' ? hour : event.end,
+          neighbour: glued
+            ? edge === 'end'
+              ? { key: glued.key, start: hour, end: glued.end }
+              : { key: glued.key, start: glued.start, end: hour }
+            : null,
+        };
+        setEventRetime(last);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        setEventRetime(null);
+        const done = last as EventRetime | null;
+        if (!done || (done.start === event.start && done.end === event.end)) return;
+        edit((p) => {
+          const next = setPhaseEvent(p, id, done.eventKey, { start: done.start, end: done.end });
+          return done.neighbour
+            ? setPhaseEvent(next, id, done.neighbour.key, { start: done.neighbour.start, end: done.neighbour.end })
+            : next;
+        }, `horaires de ${event.label}`);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    };
+
+  /** « + » under an événement: one more place. « Autant que possible » (0) becomes one past who is there. */
+  const addEventPlace = (event: PhaseEvent, taken: number) =>
+    edit(
+      (p) => setPhaseEvent(p, id, event.key, { headcount: event.headcount === 0 ? taken + 1 : event.headcount + 1 }),
+      `une place de plus sur ${event.label}`,
+    );
+
+  /** The pointer over the événements lane: where a click would create one, on that day. */
+  const hoverEvents = (moved: React.MouseEvent<HTMLDivElement>) => {
+    const target = moved.target as HTMLElement;
+    if (target.closest('.shift-ghost')) return;
+    if (target.closest('.phase-event-block')) {
+      setEventGhost(null);
+      return;
+    }
+    const x = moved.clientX - moved.currentTarget.getBoundingClientRect().left;
+    const segment = segmentAt(axis, x);
+    const found = segment
+      ? ghostWindow(
+          phase.events,
+          segment.start + (x - segment.x) / axis.pxPerHour,
+          FALLBACK_SHIFT_HOURS,
+          segment.start,
+          segment.end,
+        )
+      : null;
+    setEventGhost((current) =>
+      found === null
+        ? null
+        : current && current.start === found.start && current.end === found.end
+          ? current
+          : found,
+    );
+  };
+
+  /** Creates the événement under the pointer and opens it in the pane, where it is named. */
+  const createEvent = (window: Edges) => {
+    const before = new Set(phase.events.map((e) => e.key));
+    let created: string | undefined;
+    edit((p) => {
+      const next = addPhaseEvent(p, id, 'Nouvel événement', window.start, window.end, 1);
+      created = (id === 'montage' ? next.montage : next.demontage).events.find((e) => !before.has(e.key))?.key;
+      return next;
+    }, `événement ajouté sur ${phase.label || (id === 'montage' ? 'le montage' : 'le démontage')}`);
+    setEventGhost(null);
+    if (created) setSelection({ kind: 'evenement', phaseId: id, eventKey: created, fill: false });
+  };
+
   if (!phase.enabled) {
     return (
       <div className="screen">
@@ -570,10 +707,10 @@ export function PhaseGrid({
   }
 
   /** The événements lane: one row of blocks, as tall as the fullest of them. */
-  const eventRows = Math.max(
-    1,
-    ...fills.map((fill) => Math.max(fill.event.headcount, fill.taken)),
-  );
+  const eventRows =
+    Math.max(1, ...fills.map((fill) => Math.max(fill.event.headcount, fill.taken))) +
+    // Mode édition draws a « + » place under every événement.
+    (editing ? 1 : 0);
   const eventBlockH = eventBlockHeight(eventRows);
   const eventLaneHeight = eventBlockH + LANE_PAD;
 
@@ -635,7 +772,12 @@ export function PhaseGrid({
           )}
 
           <span className="toolbar-note">
-            {keyNote ??
+            {editing ? (
+              <strong className="edit-mode-note">
+                Mode édition: tirer un bord d'un événement, « + » pour une place de plus, cliquer dans
+                le vide de la ligne Événements pour en créer un. Échap pour sortir.
+              </strong>
+            ) : keyNote ??
               (issues.length > 0
                 ? `${issues.length} case(s) en rouge: contredisent une réponse`
                 : 'Flèches pour circuler, Suppr pour retirer. Tirer un bord allonge une case.')}
@@ -658,7 +800,7 @@ export function PhaseGrid({
         */}
         <div
           ref={scroll}
-          className="grid-scroll"
+          className={`grid-scroll${editing ? ' is-editing' : ''}`}
           /*
            * IT ACCEPTS THE DROP AND SAYS NOTHING, since 2026-09-13, exactly as the exploit does
            * and for the reason written there: every other dashed-blue surface in this tool means
@@ -678,14 +820,17 @@ export function PhaseGrid({
         >
           <div className="grid-inner" style={{ width: `calc(var(--label-w) + ${axis.width}px)` }}>
             <div className="grid-head">
-              <div className="grid-corner">
-                <span>{phase.label || (id === 'montage' ? 'Montage' : 'Démontage')}</span>
-                <span>{fmtHours(phase.lengthHours)} au total</span>
+              <div className="grid-corner is-with-tool">
+                <div className="grid-corner-text">
+                  <span>{phase.label || (id === 'montage' ? 'Montage' : 'Démontage')}</span>
+                  <span>{fmtHours(phase.lengthHours)} au total</span>
+                </div>
+                {!readOnly && <EditModeButton editing={editing} onToggle={() => setEditing(!editing)} />}
               </div>
               <PhaseRuler axis={axis} phase={phase} />
             </div>
 
-            {fills.length > 0 && (
+            {(fills.length > 0 || editing) && (
               <div className="lane is-events">
                 <div className="lane-label">
                   <span className="lane-label-name">Événements</span>
@@ -707,6 +852,8 @@ export function PhaseGrid({
                       '--hour-w': `${axis.pxPerHour}px`,
                     } as React.CSSProperties
                   }
+                  onMouseMove={editing && !eventRetime ? hoverEvents : undefined}
+                  onMouseLeave={editing ? () => setEventGhost(null) : undefined}
                 >
                   {axis.segments.map((segment) => (
                     <div
@@ -716,7 +863,32 @@ export function PhaseGrid({
                     />
                   ))}
 
-                  {fills.map(({ event, taken, missing }) => {
+                  {editing &&
+                    eventGhost &&
+                    piecesOf(axis, eventGhost).map((piece) => (
+                      <div
+                        key={`ghost-${piece.x}`}
+                        className="shift-ghost"
+                        role="button"
+                        style={{ left: piece.x, width: Math.max(6, piece.width - 2) }}
+                        title={`Créer un événement de ${fmtHours(eventGhost.end - eventGhost.start)}`}
+                        onClick={(clicked) => {
+                          clicked.stopPropagation();
+                          createEvent(eventGhost);
+                        }}
+                      >
+                        + {fmtHours(eventGhost.end - eventGhost.start)}
+                      </div>
+                    ))}
+
+                  {fills.map(({ event: stored, taken, missing }) => {
+                    // An événement being retimed is drawn at the hours the grip proposes.
+                    const event =
+                      eventRetime?.eventKey === stored.key
+                        ? { ...stored, start: eventRetime.start, end: eventRetime.end }
+                        : eventRetime?.neighbour?.key === stored.key
+                          ? { ...stored, start: eventRetime.neighbour.start, end: eventRetime.neighbour.end }
+                          : stored;
                     const inside = boxes.filter((b) => b.eventKey === event.key);
                     /*
                      * TOO MANY IS AS WRONG AS TOO FEW, since 2026-09-13. An événement asking for
@@ -729,7 +901,7 @@ export function PhaseGrid({
                     return piecesOf(axis, event).map((piece, i) => (
                       <div
                         key={`${event.key}-${piece.x}`}
-                        className={`phase-event-block${missing > 0 || over ? ' is-short' : ''}`}
+                        className={`phase-event-block${missing > 0 || over ? ' is-short' : ''}${editing ? ' is-editing' : ''}`}
                         style={{
                           left: piece.x,
                           width: Math.max(56, piece.width - 2),
@@ -737,10 +909,10 @@ export function PhaseGrid({
                           top: LANE_PAD / 2,
                         }}
                         onDragOver={(e) => {
-                          if (drag && !readOnly) e.preventDefault();
+                          if (drag && !readOnly && !editing) e.preventDefault();
                         }}
                         onDrop={() => {
-                          if (!drag || readOnly) return;
+                          if (!drag || readOnly || editing) return;
                           place(
                             { kind: drag.kind, key: drag.key },
                             { kind: 'event', eventKey: event.key },
@@ -818,7 +990,7 @@ export function PhaseGrid({
                                  * taking somebody out of one meant opening their panel and finding
                                  * the button while every other box came out on the bin.
                                  */
-                                draggable={!readOnly}
+                                draggable={!readOnly && !editing}
                                 onDragStart={(dragged) => {
                                   dragged.stopPropagation();
                                   dragged.dataTransfer.effectAllowed = 'move';
@@ -878,7 +1050,41 @@ export function PhaseGrid({
                                 Vide
                               </span>
                             ))}
+                            {editing && !readOnly && (
+                              <span
+                                className="box is-add is-mini"
+                                role="button"
+                                title="Ajouter une place à cet événement"
+                                onClick={(clicked) => {
+                                  clicked.stopPropagation();
+                                  addEventPlace(stored, taken);
+                                }}
+                              >
+                                +
+                              </span>
+                            )}
                           </div>
+                        )}
+
+                        {editing && !readOnly && (
+                          <>
+                            {Math.abs(piece.start - event.start) < 1e-6 && (
+                              <span
+                                className="phase-event-grip is-start"
+                                title="Tirer pour changer le début"
+                                onPointerDown={beginEventRetime(stored, 'start', piece.segment)}
+                                onClick={(clicked) => clicked.stopPropagation()}
+                              />
+                            )}
+                            {Math.abs(piece.end - event.end) < 1e-6 && (
+                              <span
+                                className="phase-event-grip is-end"
+                                title="Tirer pour changer la fin"
+                                onPointerDown={beginEventRetime(stored, 'end', piece.segment)}
+                                onClick={(clicked) => clicked.stopPropagation()}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
                     ));
@@ -968,7 +1174,7 @@ export function PhaseGrid({
                   <PoleTrack
                     axis={axis}
                     height={height}
-                    readOnly={readOnly}
+                    readOnly={readOnly || editing}
                     dragging={drag !== null}
                     onDropPerson={(x) => dropOn(pole.key, x)}
                   >
@@ -985,7 +1191,7 @@ export function PhaseGrid({
                           selection.assignmentKey === box.assignmentKey
                         }
                         kin={kin?.kind === box.personKind && kin.key === box.personKey}
-                        readOnly={readOnly}
+                        readOnly={readOnly || editing}
                         phase={phase}
                         resize={resize?.assignmentKey === box.assignmentKey ? resize : null}
                         onDragStart={(payload) => setDrag(payload)}
@@ -1046,7 +1252,7 @@ export function PhaseGrid({
         }
         onDragEndPool={() => setDrag(null)}
         onDropUnassign={takeAway}
-        readOnly={readOnly}
+        readOnly={readOnly || editing}
       />
 
       <InfoPanel selection={selection} onSelect={setSelection} readOnly={readOnly} />

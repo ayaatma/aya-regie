@@ -180,6 +180,103 @@ async function main() {
         await page.evaluate(() => document.querySelector('.panel-unfold')?.click());
         await sleep(300);
       }
+      if (want('edition')) {
+        // Mode édition (2026-09-16): in, a place added, an edge pulled, a créneau created in the
+        // void, Échap out; then the same on the montage, and leaving by changing tab. Each check
+        // is printed, since this script asserts nothing.
+        await tab('Grille');
+        const state = () =>
+          page.evaluate(() => ({
+            editing: !!document.querySelector('.grid-scroll.is-editing'),
+            button: document.querySelector('.btn-emoji.is-framed')?.textContent,
+            corner: document.querySelector('.grid-corner-text')?.textContent,
+          }));
+        const laneTitles = () =>
+          page.evaluate(() => [...document.querySelectorAll('.lane-track')[0].querySelectorAll('.shift')].slice(0, 2).map((el) => el.title.split('\n').slice(1, 3).join(' | ')));
+        await page.click('.btn-emoji.is-framed');
+        await sleep(400);
+        console.log('edition entrée', JSON.stringify(await state()));
+        await shot('23-grille-edition');
+
+        const before = await laneTitles();
+        await page.evaluate(() => document.querySelector('.lane-track .box.is-add')?.click());
+        await sleep(300);
+        console.log('edition plus', JSON.stringify(before[0]), '->', JSON.stringify((await laneTitles())[0]));
+
+        const grip = await page.$('.lane-track .shift .shift-grip.is-end');
+        const gb = await grip.boundingBox();
+        await page.mouse.move(gb.x + 3, gb.y + gb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(gb.x + 45, gb.y + gb.height / 2, { steps: 6 });
+        await sleep(250);
+        await shot('24-grille-edition-etirer');
+        await page.mouse.up();
+        await sleep(400);
+        console.log('edition étirer', JSON.stringify(before), '->', JSON.stringify(await laneTitles()));
+
+        // Walk the lanes until an empty stretch offers a créneau.
+        let ghost = false;
+        const tracks = await page.$$('.lane-track');
+        for (const track of tracks) {
+          const tb = await track.boundingBox();
+          if (!tb || tb.y < 0 || tb.y > 950) continue;
+          for (let x = tb.x + 5; x < Math.min(tb.x + tb.width, 1000) && !ghost; x += 12) {
+            await page.mouse.move(x, tb.y + 10);
+            ghost = !!(await page.$('.shift-ghost'));
+          }
+          if (ghost) break;
+        }
+        if (ghost) {
+          await sleep(200);
+          await shot('25-grille-edition-fantome');
+          const count = (await state()).corner;
+          await page.click('.shift-ghost');
+          await sleep(400);
+          console.log('edition créer', count, '->', (await state()).corner);
+        } else {
+          console.log('edition créer: aucun vide trouvé à l’écran');
+        }
+        await page.keyboard.press('Escape');
+        await sleep(300);
+        console.log('edition échap', JSON.stringify(await state()));
+
+        // Leaving by changing tab.
+        await page.click('.btn-emoji.is-framed');
+        await sleep(200);
+        await tab('Personnes');
+        await tab('Grille');
+        console.log('edition onglet', JSON.stringify(await state()));
+
+        // The montage: événements.
+        await clickButton(/^Montage$/);
+        await sleep(800);
+        await page.click('.btn-emoji.is-framed');
+        await sleep(400);
+        await shot('26-montage-edition');
+        const events = await page.$('.lane.is-events .lane-track');
+        const eb = await events.boundingBox();
+        let eventGhost = false;
+        for (let x = eb.x + 5; x < Math.min(eb.x + eb.width, 1000) && !eventGhost; x += 10) {
+          await page.mouse.move(x, eb.y + 10);
+          eventGhost = !!(await page.$('.shift-ghost'));
+        }
+        if (eventGhost) {
+          await shot('27-montage-edition-fantome');
+          const n = await page.$$eval('.phase-event-block', (els) => els.length);
+          await page.click('.shift-ghost');
+          await sleep(500);
+          console.log('edition événement', n, '->', await page.$$eval('.phase-event-block', (els) => els.length),
+            await page.evaluate(() => document.querySelector('input[name^="evenement-label-"]')?.value));
+          await shot('28-montage-edition-cree');
+        } else {
+          console.log('edition événement: aucun vide trouvé à l’écran');
+        }
+        await page.keyboard.press('Escape');
+        await sleep(300);
+        console.log('edition montage échap', JSON.stringify(await state()));
+        await clickButton(/^Exploit$/);
+        await sleep(500);
+      }
       if (want('tableau')) {
         await tab('Tableau de bord');
         await tall('40-tableau');

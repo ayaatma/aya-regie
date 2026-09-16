@@ -2602,3 +2602,68 @@ test('the form proposes an empty event its settings, ticked, and an event alread
   const planned = render(<SetupFromFormCard plan={plan} csv={csv} mapping={plan.formMapping} onApply={noop} />, plan);
   assert.ok(!planned.includes('name="setup-event" checked=""'), 'un événement déjà planifié garde ses dates');
 });
+
+// ---------------------------------------------------------------------------
+// Mode édition des grilles, 2026-09-16
+// ---------------------------------------------------------------------------
+
+test('the three grids carry the 🖍️ button in their corner, off by default', () => {
+  const exploit = render(<GridScreen onSolve={noop} solving={false} solveMode={null} />);
+  const montage = render(<PhaseGrid id="montage" />, planWithMontage());
+  for (const html of [exploit, montage]) {
+    assert.ok(html.includes('class="btn-emoji is-framed"'), 'le bouton encadré est dans le coin');
+    assert.ok(html.includes('aria-pressed="false"') && html.includes('🖍️'), 'hors du mode au départ');
+    assert.ok(!html.includes('grid-scroll is-editing'), 'et la grille n’est pas encadrée de vert');
+  }
+  // A reader edits nothing, so the button is not offered.
+  assert.ok(!render(<GridScreen onSolve={noop} solving={false} solveMode={null} readOnly />).includes('btn-emoji is-framed'));
+});
+
+test('in mode édition a créneau offers two grips and a « + », and none of its boxes drags', async () => {
+  const { ShiftBlock } = await import('../components/ShiftBlock.tsx');
+  const report = validate(plan);
+  const shiftReport = report.shifts.find((s) => s.stars.length > 0)!;
+  const shift = plan.shifts.find((s) => s.key === shiftReport.key)!;
+  const block = (editing: boolean) =>
+    render(
+      <ShiftBlock
+        shift={shift}
+        report={shiftReport}
+        left={0}
+        width={100}
+        poleColour="#336699"
+        lockedKeys={new Set()}
+        volumeBands={new Map()}
+        selectedVolunteerKey={null}
+        buddyKeys={new Set()}
+        dragActive={false}
+        legalTarget
+        draggingKey={null}
+        isDropShift={false}
+        dropBoxVolunteerKey={null}
+        cursorIndex={null}
+        onSelect={noop}
+        onFocusBox={noop}
+        onToggleLock={noop}
+        onDragStartBox={noop}
+        onDragEndBox={noop}
+        onDropOnShift={noop}
+        onDropOnBox={noop}
+        onEnterShift={noop}
+        onEnterBox={noop}
+        selectedShiftKey={null}
+        onSelectShift={noop}
+        onSelectOrga={noop}
+        onRemoveOrga={noop}
+        editing={editing}
+      />,
+    );
+  const off = block(false);
+  assert.ok(off.includes('draggable="true"'), 'hors du mode, les cases se glissent');
+  assert.ok(!off.includes('shift-grip'));
+
+  const on = block(true);
+  assert.ok(on.includes('shift-grip is-start') && on.includes('shift-grip is-end'), 'deux bords à tirer');
+  assert.ok(on.includes('box is-add'), 'une place en plus à ajouter');
+  assert.ok(!on.includes('draggable="true"'), 'plus aucune case ne se glisse');
+});

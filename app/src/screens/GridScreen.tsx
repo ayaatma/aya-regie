@@ -30,10 +30,12 @@ import {
   moveOrganiserToShift,
   removeOrganiserFromShift,
   move,
+  setHeadcount,
   setLocked,
   swap,
   unassign,
 } from '../store/edits.ts';
+import { EditModeButton, MIN_WINDOW_HOURS, edgeLimits, ghostWindow } from '../components/EditModeButton.tsx';
 import { useLoadedPlan } from '../store/store.tsx';
 import { ShiftBlock, type VolumeBand } from '../components/ShiftBlock.tsx';
 import { LaneRuler, OrganiserBand, TimeRuler } from '../components/TimeRuler.tsx';
@@ -43,6 +45,8 @@ import { selectedVolunteerKey, type Selection } from '../components/selection.ts
 import { organiserName } from '../components/labels.ts';
 import { DRAG_MIME, DRAG_MIME_ORGA, type DragPayload } from '../components/drag.ts';
 import {
+  BOX_GAP,
+  BOX_H,
   EXPLOIT_ZOOM,
   LABEL_W,
   fitZoom,
@@ -58,9 +62,12 @@ import { laneRows } from '../components/laneRows.ts';
 import { buddiesOf, teammatesOf } from '../components/relations.ts';
 import { stepCursor, type NavLanes } from '../components/gridNav.ts';
 import {
+  addShift,
   assignOrganiserToPoleAt,
+  defaultShiftHours,
   setOrganiserWindow,
   setPoleLocked,
+  setShiftWindow,
 } from '../store/setupEdits.ts';
 import type { SolveMode } from '../solver/solver.worker.ts';
 
@@ -104,6 +111,14 @@ const RESPONSABLE_SNAP = 0.25;
 
 /** Pixels left over when the grid is fitted to the screen, so no scrollbar appears on the nose. */
 const FIT_SLACK = 4;
+
+/** A créneau's edge being pulled in « mode édition », and the glued neighbour that follows it. */
+interface Retime {
+  shiftKey: string;
+  start: number;
+  end: number;
+  neighbour: { key: string; start: number; end: number } | null;
+}
 
 export interface GridScreenProps {
   onSolve(mode: SolveMode): void;
@@ -175,6 +190,15 @@ export function GridScreen({
   const [cursor, setCursor] = useState<{ shiftKey: string; index: number } | null>(null);
   /** What the last key press did, said out loud for a few seconds. */
   const [keyNote, setKeyNote] = useState<string | null>(null);
+  /**
+   * « Mode édition », since 2026-09-16: the créneaux themselves are edited on the grid. Local
+   * state on purpose: changing tab or moment unmounts this screen, which is what leaves the mode.
+   */
+  const [editing, setEditing] = useState(false);
+  /** The créneau whose edge is being pulled, drawn at its proposed hours until let go. */
+  const [retime, setRetime] = useState<Retime | null>(null);
+  /** The créneau a click would create where the pointer is, on an empty stretch of a lane. */
+  const [ghost, setGhost] = useState<{ poleKey: string; start: number; end: number } | null>(null);
 
   // The event declares its own length, so the grid spans the event rather than the shifts. It
   // still stretches past the end when something was left there, because hiding work somebody
@@ -747,6 +771,11 @@ export function GridScreen({
           deleteAtCursor();
           return;
         case 'Escape':
+          // Leaving the mode comes first: the selection is still there when it is left.
+          if (editing) {
+            setEditing(false);
+            return;
+          }
           clearSelection();
           return;
         default:
@@ -754,7 +783,105 @@ export function GridScreen({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [clearSelection, cursor, deleteAtCursor, moveCursor]);
+  }, [clearSelection, cursor, deleteAtCursor, editing, moveCursor]);
+
+  // Leaving the mode drops whatever it had under way.
+  useEffect(() => {
+    if (editing) return;
+    setRetime(null);
+    setGhost(null);
+  }, [editing]);
+
+  // ------------------------------------------------------------------------
+  // Mode édition
+  // ------------------------------------------------------------------------
+
+  /**
+   * A grip pressed: follow the pointer on the window until it is let go, then write both créneaux
+   * in one edit. On the window rather than the grip, for the reason `Bars` gives on the phases:
+   * the grip is redrawn as the créneau changes shape, and a replaced element loses its listeners.
+   * The last window is carried in a local, because the listener predates any state set after it.
+   */
+  const beginRetime = useCallback(
+    (shift: Shift, edge: 'start' | 'end', down: React.PointerEvent<HTMLElement>) => {
+      if (readOnly) return;
+      down.preventDefault();
+      down.stopPropagation();
+      const track = down.currentTarget.closest('.lane-track');
+      if (!track) return;
+      const left = track.getBoundingClientRect().left;
+      const lane = plan.shifts.filter((s) => s.poleKey === shift.poleKey);
+      const { min, max, glued } = edgeLimits(shift, lane, edge, 0, eventHours);
+
+      let last: Retime | null = null;
+      const move = (event: PointerEvent) => {
+        const raw = Math.round((event.clientX - left) / pxPerHour / MIN_WINDOW_HOURS) * MIN_WINDOW_HOURS;
+        const hour = Math.min(max, Math.max(min, raw));
+        last = {
+          shiftKey: shift.key,
+          start: edge === 'start' ? hour : shift.start,
+          end: edge === 'end' ? hour : shift.end,
+          neighbour: glued
+            ? edge === 'end'
+              ? { key: glued.key, start: hour, end: glued.end }
+              : { key: glued.key, start: glued.start, end: hour }
+            : null,
+        };
+        setRetime(last);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        setRetime(null);
+        const done = last as Retime | null;
+        if (!done || (done.start === shift.start && done.end === shift.end)) return;
+        const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
+        edit((p) => {
+          const moved = setShiftWindow(p, done.shiftKey, done.start, done.end);
+          return done.neighbour
+            ? setShiftWindow(moved, done.neighbour.key, done.neighbour.start, done.neighbour.end)
+            : moved;
+        }, `horaires d'un créneau de ${where}`);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    },
+    [edit, eventHours, index, plan.shifts, pxPerHour, readOnly],
+  );
+
+  const addPlace = useCallback(
+    (shiftKey: string) => {
+      const shift = index.shiftByKey.get(shiftKey);
+      if (!shift) return;
+      const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
+      edit((p) => setHeadcount(p, shiftKey, shift.headcount + 1), `une place de plus sur un créneau de ${where}`);
+    },
+    [edit, index],
+  );
+
+  /** The pointer moving over a lane: where a click would create a créneau, if anywhere. */
+  const hoverLane = useCallback(
+    (pole: Pole, shifts: readonly Shift[], event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('.shift-ghost')) return;
+      if (target.closest('.shift')) {
+        setGhost(null);
+        return;
+      }
+      const hour = (event.clientX - event.currentTarget.getBoundingClientRect().left) / pxPerHour;
+      const found = ghostWindow(shifts, hour, defaultShiftHours(pole), 0, eventHours);
+      setGhost((current) =>
+        found === null
+          ? null
+          : current && current.poleKey === pole.key && current.start === found.start && current.end === found.end
+            ? current
+            : { poleKey: pole.key, ...found },
+      );
+    },
+    [eventHours, pxPerHour],
+  );
 
   /* The cursor may land on a box three screens down, so the grid follows it. */
   useEffect(() => {
@@ -883,7 +1010,12 @@ export function GridScreen({
           )}
 
           <span className="toolbar-note">
-            {keyNote ?? (
+            {editing ? (
+              <strong className="edit-mode-note">
+                Mode édition: tirer un bord d'un créneau, « + » pour une place de plus, cliquer dans
+                le vide d'un pôle pour créer un créneau. Échap pour sortir.
+              </strong>
+            ) : keyNote ?? (
               <>
                 {summary.gapHours > 0
                   ? `${fmtHours(summary.gapHours)} à pourvoir`
@@ -905,7 +1037,7 @@ export function GridScreen({
         */}
         <div
           ref={scroll}
-          className="grid-scroll"
+          className={`grid-scroll${editing ? ' is-editing' : ''}`}
           onClick={(event) => {
             const target = event.target as HTMLElement;
             if (target.closest('.box, button, [role="button"]')) return;
@@ -948,9 +1080,12 @@ export function GridScreen({
         >
           <div className="grid-inner" style={{ width: `calc(var(--label-w) + ${trackWidth}px)` }}>
             <div className="grid-head">
-              <div className="grid-corner">
-                <span>{plan.poles.filter((p) => index.isLeaf(p.key)).length} pôles</span>
-                <span>{plan.shifts.length} créneaux</span>
+              <div className="grid-corner is-with-tool">
+                <div className="grid-corner-text">
+                  <span>{plan.poles.filter((p) => index.isLeaf(p.key)).length} pôles</span>
+                  <span>{plan.shifts.length} créneaux</span>
+                </div>
+                {!readOnly && <EditModeButton editing={editing} onToggle={() => setEditing(!editing)} />}
               </div>
               <TimeRuler
                 startISO={plan.startISO}
@@ -1058,9 +1193,10 @@ export function GridScreen({
                   </div>
 
                   {lanes.map((lane) => {
-                    const height = laneHeight(lane.shifts, (key) =>
-                      shiftReports.get(key)?.assigned ?? 0,
-                    );
+                    // Mode édition draws a « + » place under every créneau, so the lane grows a row.
+                    const height =
+                      laneHeight(lane.shifts, (key) => shiftReports.get(key)?.assigned ?? 0) +
+                      (editing ? BOX_H + BOX_GAP : 0);
                     const gap = lane.shifts.reduce(
                       (total, s) =>
                         total + (shiftReports.get(s.key)?.missing ?? 0) * (s.end - s.start),
@@ -1083,7 +1219,27 @@ export function GridScreen({
                             style={
                               { width: trackWidth, '--hour-w': `${pxPerHour}px` } as React.CSSProperties
                             }
+                            onMouseMove={
+                              editing && !retime ? (event) => hoverLane(lane.pole, lane.shifts, event) : undefined
+                            }
+                            onMouseLeave={editing ? () => setGhost(null) : undefined}
                           >
+                            {editing && ghost?.poleKey === lane.pole.key && (
+                              <div
+                                className="shift-ghost"
+                                role="button"
+                                style={{ left: ghost.start * pxPerHour, width: (ghost.end - ghost.start) * pxPerHour - 2 }}
+                                title={`Créer un créneau de ${fmtHours(ghost.end - ghost.start)} sur ${lane.pole.name}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  const { start, end } = ghost;
+                                  setGhost(null);
+                                  edit((p) => addShift(p, lane.pole.key, start, end), `créneau ajouté sur ${lane.pole.name}`);
+                                }}
+                              >
+                                + {fmtHours(ghost.end - ghost.start)}
+                              </div>
+                            )}
                             {(() => {
                               /*
                                * One person, one row, across the whole lane. Somebody working two
@@ -1109,7 +1265,14 @@ export function GridScreen({
                                   ),
                                 })),
                               );
-                              return lane.shifts.map((shift) => {
+                              return lane.shifts.map((stored) => {
+                              // A créneau being retimed is drawn at the hours the grip proposes.
+                              const shift =
+                                retime?.shiftKey === stored.key
+                                  ? { ...stored, start: retime.start, end: retime.end }
+                                  : retime?.neighbour?.key === stored.key
+                                    ? { ...stored, start: retime.neighbour.start, end: retime.neighbour.end }
+                                    : stored;
                               const shiftReport = shiftReports.get(shift.key);
                               if (!shiftReport) return null;
                               const dropBoxVolunteerKey =
@@ -1157,6 +1320,9 @@ export function GridScreen({
                                   supportOnlyOrgaKeys={supportOnlyByShift.get(shift.key)}
                                   slots={layout.get(shift.key)}
                                   readOnly={readOnly}
+                                  editing={editing}
+                                  onBeginRetime={beginRetime}
+                                  onAddPlace={addPlace}
                                 />
                               );
                               });
@@ -1187,7 +1353,7 @@ export function GridScreen({
         onDragStartPerson={beginDrag}
         onDragEndPool={endDrag}
         onDropUnassign={onDropUnassign}
-        readOnly={readOnly}
+        readOnly={readOnly || editing}
       />
 
       <InfoPanel selection={selection} onSelect={setSelection} readOnly={readOnly} />

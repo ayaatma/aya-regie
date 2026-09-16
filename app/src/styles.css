@@ -5126,3 +5126,142 @@ textarea.select,
 .chip.is-muted {
   opacity: 0.55;
 }
+
+/* --------------------------------------------------------------------------
+   Mode édition des grilles, 2026-09-16: le cadre vert, les poignées, le « + »
+   et le créneau qu'un clic créerait. Les trois grilles partagent ces règles.
+   -------------------------------------------------------------------------- */
+
+/* Le bouton du coin, encadré pour se lire comme un interrupteur. */
+.btn-emoji.is-framed {
+  flex: 0 0 auto;
+  font-size: 17px;
+  padding: 3px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.btn-emoji.is-framed[aria-pressed='true'] {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  box-shadow: 0 0 0 1px var(--ok);
+}
+
+.grid-corner.is-with-tool {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.grid-corner-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/*
+ * Une bordure et non un contour: un contour est peint sous les en-têtes collants et les
+ * étiquettes des pôles, une bordure est hors de la zone qui défile et reste toujours entière.
+ * Transparente hors du mode, pour que la grille ne saute pas de trois pixels en y entrant.
+ */
+.grid-scroll {
+  border: 3px solid transparent;
+}
+
+.grid-scroll.is-editing {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, var(--surface-sunken));
+}
+
+.grid-scroll.is-editing .pole-group-head,
+.grid-scroll.is-editing .lane-track {
+  background-color: color-mix(in srgb, var(--ok) 7%, transparent);
+}
+
+.edit-mode-note {
+  color: var(--ok);
+}
+
+/* Les deux bords d'un créneau, à tirer. */
+.shift-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 1;
+  background: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+
+.shift-grip.is-start {
+  left: 0;
+}
+
+.shift-grip.is-end {
+  right: 0;
+}
+
+.shift-grip:hover {
+  background: var(--ok);
+}
+
+/* La place en plus, sous les autres. */
+.box.is-add {
+  border-style: dashed;
+  border-color: var(--ok);
+  background: transparent;
+  color: var(--ok);
+  justify-content: center;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.box.is-add:hover {
+  background: var(--ok-bg);
+}
+
+/* Le créneau qu'un clic créerait à cet endroit. */
+.shift-ghost {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border: 2px dashed var(--ok);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: copy;
+  z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.phase-event-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 1;
+  background: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+
+.phase-event-grip.is-start {
+  left: 0;
+}
+
+.phase-event-grip.is-end {
+  right: 0;
+}
+
+.phase-event-grip:hover {
+  background: var(--ok);
+}

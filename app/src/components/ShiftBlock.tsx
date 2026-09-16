@@ -122,6 +122,15 @@ export interface ShiftBlockProps {
    * See `laneRows`. Absent means the old behaviour, everybody in report order.
    */
   slots?: ReadonlyArray<string | null>;
+  /**
+   * « Mode édition », since 2026-09-16: the créneau itself is what is being changed, not who is in
+   * it. Its two edges become grips, a « + » place is drawn under the last one, and no box drags.
+   */
+  editing?: boolean;
+  /** A grip pressed. The grid follows the pointer, since only the lane knows the neighbours. */
+  onBeginRetime?(shift: Shift, edge: 'start' | 'end', event: React.PointerEvent<HTMLElement>): void;
+  /** The « + » under the places: one more person needed on this créneau. */
+  onAddPlace?(shiftKey: string): void;
 }
 
 function ShiftBlockImpl(props: ShiftBlockProps) {
@@ -158,6 +167,9 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     onRemoveOrga,
     supportOnlyOrgaKeys,
     slots,
+    editing = false,
+    onBeginRetime,
+    onAddPlace,
   } = props;
 
   /*
@@ -194,6 +206,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     illegalShift ? 'is-flagged' : '',
     warnedShift ? 'is-warned' : '',
     shift.key === selectedShiftKey ? 'is-picked' : '',
+    editing ? 'is-editing' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -212,7 +225,8 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     ];
 
   const height =
-    Math.max(shift.headcount, places.length + report.orgas.length) * (BOX_H + BOX_GAP);
+    (Math.max(shift.headcount, places.length + report.orgas.length) + (editing ? 1 : 0)) *
+    (BOX_H + BOX_GAP);
 
   // The headcount lives in the tooltip now that the counter strip is gone, along with whatever
   // is wrong with the shift, so the border always has its explanation one hover away.
@@ -259,7 +273,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           // Draggable since 2026-09-12, like a volunteer's box: an orga put on the wrong créneau
           // was removed with the ✕ and placed again from the list, which is two gestures for what
           // reads as one. Never locked: a place held by an orga carries no padlock.
-          draggable={!readOnly}
+          draggable={!readOnly && !editing}
           title={
             `${orga.name}\nOrga, placé·e à la main. Ne compte dans aucune règle d'heures.` +
             (inSupport
@@ -381,7 +395,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           <div
             key={boxKey}
             className={boxClass}
-            draggable={!locked && !readOnly}
+            draggable={!locked && !readOnly && !editing}
             title={`${entry.name}\n${levelLabel(entry.level)}${locked ? '\nVerrouillé' : ''}${bandNote}${buddyNote}${issueNote}`}
             // Clicking a box selects the person, and clicking them again leaves them selected: a
             // second look at somebody is not a request to stop looking. Letting go is done on the
@@ -471,6 +485,33 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
         );
       })}
 
+      {editing && !readOnly && (
+        <>
+          <div
+            className="box is-add"
+            role="button"
+            title="Ajouter une place à ce créneau"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAddPlace?.(shift.key);
+            }}
+          >
+            +
+          </div>
+          <span
+            className="shift-grip is-start"
+            title="Tirer pour changer le début"
+            onPointerDown={(event) => onBeginRetime?.(shift, 'start', event)}
+            onClick={(event) => event.stopPropagation()}
+          />
+          <span
+            className="shift-grip is-end"
+            title="Tirer pour changer la fin"
+            onPointerDown={(event) => onBeginRetime?.(shift, 'end', event)}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </>
+      )}
     </div>
   );
 }
