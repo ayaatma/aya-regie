@@ -57,3 +57,16 @@ The `Screen` union lost `recrutement`, `impression` and `journal`.
 `tools/src/solver.ts` (`choice2: 100` and the measurement), `styles.css` (`.chip.is-choice`,
 `.stack-*` at the end). Tests: `screens.test.tsx` (the filter in the three moments, the match
 rule, the stacked shell folded and unfolded).
+
+## 2026-09-16: tabs grouped, top bar buttons in a « ⋯ » menu
+
+Ten tabs plus seven buttons ran off the régisseur's window. Three HTML mock-ups were shown (one
+line with a menu, two lines, grouped tabs); the régisseur chose **grouped tabs**. `App.tsx`:
+`GROUPS` = Planning (Grille, Propositions), Personnes, Logistique (Artistes, Catering, Magasin),
+Suivi (Tableau de bord, Historique), Réglages (Réglages, Import/Export). A group of several
+screens shows a `.subtabs` line under the top bar (`.app.has-subtabs`, four grid rows; the
+organiser view keeps three). Clicking a group reopens the screen last shown in it
+(`lastInGroup`). Group tabs carry their screens' badges. Only ↶ ↷, the save state and Point de
+sauvegarde stay visible; Vue bénévole, Vue responsable, Changer d'événement, Mon compte and Se
+déconnecter are in the `.topbar-menu` (closes on outside click and Escape). `shoot.cjs`'s `tab()`
+opens the group then the sub-tab.
