@@ -7,7 +7,7 @@ metadata:
 
 # Feuille privée (2026-09-15)
 
-**State: CODE BUILT, green (358 engine incl. 5 for the function core, 429 app tests), NOT DEPLOYED.
+**State 2026-09-16: DEPLOYED by the developer (service account created in the no-organisation project aya-regie, key in the secret, function deployed, sheet shared Lecteur; migrations 24 to 32 applied and app deployed), end-to-end check against a private sheet NOT YET CONFIRMED. Gotcha: the first key attempt failed with iam.disableServiceAccountKeyCreation because the service account had been created in a project under the org aya-atma-org; a project with no organisation has no org policy. Built 2026-09-15: green (358 engine incl. 5 for the function core, 429 app tests).
 No schema, no PLAN_FORMAT change, no migration. The app change is safe to deploy before the function:
 it falls back to the public link.** Part of [[project-field-test-roadmap]], item 1 (sync). The
 automatic periodic sync and the confirmation form are NOT built.
