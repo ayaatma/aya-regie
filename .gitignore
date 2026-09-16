@@ -14,3 +14,5 @@ phase-preview.html
 db/.migration-state.json
 
 .claude/settings.local.json
+# Written by the Supabase CLI (project ref, versions): local to the machine that deployed.
+supabase/.temp/
