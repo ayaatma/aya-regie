@@ -772,9 +772,13 @@ button {
 
 /* The hour axis, repeated once per pole rather than once per row. */
 
+/*
+ * Two lines since 2026-09-16: the day on top, the hours underneath. The day used to follow its
+ * hour on the same line ("0h dim. 14/03") and ran over the next hour's label.
+ */
 .lane-ruler {
   position: relative;
-  height: 15px;
+  height: 26px;
 }
 
 .lane-ruler-hour {
@@ -783,8 +787,9 @@ button {
   bottom: 0;
   border-left: 1px solid var(--line);
   padding-left: 4px;
+  padding-top: 13px;
   font-size: 10px;
-  line-height: 15px;
+  line-height: 13px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -803,6 +808,9 @@ button {
 }
 
 .lane-ruler-day {
+  position: absolute;
+  top: 0;
+  left: 4px;
   color: var(--ink-soft);
   font-weight: 600;
 }

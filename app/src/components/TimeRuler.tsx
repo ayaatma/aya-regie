@@ -191,8 +191,8 @@ function LaneRulerImpl({
       {ticks.map((hour) => {
         const isSlot = slotStarts.has(hour) || hour === hours;
         const midnight = hour > 0 && isMidnight(startISO, hour);
-        // The day beside the hour where the day changes, so a pole far down the grid still
-        // says which night its 2h is.
+        // The day above the hour where the day changes, so a pole far down the grid still says
+        // which night its 2h is. On a line of its own: beside the hour it ran over the next one.
         const day = days.get(hour);
         return (
           <div
@@ -201,7 +201,7 @@ function LaneRulerImpl({
             style={{ left: hour * pxPerHour }}
           >
             {isSlot || midnight || hour % every === 0 ? toClock(startISO, hour) : ''}
-            {day !== undefined && <span className="lane-ruler-day"> {day}</span>}
+            {day !== undefined && <span className="lane-ruler-day">{day}</span>}
           </div>
         );
       })}
