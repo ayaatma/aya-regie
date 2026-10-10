@@ -1,0 +1,49 @@
+---
+name: feature-photos
+description: 2026-10-10, the trombinoscope photos: fetched from the form's Drive uploads after an applied import, or dropped on a fiche by the régie; one 320 px square per person in the private Storage bucket `photos`, never in the plan. Function drive-photo and migration 34 WRITTEN, NOT DEPLOYED / NOT APPLIED.
+metadata:
+  type: project
+---
+
+# Photos du trombinoscope (2026-10-10)
+
+**State: BUILT, green (375 engine, 441 app tests, sql-check, vite build). NOT VERIFIED IN A
+BROWSER OR AGAINST SUPABASE.** To make it live (developer): enable the Google Drive API in the
+service account's Google Cloud project, `npx supabase functions deploy drive-photo`, apply
+migration 34 (`2026-10-10_photos_bucket.sql`, after 33), share the form's upload folder in Drive
+(Lecteur) with the service account. On 2026-10-10 `npm run migrate` could not reach the database
+(« tenant/user ... not found »: the pooler host in `.env.deploy.local` no longer matches), so
+whether 33 is applied was not re-checked.
+
+## Decisions (the developer, 2026-10-10)
+
+1. **Two ways in, both wanted**: automatic from the form's upload question (Google exports Drive
+   links `open?id=<id>`), and a file the admin drops on the fiche or picks in a file dialog.
+2. **Not in the plan.** A photo is a file: no `Volunteer` field, no load_plan / write_plan_body
+   change, no PLAN_FORMAT bump. The importer returns `ImportResult.photos` (key + Drive id); the
+   import screen fetches them once the import is APPLIED (never on a read the régisseur abandons).
+3. **Storage**: private bucket `photos`, 2 MB, webp/jpeg only, policies for `authenticated` only
+   (anon, so orga and volunteer codes, reach nothing; the fiche hides the photo when read-only).
+   Object name `<event id>/<sha256(key) 32 hex>--drive-<id>.webp` or `--manuel-<ms>.webp`: no
+   personal data in paths, and ONE listing tells for everybody what is held and where it came from.
+4. **A hand-picked photo is never replaced by the form's**; the same Drive file is never fetched
+   twice; a different Drive file (re-submission) replaces. `needsDriveFetch` in `tools/src/photos.ts`.
+5. **Shrunk in the browser**: square crop of the short side, 30 % from the top on a portrait,
+   320 px, WebP 0.85 (JPEG if the browser cannot write WebP), about 20 KB.
+6. **Drive's thumbnail first** (asked at 800 px) in `supabase/functions/drive-photo/core.ts`,
+   because iPhones send HEIC, which no canvas reads; the file itself only for a drawable type.
+   A HEIC dropped by hand is refused with a sentence saying to convert it.
+7. Same service account and secret as [[feature-private-sheet]]; `accessToken` gained a scope.
+
+## Where
+
+`tools/src/photos.ts` (pure, tested), `import.ts` field `photo` (matcher /photo|trombinoscope/,
+early, not a consent question), `form-mapping.ts` label, `app/src/photos/photoStore.ts` (book per
+event, signed URLs 6 h, `putPhoto`, `removePhoto`, `syncFormPhotos` three at a time),
+`components/PersonPhoto.tsx` on VolunteerFiche and OrganiserFiche, `PhotoSyncNotice` in ImportScreen.
+
+## Not done
+
+Orphan photos (a person removed, a plan deleted) stay in the bucket. No photo in the Personnes
+list, the printable trombinoscope, or the volunteer view, although the form promises volunteers
+they will see who they work with. The orgas' own form is not read for a photo.

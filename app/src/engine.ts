@@ -188,7 +188,12 @@ export type {
   ImportResult,
   IssueSeverity,
   ResolvedBuddy,
+  PhotoLink,
 } from '@engine/import.ts';
+
+/** The trombinoscope's photos: object names, what a re-import fetches, the crop. */
+export { driveFileIds, needsDriveFetch, parsePhotoObjectName, photoObjectName, squareCrop } from '@engine/photos.ts';
+export type { PhotoSource } from '@engine/photos.ts';
 
 /**
  * The montage and the démontage: two grids that no rule and no solver touches.

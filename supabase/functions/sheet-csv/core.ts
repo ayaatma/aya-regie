@@ -53,11 +53,11 @@ function pemToPkcs8(pem: string): ArrayBuffer {
 export const SHEETS_READONLY = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
 /** The signed assertion Google exchanges for an access token (OAuth 2.0 JWT bearer grant). */
-export async function signedAssertion(key: ServiceAccountKey, nowSeconds: number): Promise<string> {
+export async function signedAssertion(key: ServiceAccountKey, nowSeconds: number, scope: string = SHEETS_READONLY): Promise<string> {
   const header = { alg: 'RS256', typ: 'JWT' };
   const claims = {
     iss: key.client_email,
-    scope: SHEETS_READONLY,
+    scope,
     aud: key.token_uri ?? 'https://oauth2.googleapis.com/token',
     iat: nowSeconds,
     exp: nowSeconds + 3600,
@@ -83,9 +83,17 @@ export class SheetError extends Error {
 
 type Fetch = typeof fetch;
 
-/** An access token for the service account, from Google's token endpoint. */
-export async function accessToken(key: ServiceAccountKey, fetcher: Fetch, nowSeconds: number): Promise<{ token: string; expiresAt: number }> {
-  const assertion = await signedAssertion(key, nowSeconds);
+/**
+ * An access token for the service account, from Google's token endpoint. Read-only Sheets by
+ * default; the `drive-photo` function asks for read-only Drive with the same key, since 2026-10-10.
+ */
+export async function accessToken(
+  key: ServiceAccountKey,
+  fetcher: Fetch,
+  nowSeconds: number,
+  scope: string = SHEETS_READONLY,
+): Promise<{ token: string; expiresAt: number }> {
+  const assertion = await signedAssertion(key, nowSeconds, scope);
   const response = await fetcher(key.token_uri ?? 'https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },

@@ -3027,3 +3027,24 @@ $fn$;
 
 revoke all on function public.get_public_planning(uuid) from public;
 grant execute on function public.get_public_planning(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Les photos du trombinoscope, since 2026-10-10 (migration 34)
+--
+-- A private Storage bucket, not a table: a photo is a file and never part of the plan document.
+-- Objects are `<event id>/<sha-256 of the person's key>--<source>.webp` (tools/src/photos.ts).
+-- A signed-in regisseur reads and writes them; anon reaches none.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('photos', 'photos', false, 2097152, array['image/webp', 'image/jpeg'])
+on conflict (id) do nothing;
+
+create policy photos_organiser_select on storage.objects
+  for select to authenticated using (bucket_id = 'photos');
+create policy photos_organiser_insert on storage.objects
+  for insert to authenticated with check (bucket_id = 'photos');
+create policy photos_organiser_update on storage.objects
+  for update to authenticated using (bucket_id = 'photos') with check (bucket_id = 'photos');
+create policy photos_organiser_delete on storage.objects
+  for delete to authenticated using (bucket_id = 'photos');

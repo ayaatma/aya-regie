@@ -16,7 +16,7 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { EVENT_START_ISO, buildArtists, buildPoles } from './event-config.js';
-import { bindColumns, bindForm, importVolunteers, surveyForm } from './import.js';
+import { bindColumns, bindForm, importVolunteers, parseCsv, surveyForm } from './import.js';
 import { FORM_COLUMNS, brevoContactsCsv } from './csv.js';
 import { emptyPlan } from './plan.js';
 import type { Plan } from './plan.js';
@@ -222,6 +222,22 @@ function rowCsv(over: Record<number, string> = {}): string {
 
 const importOne = (over: Record<number, string> = {}) =>
   importVolunteers(rowCsv(over), { poles, artists, startISO: EVENT_START_ISO });
+
+test('the trombinoscope upload of the 2026-10 form is read as a Drive file id, outside the volunteer', () => {
+  // The 47-column export of October 2026 ends on this paragraph-long upload question.
+  const header =
+    "📸 On a besoin d'une petite photo de toi pour notre trombinoscope des bénévoles ! Pas d'inquiétude, elle restera strictement en interne.";
+  // The header row is the first record, which may span lines: a header carries a line break.
+  const [headers, values] = parseCsv(rowCsv());
+  const quote = (v: string) => (/["\n,]/.test(v) ? `"${v.split('"').join('""')}"` : v);
+  const csv = [
+    [...headers!, header].map(quote).join(','),
+    [...values!, 'https://drive.google.com/open?id=FakeDriveFileId_0123456789'].map(quote).join(','),
+  ].join('\n');
+  const result = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO });
+  deepStrictEqual(result.photos, [{ volunteerKey: result.volunteers[0]!.key, driveFileId: 'FakeDriveFileId_0123456789' }]);
+  deepStrictEqual(importOne().photos, []);
+});
 
 test('the volume answers are read as totals, not as the digit they happen to contain', () => {
   // "2 h de plus" is six hours and "4 h de plus" is eight. Reading the first digit made the

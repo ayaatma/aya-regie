@@ -30,6 +30,7 @@ import { SkillPicker } from './SkillPicker.tsx';
 import { setOrganiserPhase } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from './labels.ts';
+import { PersonPhoto } from './PersonPhoto.tsx';
 
 export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
   const { plan, index, edit } = useLoadedPlan();
@@ -65,6 +66,7 @@ export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
 
   return (
     <div className="orga-fiche">
+      <PersonPhoto personKey={person.key} name={who} />
       <div className="rules-grid">
         {field('Prénom', 'firstName', { autoComplete: 'given-name' })}
         {field('Nom', 'lastName', { autoComplete: 'family-name' })}

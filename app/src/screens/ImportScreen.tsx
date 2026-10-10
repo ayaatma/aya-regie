@@ -40,11 +40,12 @@ import { rememberSheet, setFormMapping } from '../store/edits.ts';
 import { FormMappingCard } from './FormMappingCard.tsx';
 import { SetupFromFormCard } from './SetupFromFormCard.tsx';
 import { OrganiserImportCard } from './OrganiserImportCard.tsx';
+import { photosAvailable, syncFormPhotos, type PhotoSyncReport } from '../photos/photoStore.ts';
 
 type Source = { kind: 'sheet'; url: string } | { kind: 'file'; name: string };
 
 export function ImportScreen() {
-  const { plan, index, apply } = useLoadedPlan();
+  const { plan, index, apply, id: eventId } = useLoadedPlan();
 
   /*
    * The field starts on the link this plan already knows, so the common case is one click.
@@ -81,6 +82,10 @@ export function ImportScreen() {
    * happened. Cleared by the next fetch.
    */
   const [notice, setNotice] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  /** The form's photos being fetched after an applied import, then what came of it. */
+  const [photoSync, setPhotoSync] = useState<
+    { running: true; done: number; total: number } | { running: false; report: PhotoSyncReport; names: Map<string, string> } | null
+  >(null);
   /** Bumped on each applied setup, so the card is rebuilt against the plan it just changed. */
   const [setupRound, setSetupRound] = useState(0);
 
@@ -264,6 +269,7 @@ export function ImportScreen() {
       );
       setImported(null);
       setFlipped(new Set());
+      startPhotoSync(imported.result);
       const review = imported.result.volunteers.filter((v) => v.needsReview).length;
       setNotice({
         tone: 'ok',
@@ -275,6 +281,22 @@ export function ImportScreen() {
     } catch (cause) {
       setNotice({ tone: 'bad', text: `L'import n'a pas pu être appliqué: ${cause instanceof Error ? cause.message : String(cause)}` });
     }
+  };
+
+  /**
+   * The form's photos, fetched from Drive once the import is applied, never before: an import
+   * the régisseur abandons fetches nothing. Runs on its
+   * own: the import is applied whatever happens to the photos. A photo already held from the same
+   * Drive file, or chosen by hand, is not fetched again.
+   */
+  const startPhotoSync = (result: ImportResult): void => {
+    const links = result.photos ?? [];
+    if (!photosAvailable || eventId === null || links.length === 0) return;
+    const names = new Map(result.volunteers.map((v) => [v.key, `${v.firstName} ${v.lastName}`.trim()]));
+    setPhotoSync({ running: true, done: 0, total: links.length });
+    void syncFormPhotos(eventId, links, (done, total) => setPhotoSync({ running: true, done, total })).then((report) =>
+      setPhotoSync({ running: false, report, names }),
+    );
   };
 
   /** True when the field holds exactly the link this plan already imported from. */
@@ -320,6 +342,7 @@ export function ImportScreen() {
         </div>
 
         <div className="import-body">
+          {photoSync && <PhotoSyncNotice state={photoSync} onClose={() => setPhotoSync(null)} />}
           {notice && (
             <p className={`alert is-${notice.tone} import-notice`} role="status" ref={(el) => el?.scrollIntoView({ block: "nearest" })}>
               {notice.text}{' '}
@@ -693,5 +716,47 @@ function RawAnswer({ label, value }: { label: string; value: string }) {
       <span className="fiche-raw-label">{label}</span>
       {value.trim()}
     </p>
+  );
+}
+
+/** Where the form's photos stand after an import: counting, then one sentence and the failures. */
+function PhotoSyncNotice({
+  state,
+  onClose,
+}: {
+  state: { running: true; done: number; total: number } | { running: false; report: PhotoSyncReport; names: Map<string, string> };
+  onClose(): void;
+}) {
+  if (state.running) {
+    return (
+      <p className="alert is-ok import-notice" role="status">
+        Photos du formulaire: {state.done} / {state.total} récupérées…
+      </p>
+    );
+  }
+  const { report, names } = state;
+  const parts = [
+    report.fetched > 0 ? `${report.fetched} récupérée(s)` : '',
+    report.kept > 0 ? `${report.kept} déjà là` : '',
+    report.failed.length > 0 ? `${report.failed.length} en échec` : '',
+  ].filter(Boolean);
+  const bad = report.unavailable !== null || report.failed.length > 0;
+  return (
+    <div className={`alert is-${bad ? 'bad' : 'ok'} import-notice`} role="status">
+      Photos du formulaire: {parts.length > 0 ? parts.join(', ') : 'aucune à récupérer'}.
+      {report.unavailable && <> Récupération interrompue: {report.unavailable}</>}{' '}
+      <button type="button" className="btn is-small" onClick={onClose}>
+        OK
+      </button>
+      {report.failed.length > 0 && (
+        <ul>
+          {report.failed.map((f) => (
+            <li key={f.volunteerKey}>
+              {names.get(f.volunteerKey) ?? f.volunteerKey}: {f.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

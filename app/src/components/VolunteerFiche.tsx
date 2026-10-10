@@ -45,6 +45,7 @@ import { VolunteerEdit } from './VolunteerEdit.tsx';
 import { ApplicationSection } from './ApplicationSection.tsx';
 import { AvailabilityDays } from './AvailabilityDays.tsx';
 import { SkillPicker } from './SkillPicker.tsx';
+import { PersonPhoto } from './PersonPhoto.tsx';
 
 /**
  * The chips at the top of somebody's panel, and what each one is allowed to claim.
@@ -191,6 +192,7 @@ function VolunteerDetail({
         apparait 2 fois". The head is the one that stays, because it carries the orga / bénévole
         mark beside the name and this one never did.
       */}
+      <PersonPhoto personKey={volunteer.key} name={`${volunteer.firstName} ${volunteer.lastName}`} readOnly={readOnly} />
       <p className="panel-sub">
         {preferenceLabel(index.plan.preferenceSlots, volunteer.preferredSlotId)},{' '}
         {volumeText(volunteer.requestedHours, index.dayMode)} demandées

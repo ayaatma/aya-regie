@@ -45,6 +45,7 @@ import {
   type MappedField,
 } from './form-mapping.js';
 import { NICKNAMES } from './names.js';
+import { driveFileIds } from './photos.js';
 import { matchPerson, normalise, type MatchCandidate } from './text.js';
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,10 @@ const FIELDS = [
   // « Es-tu dispo pour l'exploit ? »: a no keeps somebody who only comes for the montage or the
   // démontage off every créneau of the event. Optional.
   'exploitHelp',
+  // « 📸 On a besoin d'une petite photo de toi pour notre trombinoscope »: a Google Forms file
+  // upload, exported as Drive links. Not a field of the plan: read into `ImportResult.photos` and
+  // fetched into the photo store once the import is applied. Optional. See `photos.ts`.
+  'photo',
 ] as const;
 
 export type FormField = (typeof FIELDS)[number];
@@ -155,6 +160,9 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'nickname',    test: (h) => /^surnom/.test(h), required: false },
   { field: 'email',       test: (h) => /^adresse e mail$|^e mail$|^mail$/.test(h), required: false },
   { field: 'phone',       test: (h) => /^numero de telephone/.test(h), required: false },
+  // Early, because its header is a paragraph that names the bénévoles and their créneaux. Never a
+  // consent question about being photographed: that one is a yes / no, not an upload.
+  { field: 'photo',       test: (h) => /photo|trombinoscope/.test(h) && !/droit a l image|pris en photo|autorises? (a|qu)/.test(h), required: false },
   { field: 'choice1Level', test: (h) => /niveau/.test(h) && /choix principal|choix 1/.test(h), required: true },
   { field: 'choice2Level', test: (h) => /niveau/.test(h) && /deuxieme choix|choix 2/.test(h), required: true },
   { field: 'choice1Pole',  test: (h) => /choix principal|premier choix|choix 1/.test(h), required: true },
@@ -398,6 +406,18 @@ export interface ImportResult {
   volunteers: Volunteer[];
   buddies: ResolvedBuddy[];
   issues: ImportIssue[];
+  /**
+   * The photo each person uploaded with the form, as a Drive file id, since 2026-10-10. Absent
+   * when the form asks for none. Kept out of `Volunteer` on purpose: a photo is a file in the
+   * photo store, not an answer of the plan, and the plan never carries it.
+   */
+  photos?: PhotoLink[];
+}
+
+/** One uploaded photo: whose, and which Drive file. */
+export interface PhotoLink {
+  volunteerKey: string;
+  driveFileId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1102,6 +1122,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   }> = [];
   /** Which CSV line each volunteer came from. Only ever used to talk to the régisseur. */
   const rowOf = new Map<string, number>();
+  const photoOf = new Map<string, string>();
   const identities = new Set<string>();
 
   const activityColumns = sideActivityColumns(rows[0]!, binding, options.sideActivities ?? []);
@@ -1430,6 +1451,9 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     }
     identities.add(key);
     rowOf.set(key, rowNumber);
+    // The first file of the answer: the question takes one photo, and a second is a mistake.
+    const photo = driveFileIds(cell(row, 'photo'))[0];
+    if (photo) photoOf.set(key, photo);
     const existing = options.existingCodes?.get(normalise(person));
     volunteers.push({
       key,
@@ -1531,7 +1555,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   }
 
   const buddies = resolveBuddies(rawBuddies, volunteers, rowOf, issues);
-  return { volunteers, buddies, issues };
+  return { volunteers, buddies, issues, photos: [...photoOf].map(([volunteerKey, driveFileId]) => ({ volunteerKey, driveFileId })) };
 }
 
 /**
