@@ -22,6 +22,7 @@ import {
   type MailTemplate,
 } from './model.js';
 import type { Plan } from './plan.js';
+import { planningText } from './followup.js';
 
 /** Who a status belongs to. Same words as `TicketPersonKind`, minus the guests. */
 export type RegistrantKind = 'benevole' | 'orga' | 'artiste' | 'extra';
@@ -38,6 +39,8 @@ export interface Registrant {
   accessCode: string;
   /** The act's name for a member of one; empty for the others. */
   actName: string;
+  /** The hours a bénévole asked for; zero for the others. */
+  requestedHours: number;
 }
 
 export const MAIL_AUDIENCE_LABEL: Record<MailAudience, string> = {
@@ -57,13 +60,14 @@ export function registrants(plan: Plan): Registrant[] {
     out.push({
       kind: 'benevole', key: v.key, firstName: v.firstName, lastName: v.lastName, email: v.email,
       status: statusOf(v), audience: 'benevole', accessCode: v.accessCode ?? '', actName: '',
+      requestedHours: v.requestedHours ?? 0,
     });
   }
   for (const o of plan.organisers) {
     out.push({
       kind: 'orga', key: o.key, firstName: o.firstName, lastName: o.lastName, email: o.email,
       status: applicationStatusOf(o), audience: leaders.has(o.key) ? 'responsable' : 'orga',
-      accessCode: o.accessCode, actName: '',
+      accessCode: o.accessCode, actName: '', requestedHours: 0,
     });
   }
   for (const a of plan.artists) {
@@ -71,6 +75,7 @@ export function registrants(plan: Plan): Registrant[] {
       out.push({
         kind: 'artiste', key: m.key, firstName: m.firstName, lastName: m.lastName, email: m.email ?? '',
         status: applicationStatusOf(m), audience: 'artiste', accessCode: '', actName: a.name,
+        requestedHours: 0,
       });
     }
   }
@@ -78,6 +83,7 @@ export function registrants(plan: Plan): Registrant[] {
     out.push({
       kind: 'extra', key: x.key, firstName: x.firstName, lastName: x.lastName, email: x.email ?? '',
       status: applicationStatusOf(x), audience: x.status, accessCode: '', actName: '',
+      requestedHours: 0,
     });
   }
   return out;
@@ -129,7 +135,9 @@ export const MAIL_PLACEHOLDERS: readonly { token: string; label: string }[] = [
   { token: '{lieu}', label: 'Adresse du lieu' },
   { token: '{groupe}', label: 'Nom du groupe (artistes)' },
   { token: '{code}', label: "Code d'accès (bénévoles et orgas)" },
-  { token: '{lien}', label: 'Lien vers le planning (bénévoles et orgas)' },
+  { token: '{lien}', label: 'Lien personnel: planning et réponses (bénévoles), planning (orgas)' },
+  { token: '{heures}', label: 'Heures demandées (bénévoles)' },
+  { token: '{planning}', label: 'Ses créneaux, un par ligne (bénévoles et orgas)' },
 ];
 
 /*
@@ -144,7 +152,8 @@ export const DEFAULT_MAIL_TEMPLATES: Record<MailAudience, MailTemplate> = {
       'Bonjour {prenom},\n\n' +
       'Bonne nouvelle : ton inscription comme bénévole pour {evenement} ({date}) est validée. ' +
       "Merci de rejoindre l'équipe !\n\n" +
-      'Ton planning personnel sera consultable sur {lien} avec ton code d\'accès : {code}\n' +
+      'Ton planning personnel sera consultable ici : {lien}\n' +
+      "(ton code d'accès, si on te le demande : {code})\n" +
       "Il peut encore bouger d'ici l'événement, on te prévient quand il est définitif.\n\n" +
       'À très vite,\n' +
       "L'équipe d'organisation",
@@ -238,16 +247,31 @@ export interface RenderedMail {
   empty: string[];
 }
 
-/**
- * Fills a message for one person. `siteUrl` is where the tool is served (`location.origin`); the
- * link an orga is given opens the orgas' door rather than the bénévoles' one.
- */
+/** The validation message of one person, filled. See `renderTemplate`. */
 export function renderMail(
   plan: Pick<Plan, 'name' | 'startISO' | 'address' | 'mailTemplates'>,
   person: Registrant,
   siteUrl: string,
 ): RenderedMail {
-  const template = mailTemplateFor(plan, person.audience);
+  return renderTemplate(plan, person, mailTemplateFor(plan, person.audience), siteUrl);
+}
+
+/** « 6 » or « 4,5 », for a blank. */
+const hoursText = (hours: number): string => (Number.isInteger(hours) ? String(hours) : String(hours).replace('.', ','));
+
+/**
+ * Fills any message for one person. `siteUrl` is where the tool is served (`location.origin`).
+ *
+ * `{lien}` IS PERSONAL since 2026-10-22: a bénévole's carries their code (`/?code=`), so the page
+ * opens on their planning and their questions without typing anything; an orga's opens the
+ * orgas' door. `{planning}` is only computed when the message holds it, and needs the whole plan.
+ */
+export function renderTemplate(
+  plan: Pick<Plan, 'name' | 'startISO' | 'address'>,
+  person: Registrant,
+  template: MailTemplate,
+  siteUrl: string,
+): RenderedMail {
   const base = siteUrl.replace(/\/+$/, '');
   const holdsCode = person.kind === 'benevole' || person.kind === 'orga';
   const values: Record<string, string> = {
@@ -258,8 +282,19 @@ export function renderMail(
     '{lieu}': plan.address.trim(),
     '{groupe}': person.actName.trim(),
     '{code}': person.accessCode.trim(),
-    '{lien}': !holdsCode || base === '' ? '' : person.kind === 'orga' ? `${base}/?responsable` : `${base}/`,
+    '{lien}':
+      !holdsCode || base === ''
+        ? ''
+        : person.kind === 'orga'
+          ? `${base}/?responsable`
+          : person.accessCode.trim() === ''
+            ? `${base}/`
+            : `${base}/?code=${encodeURIComponent(person.accessCode.trim())}`,
+    '{heures}': person.kind === 'benevole' && person.requestedHours > 0 ? hoursText(person.requestedHours) : '',
   };
+  if (`${template.subject}${template.body}`.includes('{planning}')) {
+    values['{planning}'] = holdsCode ? planningText(plan as Plan, person.kind as 'benevole' | 'orga', person.key) : '';
+  }
   const empty = new Set<string>();
   const fill = (text: string): string =>
     text.replace(/\{[a-z]+\}/g, (token) => {

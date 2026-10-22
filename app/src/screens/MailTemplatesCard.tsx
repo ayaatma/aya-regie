@@ -58,8 +58,9 @@ export function MailTemplatesCard() {
       meta={rewritten.length === 0 ? 'textes par défaut' : `${rewritten.length} texte(s) personnalisé(s)`}
     >
       <p className="people-meta setup-orgas-note">
-        Le mail part quand on valide une personne depuis sa fiche (onglet Personnes), après un aperçu.
-        Un texte par type de personne.
+        Le mail part quand on valide une personne depuis sa fiche (onglet Personnes), après un aperçu,
+        ou en groupe avec « Valider les personnes placées » (Personnes, Mails). Un texte par type de
+        personne.
       </p>
       <div className="mail-template">
         <label className="field">

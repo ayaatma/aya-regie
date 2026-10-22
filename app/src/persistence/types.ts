@@ -147,6 +147,23 @@ export interface VolunteerSchedule {
     pole: string;
     evenement: string;
   }>;
+  /**
+   * The questions of the follow-up this person was sent, since 2026-10-22, in the event's order,
+   * with the answer already given. Absent from a database that predates migration 36.
+   */
+  questions?: VolunteerQuestion[];
+}
+
+/** One question of the follow-up, as `get_volunteer_schedule` returns it. */
+export interface VolunteerQuestion {
+  key: string;
+  label: string;
+  /** The step's question, `{heures}` not yet filled. */
+  question: string;
+  reply: 'confirmer' | 'oui-non';
+  sentAt: string;
+  answer: 'oui' | 'non' | null;
+  answeredAt: string | null;
 }
 
 /**
@@ -231,6 +248,11 @@ export interface PlanStore {
    * the browser to filter. Null means no such code.
    */
   volunteerSchedule?(code: string): Promise<VolunteerSchedule | null>;
+  /**
+   * Answers a question of the follow-up with a bénévole's code (`answer_step`). Null when refused:
+   * a wrong code, or a question this person was never sent.
+   */
+  answerStep?(code: string, stepKey: string, answer: 'oui' | 'non'): Promise<{ answeredAt: string } | null>;
   /**
    * The whole planning, read only, for a pole organiser's access code.
    *

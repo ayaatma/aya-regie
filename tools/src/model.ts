@@ -1092,19 +1092,112 @@ export const applicationStatusOf = (person: { applicationStatus?: ApplicationSta
   person.applicationStatus ?? 'candidature';
 
 /**
- * One message or check the régisseur ticks per person ("Mail de confirmation envoyé"). A setting
- * per event, because every event runs its own sequence; the key is stable so renaming a step
- * never unticks anybody.
+ * One step of the follow-up of a bénévole after their validation. A setting per event, because
+ * every event runs its own sequence; the key is stable so renaming a step never unticks anybody.
+ *
+ * Since 2026-10-22 a step may carry a MAIL (`StepMail`): it is then a grouped sending from the
+ * Mails tab, to the validated bénévoles its target names, and possibly a question they answer
+ * from their personal page. A step without one is still a box ticked by hand, for what happens
+ * outside the tool. See `followup.ts`.
  */
 export interface ApplicationStep {
   key: string;
   label: string;
+  mail?: StepMail;
 }
 
+/**
+ * What a bénévole is asked by a step's mail. `confirmer` is one button (« Je confirme mes
+ * horaires »), `oui-non` two. The answer is given from the personal page the mail links to.
+ */
+export type StepReply = 'aucune' | 'confirmer' | 'oui-non';
+
+export const STEP_REPLIES: readonly StepReply[] = ['aucune', 'confirmer', 'oui-non'];
+
+export const STEP_REPLY_LABEL: Record<StepReply, string> = {
+  aucune: 'Aucune réponse attendue',
+  confirmer: 'Un bouton « Je confirme »',
+  'oui-non': 'Oui ou non',
+};
+
+export interface StepMail {
+  subject: string;
+  body: string;
+  /** Only the bénévoles placed somewhere: a créneau, or a box on the montage or the démontage. */
+  placedOnly: boolean;
+  /** Only those who asked for at least this many hours; zero means every validated bénévole. */
+  minRequestedHours: number;
+  reply: StepReply;
+  /** The question on their page, `{heures}` filled with their hours. Unused without a reply. */
+  question: string;
+}
+
+/*
+ * The defaults of a new event, since 2026-10-22: the Loto Tekno's sequence, written so that any
+ * event can keep it. « Mail de confirmation envoyé » is gone: the validation mail is recorded by
+ * itself. The keys of the 2026-09-15 defaults that survive (`infos`) are kept, so an event that
+ * ticked them by hand finds its ticks again.
+ */
 export const DEFAULT_APPLICATION_STEPS: readonly ApplicationStep[] = [
-  { key: 'confirmation', label: 'Mail de confirmation envoyé' },
-  { key: 'reconfirmee', label: 'Présence reconfirmée' },
-  { key: 'infos', label: 'Infos pratiques envoyées' },
+  {
+    key: 'heures-supp',
+    label: 'Heures supplémentaires',
+    mail: {
+      subject: '{evenement} : tu confirmes tes {heures} h ?',
+      body:
+        'Bonjour {prenom},\n\n' +
+        'Dans le formulaire, tu as proposé de donner {heures} h pendant {evenement} ({date}). Merci, ça nous aide énormément !\n\n' +
+        "Avant de construire les plannings, on préfère vérifier que c'est toujours bon pour toi. Un clic suffit pour répondre :\n" +
+        '{lien}\n\n' +
+        'À très vite,\n' +
+        "L'équipe d'organisation",
+      placedOnly: false,
+      minRequestedHours: 6,
+      reply: 'oui-non',
+      question: 'Tu confirmes vouloir faire {heures} h ?',
+    },
+  },
+  {
+    key: 'planning',
+    label: 'Planning',
+    mail: {
+      subject: '{evenement} : ton planning bénévole',
+      body:
+        'Bonjour {prenom},\n\n' +
+        'Voici tes créneaux pour {evenement} :\n\n' +
+        '{planning}\n\n' +
+        "Peux-tu nous confirmer qu'ils te conviennent ? Un clic suffit :\n" +
+        '{lien}\n\n' +
+        "Le planning peut encore bouger un peu : si c'est le cas, on t'enverra la nouvelle version.\n\n" +
+        'Merci !\n' +
+        "L'équipe d'organisation",
+      placedOnly: true,
+      minRequestedHours: 0,
+      reply: 'confirmer',
+      question: 'Je confirme mes horaires',
+    },
+  },
+  {
+    key: 'infos',
+    label: 'Infos pratiques',
+    mail: {
+      subject: '{evenement} : infos pratiques et planning définitif',
+      body:
+        'Bonjour {prenom},\n\n' +
+        "C'est bientôt ! Voici ton planning définitif pour {evenement} ({date}, {lieu}) :\n\n" +
+        '{planning}\n\n' +
+        'Infos pratiques :\n' +
+        '(à compléter : accès, parking, repas, tenue, contact le jour J)\n\n' +
+        'Ton planning reste consultable à tout moment ici :\n' +
+        '{lien}\n\n' +
+        'À très vite,\n' +
+        "L'équipe d'organisation",
+      placedOnly: true,
+      minRequestedHours: 0,
+      reply: 'aucune',
+      question: '',
+    },
+  },
 ];
 
 /**

@@ -23,6 +23,9 @@ import {
   type MailAudience,
   type MailTemplate,
   DEFAULT_APPLICATION_STEPS,
+  STEP_REPLIES,
+  type StepMail,
+  type StepReply,
   ENERGY_PROFILES,
   type ApplicationStatus,
   type ApplicationStep,
@@ -663,8 +666,26 @@ function applicationSteps(value: unknown): ApplicationStep[] {
   if (!Array.isArray(value)) return [...DEFAULT_APPLICATION_STEPS];
   return value
     .map((row) => (row && typeof row === 'object' ? (row as Record<string, unknown>) : {}))
-    .map((row) => ({ key: text(row.key), label: text(row.label) }))
+    .map((row): ApplicationStep => {
+      const mail = stepMail(row.mail);
+      return mail ? { key: text(row.key), label: text(row.label), mail } : { key: text(row.key), label: text(row.label) };
+    })
     .filter((row) => row.key !== '');
+}
+
+/** A step's mail, since 2026-10-22; anything not an object means the step has none. */
+function stepMail(value: unknown): StepMail | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const m = value as Record<string, unknown>;
+  const hours = Number(m.minRequestedHours);
+  return {
+    subject: text(m.subject),
+    body: text(m.body),
+    placedOnly: m.placedOnly !== false,
+    minRequestedHours: Number.isFinite(hours) && hours > 0 ? hours : 0,
+    reply: (STEP_REPLIES as readonly unknown[]).includes(m.reply) ? (m.reply as StepReply) : 'aucune',
+    question: text(m.question),
+  };
 }
 
 /**

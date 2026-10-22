@@ -12,7 +12,7 @@
  * in a select must not cost somebody their placements.
  */
 
-import type { ApplicationStatus, ApplicationStep, Plan, Volunteer } from '../engine.ts';
+import { DEFAULT_APPLICATION_STEPS, type ApplicationStatus, type ApplicationStep, type Plan, type StepMail, type Volunteer } from '../engine.ts';
 
 const withVolunteer = (plan: Plan, key: string, change: (v: Volunteer) => Volunteer): Plan => ({
   ...plan,
@@ -118,4 +118,39 @@ export function moveApplicationStep(plan: Plan, key: string, direction: -1 | 1):
   if (at < 0 || to < 0 || to >= steps.length) return plan;
   [steps[at], steps[to]] = [steps[to]!, steps[at]!];
   return { ...plan, applicationSteps: steps };
+}
+
+/** Gives a step its mail, changes it, or takes it away (`undefined`): it is then ticked by hand. */
+export function setStepMail(plan: Plan, key: string, mail: StepMail | undefined): Plan {
+  return {
+    ...plan,
+    applicationSteps: plan.applicationSteps.map((s): ApplicationStep => {
+      if (s.key !== key) return s;
+      if (mail === undefined) return { key: s.key, label: s.label };
+      return { ...s, mail };
+    }),
+  };
+}
+
+/**
+ * Adds the steps of `DEFAULT_APPLICATION_STEPS` this event lacks, by key, at the end. A step
+ * already there under the same key and with no mail is given the default's mail, keeping its own
+ * name: an event of 2026-09-15 has « Infos pratiques envoyées » as `infos`, ticked by hand.
+ * A step that already has a mail is left as it is.
+ */
+export function addDefaultSteps(plan: Plan): Plan {
+  const steps = plan.applicationSteps.map((s): ApplicationStep => {
+    const fallback = DEFAULT_APPLICATION_STEPS.find((d) => d.key === s.key);
+    return !s.mail && fallback?.mail ? { ...s, mail: fallback.mail } : s;
+  });
+  const have = new Set(steps.map((s) => s.key));
+  return { ...plan, applicationSteps: [...steps, ...DEFAULT_APPLICATION_STEPS.filter((d) => !have.has(d.key))] };
+}
+
+/** How many steps `addDefaultSteps` would add or give a mail to. */
+export function missingDefaultSteps(plan: Plan): number {
+  return DEFAULT_APPLICATION_STEPS.filter((d) => {
+    const there = plan.applicationSteps.find((s) => s.key === d.key);
+    return !there || (!there.mail && d.mail !== undefined);
+  }).length;
 }

@@ -1,5 +1,5 @@
 /**
- * Sending ONE validation mail, 2026-10-22: the pure part of the `send-mail` function.
+ * Sending ONE mail (a validation, or since migration 36 a step of the follow-up), 2026-10-22: the pure part of the `send-mail` function.
  *
  * WHY A SERVER AT ALL. A browser cannot speak SMTP, and the mailbox's password must never reach
  * one. So the régisseur's browser renders the message (`tools/src/registration.ts`, the exact
@@ -16,7 +16,10 @@
  */
 
 export type PersonKind = 'benevole' | 'orga' | 'artiste' | 'extra';
-export type SendReason = 'validation' | 'renvoi';
+/** A validation, a validation sent again, a step of the follow-up, a reminder of one. */
+export type SendReason = 'validation' | 'renvoi' | 'etape' | 'relance';
+
+const REASONS: readonly SendReason[] = ['validation', 'renvoi', 'etape', 'relance'];
 
 export interface SendRequest {
   eventId: string;
@@ -26,6 +29,10 @@ export interface SendRequest {
   subject: string;
   body: string;
   reason: SendReason;
+  /** The follow-up step (event.application_steps key); '' for a validation. */
+  stepKey: string;
+  /** The {planning} lines the mail carries, recorded beside it; '' when none. */
+  planning: string;
 }
 
 export class RequestError extends Error {
@@ -64,9 +71,14 @@ export function parseSendRequest(raw: unknown): SendRequest {
   const body = text(r.body);
   if (body.trim() === '') throw new RequestError('Le mail est vide.');
   if (body.length > MAX_BODY) throw new RequestError(`Le mail dépasse ${MAX_BODY} caractères.`);
-  const reason: SendReason = r.reason === 'renvoi' ? 'renvoi' : 'validation';
+  const reason: SendReason = REASONS.includes(r.reason as SendReason) ? (r.reason as SendReason) : 'validation';
+  const stepKey = text(r.stepKey).trim();
+  if (stepKey.length > 100) throw new RequestError('Étape non reconnue.');
+  if ((reason === 'etape' || reason === 'relance') && stepKey === '') throw new RequestError('Étape du suivi non précisée.');
+  const planning = text(r.planning);
+  if (planning.length > MAX_BODY) throw new RequestError(`Le planning dépasse ${MAX_BODY} caractères.`);
 
-  return { eventId, personKind, personKey, to, subject, body, reason };
+  return { eventId, personKind, personKey, to, subject, body, reason, stepKey, planning };
 }
 
 /** The mailbox, from the function's secrets. Null with the names of what is missing. */
@@ -126,5 +138,7 @@ export function logRow(request: SendRequest, outcome: 'envoye' | 'echec', error:
     outcome,
     error,
     reason: request.reason,
+    step_key: request.stepKey,
+    planning: request.planning,
   };
 }

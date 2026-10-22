@@ -29,6 +29,10 @@ import {
   type PersonStatus,
   type TicketingReport,
   type TicketingRow,
+  followUpOf,
+  stateLabel,
+  type FollowUp as PersonFollowUp,
+  type Plan,
 } from '../engine.ts';
 import {
   addExtraPerson,
@@ -38,7 +42,9 @@ import {
   setExtraPerson,
 } from '../store/ticketingEdits.ts';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
-import { sentAtLabel, useMailLog } from '../mail/mailStore.ts';
+import { sentAtLabel, useMailLog, type MailLog } from '../mail/mailStore.ts';
+import { BulkValidateButton } from '../components/BulkValidate.tsx';
+import { TONE_CHIP } from '../components/FollowUpSteps.tsx';
 import { downloadText, today } from '../components/download.ts';
 import { NumberField } from '../components/NumberField.tsx';
 import {
@@ -65,8 +71,39 @@ const VIEW_LABEL: Record<PeopleView, string> = {
   candidature: 'Candidature',
 };
 
-/** The application filter: a status, the Réserve, or everybody. Only bénévoles have one. */
-type FollowUp = ApplicationStatus | 'reserve' | 'mail-echec' | typeof ALL;
+/**
+ * The application filter: a status, the Réserve, a mail that failed, or since 2026-10-22 where a
+ * bénévole stands in the follow-up (a question unanswered, a « non », a planning that moved).
+ */
+type FollowUp =
+  | ApplicationStatus
+  | 'reserve'
+  | 'mail-echec'
+  | 'sans-reponse'
+  | 'reponse-non'
+  | 'planning-modifie'
+  | typeof ALL;
+
+/** A bénévole's follow-up from the mail book; null for anybody else. */
+function followUpRow(plan: Plan, row: TicketingRow, mails: MailLog): PersonFollowUp | null {
+  if (row.kind !== 'benevole') return null;
+  const volunteer = plan.volunteers.find((v) => v.key === row.key);
+  if (!volunteer) return null;
+  const { mails: sent, replies } = mails.factsOf(volunteer.key);
+  return followUpOf(plan, volunteer, sent, replies);
+}
+
+const FOLLOW_UP_TEST: Record<'sans-reponse' | 'reponse-non' | 'planning-modifie', (f: PersonFollowUp) => boolean> = {
+  'sans-reponse': (f) => f.steps.some((s) => s.state === 'en-attente'),
+  'reponse-non': (f) => f.steps.some((s) => s.state === 'non'),
+  'planning-modifie': (f) => f.steps.some((s) => s.planningChanged),
+};
+
+const FOLLOW_UP_LABEL: Record<keyof typeof FOLLOW_UP_TEST, string> = {
+  'sans-reponse': 'Sans réponse',
+  'reponse-non': 'A répondu non',
+  'planning-modifie': "Planning modifié depuis l'envoi",
+};
 
 const flatten = (text: string): string =>
   text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
@@ -135,6 +172,7 @@ export function PeopleScreen({
   });
 
   const report = ticketingReport(plan, index);
+  const followUps = report.rows.flatMap((row) => followUpRow(plan, row, mails) ?? []);
   const needle = flatten(search);
   const matching = report.rows.filter((row) => {
     if (status !== ALL && !row.statuses.some((s) => s.status === status)) return false;
@@ -142,6 +180,9 @@ export function PeopleScreen({
       if (row.kind !== 'benevole' || index.volunteerByKey.get(row.key)?.backup !== true) return false;
     } else if (followUp === 'mail-echec') {
       if (row.kind === 'invite' || mails.lastOf(row.kind, row.key)?.outcome !== 'echec') return false;
+    } else if (followUp === 'sans-reponse' || followUp === 'reponse-non' || followUp === 'planning-modifie') {
+      const f = followUpRow(plan, row, mails);
+      if (!f || !FOLLOW_UP_TEST[followUp](f)) return false;
     } else if (followUp !== ALL && row.applicationStatus !== followUp) {
       return false;
     }
@@ -230,6 +271,7 @@ export function PeopleScreen({
               {toWatch} à surveiller
             </span>
           )}
+          <BulkValidateButton className="btn is-small" />
           {issues > 0 && (
             <span className="chip is-warn" title="Des lignes portent une incohérence, signalée en bout de ligne">
               {issues} incohérence{issues > 1 ? 's' : ''}
@@ -281,6 +323,11 @@ export function PeopleScreen({
               <option value="mail-echec">
                 Mail en échec ({report.rows.filter((r) => r.kind !== 'invite' && mails.lastOf(r.kind, r.key)?.outcome === 'echec').length})
               </option>
+              {(['sans-reponse', 'reponse-non', 'planning-modifie'] as const).map((key) => (
+                <option key={key} value={key}>
+                  {FOLLOW_UP_LABEL[key]} ({followUps.filter((f) => FOLLOW_UP_TEST[key](f)).length})
+                </option>
+              ))}
             </select>
           </label>
           <label className="checkline">
@@ -670,10 +717,15 @@ function PersonLine({
 /** The « Candidature » columns of one line. Empty cells for anybody who is not a bénévole. */
 function ApplicationCells({ row }: { row: TicketingRow }) {
   const { plan, index } = useLoadedPlan();
+  const { id: eventId } = usePlan();
+  const mails = useMailLog(eventId);
   const volunteer = row.kind === 'benevole' ? index.volunteerByKey.get(row.key) : undefined;
   if (!volunteer) return <><td /><td /><td /><td /><td /><td /></>;
-  const ticked = new Set(volunteer.statusSteps ?? []);
   const waiting = plan.reserve.includes(volunteer.key);
+  // The steps as the follow-up reads them since 2026-10-22: a mail sent or answered counts, a box
+  // ticked by hand too, and a step this person is not concerned by is left out of the count.
+  const steps = (followUpRow(plan, row, mails)?.steps ?? []).filter((p) => p.state !== 'hors-cible');
+  const done = steps.filter((p) => p.state === 'oui' || p.state === 'envoye' || p.state === 'fait-main');
   return (
     <>
       <td>
@@ -682,21 +734,19 @@ function ApplicationCells({ row }: { row: TicketingRow }) {
       </td>
       <td>{plan.teams.find((t) => t.key === volunteer.teamKey)?.name ?? ''}</td>
       <td>
-        {plan.applicationSteps.length > 0 && (
+        {steps.length > 0 && (
           <span
-            className={`chip ${plan.applicationSteps.every((s) => ticked.has(s.key)) ? 'is-ok' : 'is-muted'}`}
-            title={plan.applicationSteps.map((s) => `${ticked.has(s.key) ? '✓' : '·'} ${s.label}`).join('\n')}
+            className={`chip ${done.length === steps.length ? 'is-ok' : 'is-muted'}`}
+            title={steps.map((p) => `${p.step.label} : ${stateLabel(p)}`).join('\n')}
           >
-            {plan.applicationSteps.filter((s) => ticked.has(s.key)).length}/{plan.applicationSteps.length}
+            {done.length}/{steps.length}
           </span>
         )}
-        {plan.applicationSteps
-          .filter((step) => ticked.has(step.key))
-          .map((step) => (
-            <span key={step.key} className="chip is-ok" title={step.label}>
-              ✓ {step.label}
-            </span>
-          ))}
+        {done.map((p) => (
+          <span key={p.step.key} className="chip is-ok" title={`${p.step.label} : ${stateLabel(p)}`}>
+            ✓ {p.step.label}
+          </span>
+        ))}
       </td>
       <td>{volunteer.registeredAt}</td>
       <td>{volunteer.energy ? ENERGY_LABEL[volunteer.energy] : ''}</td>
@@ -710,28 +760,42 @@ function ApplicationCells({ row }: { row: TicketingRow }) {
  * last mail went. ⏳ is the mark the grids use for the same fact. Empty for a guest of an act.
  */
 function RegistrationCell({ row }: { row: TicketingRow }) {
+  const { plan } = useLoadedPlan();
   const { id: eventId } = usePlan();
   const mails = useMailLog(eventId);
   const status = row.applicationStatus;
   if (status === null || row.kind === 'invite') return <td />;
   const last = mails.lastOf(row.kind, row.key);
+  // A validated bénévole reads by the furthest step of the follow-up, since 2026-10-22.
+  const followUp = followUpRow(plan, row, mails);
+  const stage = followUp && status === 'valide' && followUp.stage.label !== 'Validé·e' ? followUp.stage.label : null;
   return (
     <td>
       <span className={`people-registration is-${status}`}>
         {status === 'candidature' ? '⏳ ' : status === 'valide' ? '✓ ' : '✕ '}
-        {APPLICATION_STATUS_LABEL[status]}
+        {stage ?? APPLICATION_STATUS_LABEL[status]}
       </span>
       {last && (
         <span
           className={`people-registration-mail${last.outcome === 'echec' ? ' is-bad' : ''}`}
           title={
             last.outcome === 'envoye'
-              ? `Mail envoyé ${sentAtLabel(last.sentAt)} à ${last.recipient}`
+              ? `Dernier mail envoyé ${sentAtLabel(last.sentAt)} à ${last.recipient}`
               : `Échec de l'envoi ${sentAtLabel(last.sentAt)}: ${last.error}`
           }
         >
           {' '}
           {last.outcome === 'envoye' ? '✉️' : '⚠️'}
+        </span>
+      )}
+      {followUp?.badges.map((mark) => (
+        <span key={mark.label} className={TONE_CHIP[mark.tone]}>
+          {mark.label}
+        </span>
+      ))}
+      {followUp && followUp.alerts.length > 0 && (
+        <span className={TONE_CHIP[followUp.alerts.some((m) => m.tone === 'bad') ? 'bad' : 'warn']} title={followUp.alerts.map((m) => m.label).join('\n')}>
+          {followUp.alerts.length === 1 ? followUp.alerts[0]!.label : `${followUp.alerts.length} alertes`}
         </span>
       )}
     </td>

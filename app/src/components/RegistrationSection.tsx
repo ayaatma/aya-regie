@@ -22,6 +22,7 @@ import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_LABEL,
   MAIL_AUDIENCE_LABEL,
+  followUpOf,
   isMailAddress,
   registrantOf,
   renderMail,
@@ -30,6 +31,7 @@ import {
   type RegistrantKind,
 } from '../engine.ts';
 import { sendMail, sentAtLabel, useMailLog, type MailEntry } from '../mail/mailStore.ts';
+import { TONE_CHIP } from './FollowUpSteps.tsx';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
 
 const siteUrl = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
@@ -59,7 +61,12 @@ export function RegistrationSection({
   const mail = renderMail(plan, person, siteUrl());
   const addressOk = isMailAddress(mail.to);
   const history = log.entriesOf(kind, personKey);
-  const last = history[0] ?? null;
+  const last = log.lastValidationOf(kind, personKey);
+  const stepLabels = new Map(plan.applicationSteps.map((st) => [st.key, st.label]));
+  // A bénévole's frise: « Planning : confirmé » says validated and mailed already.
+  const volunteer = kind === 'benevole' ? plan.volunteers.find((v) => v.key === personKey) : undefined;
+  const facts = volunteer ? log.factsOf(volunteer.key) : null;
+  const followUp = volunteer && facts ? followUpOf(plan, volunteer, facts.mails, facts.replies) : null;
 
   const setStatus = (next: ApplicationStatus): void =>
     edit((p) => setRegistrationStatus(p, kind, personKey, next), `inscription de ${who}: ${APPLICATION_STATUS_LABEL[next].toLowerCase()}`);
@@ -89,6 +96,18 @@ export function RegistrationSection({
         {status === 'candidature' && <span className="registration-hint">, pas encore validée</span>}
       </span>
       <span className="registration-audience">{MAIL_AUDIENCE_LABEL[person.audience]}</span>
+      {followUp && status === 'valide' && followUp.stage.label !== 'Validé·e' && (
+        <span className="registration-stage">{followUp.stage.label}</span>
+      )}
+      {followUp && (followUp.badges.length > 0 || followUp.alerts.length > 0) && (
+        <span className="registration-marks">
+          {[...followUp.badges, ...followUp.alerts].map((mark) => (
+            <span key={mark.label} className={TONE_CHIP[mark.tone]}>
+              {mark.label}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 
@@ -194,20 +213,20 @@ export function RegistrationSection({
 
       {log.error && <p className="people-meta is-bad">{log.error}</p>}
       {last ? (
-        <MailLine entry={last} />
+        <MailLine entry={last} stepLabels={stepLabels} />
       ) : (
-        !log.loading && <p className="people-meta">Aucun mail envoyé.</p>
+        !log.loading && <p className="people-meta">Aucun mail de validation envoyé.</p>
       )}
-      {history.length > 1 && (
+      {history.length > (last ? 1 : 0) && (
         <>
           <button type="button" className="btn is-link is-small" onClick={() => setShowHistory((v) => !v)}>
-            {showHistory ? "Masquer l'historique" : `Historique des mails (${history.length})`}
+            {showHistory ? "Masquer l'historique" : `Tous les mails (${history.length})`}
           </button>
           {showHistory && (
             <ul className="registration-history">
-              {history.slice(1).map((entry) => (
+              {history.filter((entry) => entry !== last).map((entry) => (
                 <li key={entry.id}>
-                  <MailLine entry={entry} />
+                  <MailLine entry={entry} stepLabels={stepLabels} />
                 </li>
               ))}
             </ul>
@@ -218,19 +237,28 @@ export function RegistrationSection({
   );
 }
 
-function MailLine({ entry }: { entry: MailEntry }) {
+function MailLine({ entry, stepLabels }: { entry: MailEntry; stepLabels: Map<string, string> }) {
   const when = sentAtLabel(entry.sentAt);
+  const step = stepLabels.get(entry.stepKey) ?? entry.stepKey;
+  const what =
+    entry.reason === 'renvoi'
+      ? 'Mail renvoyé'
+      : entry.reason === 'etape'
+        ? `Mail « ${step} » envoyé`
+        : entry.reason === 'relance'
+          ? `Mail « ${step} » renvoyé`
+          : 'Mail de validation envoyé';
   if (entry.outcome === 'envoye') {
     return (
       <p className="registration-mail is-ok">
-        ✉️ {entry.reason === 'renvoi' ? 'Mail renvoyé' : 'Mail de validation envoyé'} {when} à {entry.recipient}
+        ✉️ {what} {when} à {entry.recipient}
         {entry.error !== '' && <span className="registration-mail-error"> {entry.error}</span>}
       </p>
     );
   }
   return (
     <p className="registration-mail is-bad">
-      ⚠️ Échec de l'envoi {when} à {entry.recipient}
+      ⚠️ Échec de l'envoi{entry.stepKey !== '' ? ` « ${step} »` : ''} {when} à {entry.recipient}
       <span className="registration-mail-error"> {entry.error}</span>
     </p>
   );

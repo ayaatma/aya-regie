@@ -119,7 +119,7 @@ async function main() {
       const GROUP_OF = {
         Grille: 'Planning', Propositions: 'Planning', Personnes: 'Personnes',
         Artistes: 'Logistique', Catering: 'Logistique', Magasin: 'Logistique', 'Équipes': 'Logistique', 'Activités annexes': 'Logistique',
-        'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', 'Import/Export': 'Réglages',
+        Mails: 'Personnes', 'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', 'Import/Export': 'Réglages',
       };
       const tab = async (label) => {
         const group = GROUP_OF[label];
@@ -571,6 +571,63 @@ async function main() {
         await page.evaluate(() => document.querySelector('.screen-body')?.scrollTo(0, 99999));
         await sleep(300);
         await shot('81-catering-bottom');
+      }
+      if (want('suivi')) {
+        // Le suivi par mail: the Mails tab, the validation of everybody placed with its list of
+        // names, a step's sending, a validated fiche, the step's mail in Réglages, then the
+        // bénévole page opened by the personal link with its questions. Last, since it leaves the app.
+        await tab('Mails');
+        await shot('110-mails');
+        await clickButton(/^Valider les \d+ personnes? placées?$/);
+        await sleep(300);
+        await shot('111-mails-validation-liste');
+        await clickButton(/^Valider (et envoyer|\d+, envoyer)/);
+        await sleep(2500);
+        await clickButton(/^Arrêter$/).catch(() => {});
+        await sleep(2000);
+        await tall('112-mails-apres-validation');
+        await clickButton(/^Envoyer aux \d+ qui ne l'ont pas reçu$/).catch(() => {});
+        await sleep(300);
+        await page.evaluate(() => {
+          // The planning step's list rather than the first card's, when it is offered.
+          const open = document.querySelector('.dialog-backdrop');
+          if (open) open.click();
+          const cards = [...document.querySelectorAll('.mails-step')];
+          const planning = cards.find((c) => (c.querySelector('h2')?.textContent || '').trim() === 'Planning');
+          [...(planning?.querySelectorAll('button') || [])].find((b) => /^Envoyer aux/.test(b.textContent || ''))?.click();
+        });
+        await sleep(400);
+        await shot('113-mails-envoi-planning');
+        await page.keyboard.press('Escape');
+        await sleep(300);
+        await tab('Personnes');
+        await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
+        await sleep(400);
+        await page.evaluate(() => document.querySelector('.followup-steps')?.scrollIntoView({ block: 'center' }));
+        await sleep(300);
+        await shot('114-personnes-fiche-suivi');
+        await tab('Réglages');
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-application');
+          card?.querySelector('button')?.click();
+          card?.scrollIntoView();
+        });
+        await sleep(300);
+        await page.evaluate(() => {
+          const rows = [...document.querySelectorAll('.setup-application .setup-step')];
+          const planning = rows.find((r) => r.querySelector('input')?.value === 'Planning');
+          [...(planning?.querySelectorAll('button') || [])].find((b) => /Mail/.test(b.textContent || ''))?.click();
+        });
+        await sleep(400);
+        await tall('115-reglages-etape-mail');
+        await page.setViewport({ width: 420, height: 900 });
+        await page.goto(`${URL}?code=2FQ6Q6BR`, { waitUntil: 'networkidle0' });
+        await sleep(1200);
+        await shot('116-benevole-questions');
+        await clickButton(/^Oui$/).catch(() => {});
+        await sleep(1200);
+        await shot('117-benevole-reponse');
+        await page.setViewport({ width: 1600, height: 1000 });
       }
       await context.close();
     }

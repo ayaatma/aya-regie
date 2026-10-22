@@ -1,13 +1,15 @@
 /**
  * `send-mail`, AyaRégie's third Supabase Edge Function, 2026-10-22.
  *
- *   POST { eventId, personKind, personKey, to, subject, body, reason }  with the régisseur's session
+ *   POST { eventId, personKind, personKey, to, subject, body, reason, stepKey?, planning? }
+ *        with the régisseur's session
  *     →  200 { entry }   the `mail_log` row, sent or failed: a refusal by the mail server is an
  *                        answer, recorded, not an error of this function
  *     |  4xx/5xx { error }   nothing was sent; `logged` true when the failure is recorded anyway
  *
- * Sends one validation mail through the association's mailbox (secrets SMTP_HOST, SMTP_USER,
- * SMTP_PASSWORD, optional SMTP_PORT, SMTP_FROM, SMTP_FROM_NAME, SMTP_REPLY_TO) and records it.
+ * Sends one mail (a validation, or a step of the follow-up) through the association's mailbox
+ * (secrets SMTP_HOST, SMTP_USER, SMTP_PASSWORD, optional SMTP_PORT, SMTP_FROM, SMTP_FROM_NAME,
+ * SMTP_REPLY_TO) and records it.
  * See `core.ts` for why, and `README.md` for the setup.
  *
  * THE ROW IS WRITTEN AS THE RÉGISSEUR, with their own token, so `sent_by` is who pressed the
@@ -84,7 +86,7 @@ Deno.serve(async (request: Request) => {
   const { data: entry, error: logError } = await supabase
     .from('mail_log')
     .insert(logRow(send, outcome, failure))
-    .select('id, person_kind, person_key, recipient, subject, outcome, error, reason, sent_at')
+    .select('id, person_kind, person_key, recipient, subject, outcome, error, reason, step_key, planning, sent_at')
     .single();
   if (logError) {
     // Sent (or not) but not recorded: say both, so the browser records it itself.

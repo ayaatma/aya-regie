@@ -25,10 +25,10 @@ import {
 import { useLoadedPlan } from '../store/store.tsx';
 import { correctVolunteer } from '../store/edits.ts';
 import { setVolunteerTeam } from '../store/teamEdits.ts';
+import { FollowUpSteps } from './FollowUpSteps.tsx';
 import {
   placesHeld,
   releasePlaces,
-  setApplicationStep,
   setRegieNote,
 } from '../store/applicationEdits.ts';
 
@@ -48,7 +48,6 @@ export function ApplicationSection({
   // Another person selected, or the note changed by an undo: the draft follows the fiche.
   useEffect(() => setNote(volunteer.regieNote ?? ''), [volunteer.key, volunteer.regieNote]);
 
-  const ticked = new Set(volunteer.statusSteps ?? []);
   const held = placesHeld(plan, volunteer.key);
   const holding = held.shifts + held.phaseBoxes;
 
@@ -153,24 +152,7 @@ export function ApplicationSection({
         </p>
       )}
 
-      {plan.applicationSteps.length > 0 && (
-        <div className="fiche-steps">
-          {plan.applicationSteps.map((step) => (
-            <label key={step.key} className="fiche-step">
-              <input
-                type="checkbox"
-                name={`fiche-step-${step.key}`}
-                checked={ticked.has(step.key)}
-                onChange={(event) => {
-                  const done = event.target.checked;
-                  edit((p) => setApplicationStep(p, volunteer.key, step.key, done), `${step.label}: ${name}`);
-                }}
-              />
-              <span>{step.label}</span>
-            </label>
-          ))}
-        </div>
-      )}
+      <FollowUpSteps volunteer={volunteer} />
 
       <textarea
         className="select"

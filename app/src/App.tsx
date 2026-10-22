@@ -20,6 +20,7 @@ import { SetupScreen } from './screens/SetupScreen.tsx';
 import { CateringScreen } from './screens/CateringScreen.tsx';
 import { ArtistsScreen } from './screens/ArtistsScreen.tsx';
 import { PeopleScreen } from './screens/PeopleScreen.tsx';
+import { MailsScreen } from './screens/MailsScreen.tsx';
 import { NavigationContext, type Navigation, type PersonRef } from './components/personNav.ts';
 import { ImportScreen } from './screens/ImportScreen.tsx';
 import { PrintScreen } from './screens/PrintScreen.tsx';
@@ -52,6 +53,7 @@ type Screen =
   | 'equipes'
   | 'annexes'
   | 'personnes'
+  | 'envois'
   | 'reglages'
   | 'import'
   | 'historique';
@@ -63,6 +65,8 @@ const TABS: Array<{ id: Screen; label: string }> = [
   // Was « Billetterie », after Catering, until 2026-09-15: the central place for a person's
   // information now, so it comes before the tabs that each hold one part of it.
   { id: 'personnes', label: 'Personnes' },
+  // 2026-10-22: the validation of everybody placed and the grouped mails of the follow-up.
+  { id: 'envois', label: 'Mails' },
   { id: 'artistes', label: 'Artistes' },
   { id: 'catering', label: 'Catering' },
   // 2026-09-15: the equipment, lent or owned, and where each piece is.
@@ -85,7 +89,7 @@ type Group = 'planning' | 'personnes' | 'logistique' | 'suivi' | 'reglages';
  */
 const GROUPS: Array<{ id: Group; label: string; screens: Screen[] }> = [
   { id: 'planning', label: 'Planning', screens: ['grille', 'propositions'] },
-  { id: 'personnes', label: 'Personnes', screens: ['personnes'] },
+  { id: 'personnes', label: 'Personnes', screens: ['personnes', 'envois'] },
   { id: 'logistique', label: 'Logistique', screens: ['artistes', 'catering', 'magasin', 'equipes', 'annexes'] },
   { id: 'suivi', label: 'Suivi', screens: ['tableau', 'historique'] },
   { id: 'reglages', label: 'Réglages', screens: ['reglages', 'import'] },
@@ -510,6 +514,7 @@ export function App({
             onGoToSetup={() => setScreen('reglages')}
           />
         )}
+        {screen === 'envois' && <MailsScreen />}
         {screen === 'reglages' && <SetupScreen />}
         {screen === 'import' && (
           <StackedScreen

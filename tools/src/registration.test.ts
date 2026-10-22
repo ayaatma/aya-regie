@@ -63,7 +63,8 @@ test('a message is filled for the person, and an orga is sent the orgas’ door'
   assert.equal(lea.subject, 'Loto Test : ton inscription bénévole est validée');
   assert.match(lea.body, /^Bonjour Léa,/);
   assert.match(lea.body, /samedi 13 mars 2027/);
-  assert.match(lea.body, /https:\/\/planning\.example\.org\/ avec ton code d'accès : ABCD1234/);
+  assert.match(lea.body, /ici : https:\/\/planning\.example\.org\/\?code=ABCD1234\n/);
+  assert.match(lea.body, /ton code d'accès, si on te le demande : ABCD1234/);
   assert.deepEqual(lea.empty, []);
 
   const sam = renderMail(plan, registrantOf(plan, 'orga', 'o1')!, 'https://planning.example.org');

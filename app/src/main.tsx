@@ -84,7 +84,9 @@ document.addEventListener('visibilitychange', () => {
  * harder to read for the sake of a rare one. `?responsable` is how they arrive.
  */
 function Root() {
-  const [volunteer, setVolunteer] = useState(false);
+  // `?code=` is the personal link of the follow-up mails, since 2026-10-22: it opens the
+  // bénévole's own page straight away, their code already typed.
+  const [volunteer, setVolunteer] = useState(() => new URLSearchParams(window.location.search).has('code'));
   /*
    * Read once, at startup, from the query string. A organiser's link carries it, and after the
    * first visit their code is remembered anyway, so this is a bookmark that keeps working.

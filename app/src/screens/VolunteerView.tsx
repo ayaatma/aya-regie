@@ -30,11 +30,15 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 import { useStore } from '../storeContext.ts';
 import { log } from '../log/logger.ts';
-import type { VolunteerSchedule } from '../persistence/types.ts';
+import type { VolunteerQuestion, VolunteerSchedule } from '../persistence/types.ts';
 
 const CODE_KEY = 'lototekno:code';
 
 const readCode = (): string => {
+  // The personal link of a mail carries the code, and wins over one remembered here: a phone
+  // shared in a family opens on the person the mail was for.
+  const linked = new URLSearchParams(window.location.search).get('code')?.trim().toUpperCase() ?? '';
+  if (linked !== '') return linked;
   try {
     return window.localStorage.getItem(CODE_KEY) ?? '';
   } catch {
@@ -185,7 +189,21 @@ export function VolunteerView({ onLeave }: { onLeave(): void }) {
     );
   }
 
-  return <VolunteerShifts schedule={schedule} onForget={forget} />;
+  const answer = store.answerStep
+    ? async (key: string, reply: 'oui' | 'non'): Promise<string | null> => {
+        try {
+          const done = await store.answerStep!(code, key, reply);
+          if (!done) return "Réponse refusée: ce lien ne correspond plus à une question en cours. Rechargez la page.";
+          look(code);
+          return null;
+        } catch (cause) {
+          log.warn('planning', 'Réponse bénévole en échec.');
+          return cause instanceof Error ? cause.message : String(cause);
+        }
+      }
+    : undefined;
+
+  return <VolunteerShifts schedule={schedule} onForget={forget} onAnswer={answer} />;
 }
 
 /**
@@ -198,9 +216,12 @@ export function VolunteerView({ onLeave }: { onLeave(): void }) {
 export function VolunteerShifts({
   schedule,
   onForget,
+  onAnswer,
 }: {
   schedule: VolunteerSchedule;
   onForget(): void;
+  /** Resolves to an error sentence, or null. Absent: the questions show, unanswerable. */
+  onAnswer?: (key: string, answer: 'oui' | 'non') => Promise<string | null>;
 }) {
   const total = schedule.creneaux.reduce((sum, c) => sum + hoursBetween(c.debut, c.fin), 0);
 
@@ -223,6 +244,14 @@ export function VolunteerShifts({
           Changer de code
         </button>
       </header>
+
+      {(schedule.questions ?? []).length > 0 && (
+        <section className="benevole-questions" aria-label="Questions de l'organisation">
+          {(schedule.questions ?? []).map((q) => (
+            <Question key={q.key} question={q} hours={schedule.benevole.heures_demandees} onAnswer={onAnswer} />
+          ))}
+        </section>
+      )}
 
       <p className="benevole-note">
         Ce planning peut encore changer d'ici l'événement. Rouvrez cette page la veille pour être
@@ -316,6 +345,73 @@ export function VolunteerShifts({
           </ol>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * One question of the follow-up, 2026-10-22: « Tu confirmes vouloir faire 8 h ? », answered in one
+ * tap. The answer goes to Postgres (`answer_step`), which only takes it for a question that was
+ * sent to this code; the page then reads itself again. A yes or no can be changed; a
+ * confirmation stays until a new planning is sent, which asks it again.
+ */
+function Question({
+  question,
+  hours,
+  onAnswer,
+}: {
+  question: VolunteerQuestion;
+  hours: number;
+  onAnswer?: (key: string, answer: 'oui' | 'non') => Promise<string | null>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
+  const text = question.question.replace(/\{heures\}/g, String(hours).replace('.', ','));
+  const answered = question.answer !== null && !changing;
+
+  const send = async (answer: 'oui' | 'non'): Promise<void> => {
+    if (!onAnswer) return;
+    setBusy(true);
+    setError(await onAnswer(question.key, answer));
+    setBusy(false);
+    setChanging(false);
+  };
+
+  return (
+    <div className={`card benevole-question${answered ? ' is-answered' : ''}`}>
+      <span className="benevole-question-label">{question.label}</span>
+      {question.reply === 'confirmer' ? (
+        answered ? (
+          <p className="benevole-question-done">✓ C'est confirmé, merci !</p>
+        ) : (
+          <button type="button" className="btn is-primary" disabled={busy || !onAnswer} onClick={() => void send('oui')}>
+            {busy ? 'Envoi…' : text || 'Je confirme'}
+          </button>
+        )
+      ) : (
+        <>
+          <p className="benevole-question-text">{text}</p>
+          {answered ? (
+            <p className="benevole-question-done">
+              Ta réponse : <strong>{question.answer === 'oui' ? 'oui' : 'non'}</strong>. Merci !{' '}
+              <button type="button" className="btn is-link" onClick={() => setChanging(true)}>
+                Changer
+              </button>
+            </p>
+          ) : (
+            <div className="benevole-question-buttons">
+              <button type="button" className="btn is-primary" disabled={busy || !onAnswer} onClick={() => void send('oui')}>
+                Oui
+              </button>
+              <button type="button" className="btn" disabled={busy || !onAnswer} onClick={() => void send('non')}>
+                Non
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {error && <p className="alert is-bad">{error}</p>}
     </div>
   );
 }

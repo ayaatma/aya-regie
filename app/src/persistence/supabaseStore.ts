@@ -124,6 +124,7 @@ const WHAT: Record<string, string> = {
   delete_plan: 'Impossible de supprimer le planning',
   read_log: 'Impossible de lire le journal',
   get_volunteer_schedule: 'Impossible de lire votre planning',
+  answer_step: "Impossible d'enregistrer votre réponse",
   get_organiser_planning: 'Impossible de lire le planning',
 };
 
@@ -311,6 +312,14 @@ export class SupabasePlanStore implements PlanStore {
   async volunteerSchedule(code: string): Promise<VolunteerSchedule | null> {
     const found = await this.call('get_volunteer_schedule', { p_code: code });
     return (found as VolunteerSchedule | null) ?? null;
+  }
+
+  /** The second call a bénévole makes without an account: one answer, checked by Postgres. */
+  async answerStep(code: string, stepKey: string, answer: 'oui' | 'non'): Promise<{ answeredAt: string } | null> {
+    const found = (await this.call('answer_step', { p_code: code, p_step: stepKey, p_answer: answer })) as
+      | { answeredAt?: string }
+      | null;
+    return found?.answeredAt ? { answeredAt: found.answeredAt } : null;
   }
 
   /**

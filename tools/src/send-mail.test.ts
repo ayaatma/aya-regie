@@ -23,6 +23,16 @@ test('a well-formed request is read, trimmed, and keeps its reason', () => {
   strictEqual(r.to, 'lea@example.org');
   strictEqual(r.reason, 'renvoi');
   strictEqual(parseSendRequest({ ...ok, reason: 'autre' }).reason, 'validation');
+  strictEqual(r.stepKey, '');
+});
+
+test('a step of the follow-up names its step, and carries the planning it sent', () => {
+  const r = parseSendRequest({ ...ok, reason: 'etape', stepKey: 'planning', planning: '- samedi 13 mars' });
+  strictEqual(r.reason, 'etape');
+  const row = logRow(r, 'envoye', '');
+  strictEqual(row.step_key, 'planning');
+  strictEqual(row.planning, '- samedi 13 mars');
+  throws(() => parseSendRequest({ ...ok, reason: 'relance' }), /Étape/);
 });
 
 test('what could smuggle a header or reach nobody is refused before any network', () => {

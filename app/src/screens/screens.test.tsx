@@ -53,6 +53,7 @@ import type { PlanStore } from '../persistence/types.ts';
 import { CheckpointBar } from '../components/CheckpointBar.tsx';
 import { formatLog } from './JournalScreen.tsx';
 import { VolunteerShifts } from './VolunteerView.tsx';
+import { MailsScreen } from './MailsScreen.tsx';
 import { PhaseGrid } from './PhaseGrid.tsx';
 import { OrganiserFiche } from '../components/OrganiserFiche.tsx';
 import { placeDeclared } from '../store/phaseEdits.ts';
@@ -2497,7 +2498,7 @@ test('a fiche says at once whether the person is validated, and offers to valida
   const done = infoOf(validated, { kind: 'benevole', volunteerKey: key });
   assert.ok(done.includes('registration is-valide'));
   assert.ok(!done.includes('>Valider</button>'));
-  assert.ok(shows(done, 'Aucun mail envoyé.'));
+  assert.ok(shows(done, 'Aucun mail de validation envoyé.'));
 
   const reading = infoOf(pending, { kind: 'benevole', volunteerKey: key }, true);
   assert.ok(shows(reading, 'Inscription'));
@@ -2692,4 +2693,53 @@ test('in mode édition a créneau offers two grips and a « + », and none of it
     'le « − » dit ce qu’il retire',
   );
   assert.ok(!on.includes('draggable="true"'), 'plus aucune case ne se glisse');
+});
+
+/*
+ * Le suivi par mail, 2026-10-22: the bénévole page asks its questions, the Mails tab offers the
+ * validation of everybody placed and one card per step.
+ */
+test('the bénévole page asks the questions it was sent, hours filled, and says what was answered', () => {
+  const html = renderToStaticMarkup(
+    <VolunteerShifts
+      schedule={{
+        ...schedule,
+        questions: [
+          { key: 'heures-supp', label: 'Heures supplémentaires', question: 'Tu confirmes vouloir faire {heures} h ?', reply: 'oui-non', sentAt: '2026-10-25T10:00:00Z', answer: null, answeredAt: null },
+          { key: 'planning', label: 'Planning', question: 'Je confirme mes horaires', reply: 'confirmer', sentAt: '2026-11-01T10:00:00Z', answer: 'oui', answeredAt: '2026-11-02T10:00:00Z' },
+        ],
+      }}
+      onForget={noop}
+      onAnswer={async () => null}
+    />,
+  );
+  assert.ok(shows(html, 'Tu confirmes vouloir faire 6 h ?'));
+  assert.ok(html.includes('>Oui</button>') && html.includes('>Non</button>'));
+  assert.ok(shows(html, "C'est confirmé, merci !"));
+  assert.ok(!html.includes('>Je confirme mes horaires</button>'), 'already confirmed');
+});
+
+test('the Mails tab offers to validate everybody placed, and a card per step with its sendings', () => {
+  const pending: Plan = { ...plan, volunteers: plan.volunteers.map((v) => ({ ...v, status: 'candidature' as const })) };
+  const html = render(<MailsScreen />, pending);
+  const placedCount = new Set(pending.assignments.map((a) => a.volunteerKey)).size;
+  assert.ok(placedCount > 0);
+  assert.ok(html.includes(`Valider les ${placedCount}`), 'the count of people placed and still inscriptions');
+  for (const step of pending.applicationSteps) assert.ok(shows(html, step.label));
+
+  const validated: Plan = { ...plan, volunteers: plan.volunteers.map((v) => ({ ...v, status: 'valide' as const })) };
+  const ready = render(<MailsScreen />, validated);
+  assert.ok(!ready.includes('Valider les '), 'nobody left to validate');
+  assert.ok(shows(ready, "qui ne l'ont pas reçu"), 'the first sending of a step');
+});
+
+test('a validated bénévole’s fiche lists the follow-up steps, and the list filters on them', () => {
+  const key = plan.assignments[0]!.volunteerKey;
+  const validated: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'valide' as const } : v)) };
+  const html = infoOf(validated, { kind: 'benevole', volunteerKey: key });
+  assert.ok(shows(html, 'Planning'));
+  assert.ok(shows(html, 'à envoyer'));
+  const people = render(<PeopleScreen focus={null} onFocus={noop} onGoToSetup={noop} />, validated);
+  assert.ok(shows(people, 'Sans réponse (0)'));
+  assert.ok(shows(people, "Planning modifié depuis l'envoi (0)"));
 });

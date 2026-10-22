@@ -143,8 +143,10 @@ import {
  * 26: 2026-10-22, validation of everybody: `applicationStatus` on orgas, members of an act and
  *    extra people, `email` on the last two, and `Plan.mailTemplates`. A build that predates this
  *    writes every one of them back as an inscription with no address and the default messages.
+ * 27: 2026-10-22, the follow-up by mail: an `ApplicationStep` may carry a `mail` (text, target,
+ *    expected reply). A build that predates this writes every step back as a plain box to tick.
  */
-export const PLAN_FORMAT = 26;
+export const PLAN_FORMAT = 27;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';

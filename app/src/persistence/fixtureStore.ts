@@ -169,6 +169,8 @@ export class FixtureStore implements PlanStore {
 
   private manifest: Manifest | null = null;
   private readonly pristine = new Map<string, Plan>();
+  /** The answers given from the bénévole page, by `code|step`, kept in this tab only. */
+  private readonly answers = new Map<string, { answer: 'oui' | 'non'; answeredAt: string }>();
 
   private async loadManifest(): Promise<Manifest> {
     if (this.manifest) return this.manifest;
@@ -366,9 +368,35 @@ export class FixtureStore implements PlanStore {
               evenement: phase.events.find((e) => e.key === a.eventKey)?.label ?? '',
             }));
         }),
+        // NOT THE DATABASE'S RULE: with no mail log here, every step asking for a reply counts
+        // as sent, so the page can be worked on and photographed. Postgres only returns the
+        // questions whose mail the server accepted.
+        questions: plan.applicationSteps.flatMap((step) => {
+          const reply = step.mail?.reply;
+          if (reply !== 'confirmer' && reply !== 'oui-non') return [];
+          const given = this.answers.get(`${wanted}|${step.key}`) ?? null;
+          return [{
+            key: step.key,
+            label: step.label,
+            question: step.mail?.question ?? '',
+            reply,
+            sentAt: plan.startISO,
+            answer: given?.answer ?? null,
+            answeredAt: given?.answeredAt ?? null,
+          }];
+        }),
       };
     }
     return null;
+  }
+
+  /** The twin of `answer_step`, without its check that the question was sent: see above. */
+  async answerStep(code: string, stepKey: string, answer: 'oui' | 'non'): Promise<{ answeredAt: string } | null> {
+    const wanted = code.trim().toUpperCase();
+    if (wanted === '' || !(await this.volunteerSchedule(wanted))) return null;
+    const answeredAt = new Date().toISOString();
+    this.answers.set(`${wanted}|${stepKey}`, { answer, answeredAt });
+    return { answeredAt };
   }
 
   /**

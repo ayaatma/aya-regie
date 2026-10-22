@@ -368,7 +368,8 @@ export {
   ENERGY_PROFILES,
   statusOf,
 } from '@engine/model.ts';
-export type { ApplicationStatus, ApplicationStep, EnergyProfile } from '@engine/model.ts';
+export type { ApplicationStatus, ApplicationStep, EnergyProfile, StepMail, StepReply } from '@engine/model.ts';
+export { STEP_REPLIES, STEP_REPLY_LABEL } from '@engine/model.ts';
 
 // Validation of everybody and the validation mails, 2026-10-22.
 export { MAIL_AUDIENCES, applicationStatusOf } from '@engine/model.ts';
@@ -382,7 +383,33 @@ export {
   registrantOf,
   registrants,
   renderMail,
+  renderTemplate,
   setRegistrationStatus,
   withMailTemplate,
 } from '@engine/registration.ts';
+
+// The follow-up by mail after the validation, 2026-10-22.
+export {
+  batchMembers,
+  blankStepMail,
+  followUpOf,
+  inTarget,
+  isPlaced,
+  placedPending,
+  planningText,
+  stateLabel,
+  stepProgress,
+  targetLabel,
+  usesPlanning,
+} from '@engine/followup.ts';
+export type {
+  BatchKind,
+  FollowUp,
+  FollowUpMark,
+  MailFact,
+  ReplyFact,
+  StepProgress,
+  StepState,
+  Tone,
+} from '@engine/followup.ts';
 export type { Registrant, RegistrantKind, RenderedMail } from '@engine/registration.ts';

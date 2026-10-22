@@ -8,7 +8,7 @@ metadata:
 # Validation des inscriptions (2026-10-22)
 
 **State: BUILT, green (386 engine, 442 app tests, both typechecks, vite build, sql-check,
-schema-check 273), shots 105-109 read in both schemes. PLAN_FORMAT 26. MIGRATION 35
+schema-check 273), shots 105-109 read in both schemes. PLAN_FORMAT 26. MIGRATION 35 (applied 2026-10-22, see the migration state hook)
 (`2026-10-22_registration_validation.sql`, after 34) WRITTEN, NOT APPLIED, min_plan_format 26: it
 ships with its deploy. Function `send-mail` NOT DEPLOYED, secrets SMTP_HOST / SMTP_USER /
 SMTP_PASSWORD (+ optional SMTP_FROM_NAME, SMTP_REPLY_TO) to set; see its README.** Dry-run on

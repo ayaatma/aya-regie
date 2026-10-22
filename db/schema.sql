@@ -1098,7 +1098,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 26,
+values ('min_plan_format', 27,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -2878,7 +2878,86 @@ grant execute on function public.write_log(uuid, jsonb)           to authenticat
 grant execute on function public.read_log(uuid, int, bigint)      to authenticated;
 
 -- ---------------------------------------------------------------------------
--- The only anonymous entry point: a volunteer's own schedule, by access code.
+-- Les mails de validation, since 2026-10-22 (migration 35)
+--
+-- One row per mail the tool tried to send: to whom, what, and whether the mail server took it.
+-- NOT IN THE PLAN DOCUMENT, on purpose: it is written by the server function that sends
+-- (supabase/functions/send-mail), at the moment it sends, and a whole-plan save from a tab opened
+-- before that moment must not be able to erase it. So the person is named by kind and key, as in
+-- ticketing_choice, and a row naming somebody the plan no longer holds is simply never shown.
+--
+-- Append only: an organiser may read and add, nobody's browser may change or remove a row. A
+-- failure the function could not record (it was unreachable) is added by the browser itself.
+-- ---------------------------------------------------------------------------
+
+create table mail_log (
+  id          bigint generated always as identity primary key,
+  event_id    uuid not null references event(id) on delete cascade,
+  person_kind text not null check (person_kind in ('benevole', 'orga', 'artiste', 'extra')),
+  person_key  text not null,
+  recipient   text not null,
+  subject     text not null,
+  body        text not null,
+  -- 'envoye' when the mail server accepted the message, 'echec' otherwise, with what it said.
+  -- Accepted is not delivered: a mailbox that bounces later is not known here.
+  outcome     text not null check (outcome in ('envoye', 'echec')),
+  error       text not null default '',
+  -- Sent by validating somebody, or sent again by hand from their fiche; since 2026-10-22
+  -- (migration 36) also a step of the follow-up ('etape'), or a reminder of one ('relance').
+  reason      text not null default 'validation'
+    constraint mail_log_reason_check check (reason in ('validation', 'renvoi', 'etape', 'relance')),
+  -- The follow-up step this mail is (event.application_steps key), '' for a validation mail.
+  step_key    text not null default '',
+  -- The {planning} lines the mail carried, '' when it carried none: what « planning modifie
+  -- depuis l'envoi » is measured against (tools/src/followup.ts).
+  planning    text not null default '',
+  sent_at     timestamptz not null default now(),
+  sent_by     uuid default auth.uid()
+);
+
+create index mail_log_person_idx on mail_log (event_id, person_kind, person_key, id desc);
+
+alter table mail_log enable row level security;
+
+create policy mail_log_organiser_select on mail_log for select to authenticated using (true);
+create policy mail_log_organiser_insert on mail_log for insert to authenticated with check (true);
+
+-- ---------------------------------------------------------------------------
+-- Les reponses au suivi, since 2026-10-22 (migration 36)
+--
+-- A step of the follow-up may ask a question (event.application_steps[].mail.reply): « tu
+-- confirmes tes 8 h ? », « je confirme mes horaires ». The benevole answers from their personal
+-- page, the link of the mail (/?code=...), through answer_step below; the regie may note an answer
+-- given on the phone, from the fiche. One row per answer, the latest one stands.
+--
+-- NOT IN THE PLAN DOCUMENT, for the reason mail_log is not: written when it happens, by somebody
+-- who has no account, and a whole-plan save must not be able to erase it. The person is named by
+-- key, as in mail_log. Append only.
+-- ---------------------------------------------------------------------------
+
+create table step_reply (
+  id            bigint generated always as identity primary key,
+  event_id      uuid not null references event(id) on delete cascade,
+  volunteer_key text not null,
+  step_key      text not null,
+  answer        text not null check (answer in ('oui', 'non')),
+  -- The mail answered (the last one sent for this step when the answer came); null for an answer
+  -- the regie noted by hand.
+  mail_id       bigint references mail_log(id) on delete set null,
+  source        text not null default 'regie' check (source in ('lien', 'regie')),
+  answered_at   timestamptz not null default now(),
+  answered_by   uuid default auth.uid()
+);
+
+create index step_reply_person_idx on step_reply (event_id, volunteer_key, step_key, id desc);
+
+alter table step_reply enable row level security;
+
+create policy step_reply_organiser_select on step_reply for select to authenticated using (true);
+create policy step_reply_organiser_insert on step_reply for insert to authenticated with check (true);
+
+-- ---------------------------------------------------------------------------
+-- The first anonymous entry point of a volunteer: their own schedule, by access code.
 --
 -- The code is authentication, this function is enforcement. Filtering happens here, in
 -- Postgres, so a wrong or guessed code returns nothing rather than returning everything to be
@@ -2949,6 +3028,42 @@ as $fn$
       left join phase_pole  pp on pp.id = pa.phase_pole_id
       left join phase_event pe on pe.id = pa.phase_event_id
       where pa.volunteer_id = me.id
+    ), '[]'::jsonb),
+    -- The questions of the follow-up this person was sent, since 2026-10-22: one per step asking
+    -- for a reply whose mail the server accepted, with the answer already given if any. An answer
+    -- older than the last mail of a step carrying {planning} answered an older planning and is not
+    -- returned: the question is asked again. Same rule as tools/src/followup.ts.
+    'questions', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'key',        st.s->>'key',
+               'label',      coalesce(st.s->>'label', ''),
+               'question',   coalesce(st.s->'mail'->>'question', ''),
+               'reply',      st.s->'mail'->>'reply',
+               'sentAt',     m.sent_at,
+               'answer',     r.answer,
+               'answeredAt', r.answered_at)
+             order by st.ord)
+      from event e
+      cross join lateral jsonb_array_elements(e.application_steps) with ordinality as st(s, ord)
+      join lateral (
+        select ml.sent_at
+        from mail_log ml
+        where ml.event_id = e.id and ml.person_kind = 'benevole' and ml.person_key = me.key
+          and ml.step_key = st.s->>'key' and ml.outcome = 'envoye'
+        order by ml.id desc
+        limit 1
+      ) m on true
+      left join lateral (
+        select sr.answer, sr.answered_at
+        from step_reply sr
+        where sr.event_id = e.id and sr.volunteer_key = me.key and sr.step_key = st.s->>'key'
+          and (sr.answered_at >= m.sent_at
+               or position('{planning}' in coalesce(st.s->'mail'->>'subject', '') || coalesce(st.s->'mail'->>'body', '')) = 0)
+        order by sr.id desc
+        limit 1
+      ) r on true
+      where e.id = me.event_id
+        and coalesce(st.s->'mail'->>'reply', 'aucune') in ('confirmer', 'oui-non')
     ), '[]'::jsonb)
   )
   from volunteer me
@@ -3082,40 +3197,78 @@ create policy photos_organiser_update on storage.objects
 create policy photos_organiser_delete on storage.objects
   for delete to authenticated using (bucket_id = 'photos');
 
+
 -- ---------------------------------------------------------------------------
--- Les mails de validation, since 2026-10-22 (migration 35)
+-- The second anonymous entry point of a benevole: answering a question of the follow-up.
 --
--- One row per mail the tool tried to send: to whom, what, and whether the mail server took it.
--- NOT IN THE PLAN DOCUMENT, on purpose: it is written by the server function that sends
--- (supabase/functions/send-mail), at the moment it sends, and a whole-plan save from a tab opened
--- before that moment must not be able to erase it. So the person is named by kind and key, as in
--- ticketing_choice, and a row naming somebody the plan no longer holds is simply never shown.
+-- THE CODE IS THE CREDENTIAL, exactly as for get_volunteer_schedule, and the checks are here:
+-- the step must exist on the person's event and ask a question, a « confirmer » step only takes
+-- « oui », and the question must have been SENT to this person (a mail accepted by the server for
+-- this step), so a code cannot answer a question nobody asked it. Returns null for any refusal,
+-- whatever the reason, like a wrong code.
 --
--- Append only: an organiser may read and add, nobody's browser may change or remove a row. A
--- failure the function could not record (it was unreachable) is added by the browser itself.
+-- A ceiling of 50 answers per person and step keeps a code from filling the table.
 -- ---------------------------------------------------------------------------
 
-create table mail_log (
-  id          bigint generated always as identity primary key,
-  event_id    uuid not null references event(id) on delete cascade,
-  person_kind text not null check (person_kind in ('benevole', 'orga', 'artiste', 'extra')),
-  person_key  text not null,
-  recipient   text not null,
-  subject     text not null,
-  body        text not null,
-  -- 'envoye' when the mail server accepted the message, 'echec' otherwise, with what it said.
-  -- Accepted is not delivered: a mailbox that bounces later is not known here.
-  outcome     text not null check (outcome in ('envoye', 'echec')),
-  error       text not null default '',
-  -- Sent by validating somebody, or sent again by hand from their fiche.
-  reason      text not null default 'validation' check (reason in ('validation', 'renvoi')),
-  sent_at     timestamptz not null default now(),
-  sent_by     uuid default auth.uid()
-);
+create or replace function public.answer_step(p_code text, p_step text, p_answer text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_event uuid;
+  v_key   text;
+  v_reply text;
+  v_mail  bigint;
+  v_at    timestamptz;
+begin
+  -- An empty code is the state of a benevole nobody issued one to: it opens nothing.
+  if p_answer is null or p_answer not in ('oui', 'non') or btrim(coalesce(p_code, '')) = '' then
+    return null;
+  end if;
 
-create index mail_log_person_idx on mail_log (event_id, person_kind, person_key, id desc);
+  select me.event_id, me.key into v_event, v_key
+  from volunteer me
+  where me.access_code = upper(trim(p_code));
+  if v_event is null then
+    return null;
+  end if;
 
-alter table mail_log enable row level security;
+  select st.s->'mail'->>'reply' into v_reply
+  from event e
+  cross join lateral jsonb_array_elements(e.application_steps) as st(s)
+  where e.id = v_event and st.s->>'key' = p_step
+  limit 1;
+  if v_reply is null or v_reply not in ('confirmer', 'oui-non') then
+    return null;
+  end if;
+  if v_reply = 'confirmer' and p_answer <> 'oui' then
+    return null;
+  end if;
 
-create policy mail_log_organiser_select on mail_log for select to authenticated using (true);
-create policy mail_log_organiser_insert on mail_log for insert to authenticated with check (true);
+  select ml.id into v_mail
+  from mail_log ml
+  where ml.event_id = v_event and ml.person_kind = 'benevole' and ml.person_key = v_key
+    and ml.step_key = p_step and ml.outcome = 'envoye'
+  order by ml.id desc
+  limit 1;
+  if v_mail is null then
+    return null;
+  end if;
+
+  if (select count(*) from step_reply r
+      where r.event_id = v_event and r.volunteer_key = v_key and r.step_key = p_step) >= 50 then
+    return null;
+  end if;
+
+  insert into step_reply (event_id, volunteer_key, step_key, answer, mail_id, source, answered_by)
+  values (v_event, v_key, p_step, p_answer, v_mail, 'lien', null)
+  returning answered_at into v_at;
+
+  return jsonb_build_object('key', p_step, 'answer', p_answer, 'answeredAt', v_at);
+end;
+$fn$;
+
+revoke all on function public.answer_step(text, text, text) from public, anon, authenticated;
+grant execute on function public.answer_step(text, text, text) to anon, authenticated;

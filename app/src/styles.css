@@ -5570,3 +5570,322 @@ textarea.select,
 .mail-placeholders code {
   margin-right: 6px;
 }
+
+/* --------------------------------------------------------------------------
+   Le suivi par mail, 2026-10-22: the frise on a fiche, the steps, the Mails tab, the
+   confirmation window with the names, the questions on the bénévole page.
+   -------------------------------------------------------------------------- */
+
+.registration {
+  flex-wrap: wrap;
+}
+
+/* « Planning : confirmé », after the status: the furthest step reached. */
+.registration-stage {
+  flex-basis: 100%;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.registration-marks {
+  flex-basis: 100%;
+}
+
+.people-meta.is-warn {
+  color: var(--orange-fonce);
+}
+
+.followup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.followup-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.followup-step:last-child {
+  border-bottom: 0;
+}
+
+.followup-step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.followup-step-label {
+  font-weight: 600;
+}
+
+.followup-step-head .chip {
+  margin: 0;
+}
+
+/* Personnes > Mails. */
+.mails-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+.mails-screen .card {
+  margin: 0 12px;
+}
+
+.mails-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  border-left: 4px solid var(--line-strong);
+}
+
+.mails-batch.is-running {
+  border-left-color: var(--accent);
+}
+
+.mails-batch .is-bad {
+  color: var(--rouge);
+}
+
+.mails-batch .is-warn {
+  color: var(--orange-fonce);
+}
+
+.mails-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mails-step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.mails-step-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mails-step.is-manual {
+  background: var(--surface-sunken);
+}
+
+.mails-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mails-figures strong {
+  font-size: 18px;
+}
+
+.mails-figures .is-ok strong {
+  color: var(--ok);
+}
+
+.mails-figures .is-warn strong {
+  color: var(--orange-fonce);
+}
+
+.mails-figures .is-bad strong {
+  color: var(--rouge);
+}
+
+.mails-figures .is-muted {
+  color: var(--ink-faint);
+}
+
+/* The window that names everybody before a grouped action. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 16, 24, 0.45);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(920px, 100%);
+  max-height: calc(100vh - 32px);
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dialog-intro p {
+  margin: 0;
+}
+
+.dialog-body {
+  display: flex;
+  gap: 14px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.dialog-names {
+  flex: 0 0 260px;
+  overflow-y: auto;
+}
+
+.dialog-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.dialog-list {
+  margin: 0 0 8px;
+  padding-left: 26px;
+}
+
+.dialog-name {
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dialog-name:hover,
+.dialog-name.is-active {
+  background: var(--accent-soft);
+}
+
+.dialog-name.is-off {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .dialog-body {
+    flex-direction: column;
+  }
+
+  .dialog-names {
+    flex-basis: auto;
+    max-height: 30vh;
+  }
+}
+
+/* Réglages, a step's mail under its row. */
+.setup-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-mail {
+  margin: 0 0 8px 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-sunken);
+}
+
+.step-mail-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step-mail .field.is-inline .select.is-narrow {
+  flex: 0 0 auto;
+  width: 70px;
+}
+
+/* The bénévole page: the questions, above the shifts. */
+.benevole-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.benevole-question {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border-left: 4px solid var(--accent);
+}
+
+.benevole-question.is-answered {
+  border-left-color: var(--ok);
+}
+
+.benevole-question-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.benevole-question-text {
+  margin: 0;
+  font-size: 16px;
+}
+
+.benevole-question-done {
+  margin: 0;
+  color: var(--ok);
+}
+
+.benevole-question-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.benevole-question .btn {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.benevole-question .btn.is-link {
+  min-height: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* In the window, the whole mail: the list beside it scrolls, the mail is read in full. */
+.dialog-preview .registration-mail-body {
+  max-height: none;
+}
