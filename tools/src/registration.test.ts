@@ -9,13 +9,17 @@ import test from 'node:test';
 import { DEFAULT_TICKETING, makeArtist, makeArtistMember } from './model.js';
 import type { Plan } from './plan.js';
 import {
-  DEFAULT_MAIL_TEMPLATES,
+  DEFAULT_MAILS,
+  audiencesWithoutMail,
   isMailAddress,
+  mailFor,
+  mailsOf,
   registrantOf,
   registrants,
   renderMail,
   setRegistrationStatus,
-  withMailTemplate,
+  withAudience,
+  withMails,
 } from './registration.js';
 
 /** Only what the module reads: it never touches a créneau. */
@@ -58,7 +62,7 @@ test('a status is set on the right person of the right kind, and on nobody else'
 });
 
 test('a message is filled for the person, and an orga is sent the orgas’ door', () => {
-  const lea = renderMail(plan, registrantOf(plan, 'benevole', 'v1')!, 'https://planning.example.org/');
+  const lea = renderMail(plan, registrantOf(plan, 'benevole', 'v1')!, 'https://planning.example.org/')!;
   assert.equal(lea.to, 'lea@example.org');
   assert.equal(lea.subject, 'Loto Test : ton inscription bénévole est validée');
   assert.match(lea.body, /^Bonjour Léa,/);
@@ -67,26 +71,45 @@ test('a message is filled for the person, and an orga is sent the orgas’ door'
   assert.match(lea.body, /ton code d'accès, si on te le demande : ABCD1234/);
   assert.deepEqual(lea.empty, []);
 
-  const sam = renderMail(plan, registrantOf(plan, 'orga', 'o1')!, 'https://planning.example.org');
+  const sam = renderMail(plan, registrantOf(plan, 'orga', 'o1')!, 'https://planning.example.org')!;
   assert.match(sam.subject, /responsable de pôle/);
   assert.match(sam.body, /https:\/\/planning\.example\.org\/\?responsable/);
 
-  const kim = renderMail(plan, registrantOf(plan, 'artiste', 'm1')!, 'https://planning.example.org');
+  const kim = renderMail(plan, registrantOf(plan, 'artiste', 'm1')!, 'https://planning.example.org')!;
   assert.match(kim.body, /venue de Les Tests à Loto Test, le samedi 13 mars 2027, Salle des fêtes, Lyon/);
 });
 
 test('a blank with nothing to put in it is reported, and an unknown one is left alone', () => {
-  const custom = withMailTemplate({}, 'orga', { subject: 'Salut {prenom}', body: 'Code {code}, {inconnu}' });
-  const noa = renderMail({ ...plan, mailTemplates: custom }, registrantOf(plan, 'orga', 'o2')!, '');
+  const custom = withMails({}, 'validation', [{ key: 'orga', audiences: ['orga'], subject: 'Salut {prenom}', body: 'Code {code}, {inconnu}' }]);
+  const noa = renderMail({ ...plan, mailTemplates: custom }, registrantOf(plan, 'orga', 'o2')!, '')!;
   assert.equal(noa.body, 'Code , {inconnu}');
   assert.deepEqual(noa.empty, ['{code}']);
 });
 
-test('a template equal to the default is not stored', () => {
-  assert.deepEqual(withMailTemplate({}, 'artiste', DEFAULT_MAIL_TEMPLATES.artiste), {});
-  const stored = withMailTemplate({}, 'artiste', { subject: 'x', body: 'y' });
-  assert.deepEqual(stored, { artiste: { subject: 'x', body: 'y' } });
-  assert.deepEqual(withMailTemplate(stored, 'artiste', null), {});
+test('a list equal to the defaults is not stored, and a changed one is stored whole', () => {
+  assert.deepEqual(withMails({}, 'validation', [...DEFAULT_MAILS.validation]), {});
+  const changed = DEFAULT_MAILS.validation.map((m) => (m.key === 'artiste' ? { ...m, subject: 'x' } : m));
+  const stored = withMails({}, 'validation', changed);
+  assert.equal(stored.validation?.length, DEFAULT_MAILS.validation.length);
+  assert.equal(mailFor({ mailTemplates: stored }, 'validation', 'artiste')?.subject, 'x');
+  assert.deepEqual(withMails(stored, 'validation', null), {});
+});
+
+test('one mail may serve several kinds, and a kind put on a mail leaves the one it was on', () => {
+  assert.equal(mailFor({ mailTemplates: {} }, 'validation', 'partenaire')?.key, 'invitation', 'partenaire et autre partagent un mail');
+  assert.equal(mailFor({ mailTemplates: {} }, 'validation', 'autre')?.key, 'invitation');
+  const moved = withAudience(mailsOf({ mailTemplates: {} }, 'validation'), 'prestataire', 'partenaire', true);
+  assert.deepEqual(moved.find((m) => m.key === 'invitation')!.audiences, ['autre']);
+  assert.deepEqual(moved.find((m) => m.key === 'prestataire')!.audiences, ['prestataire', 'partenaire']);
+});
+
+test('the cancellation has its own mails, and a kind no mail is for gets none and is named', () => {
+  const lea = renderMail(plan, registrantOf(plan, 'benevole', 'v1')!, '', 'annulation')!;
+  assert.match(lea.subject, /annulée/);
+  const withElu = { ...plan, ticketing: { ...plan.ticketing, guestTypes: [...plan.ticketing.guestTypes, { key: 'elu', label: 'Élu·e', drinkTickets: 0, mealTickets: 0 }] } };
+  assert.equal(mailFor(withElu, 'validation', 'elu'), null);
+  assert.deepEqual(audiencesWithoutMail(withElu, 'validation'), ['Élu·e']);
+  assert.deepEqual(audiencesWithoutMail(withElu, 'annulation'), ['Élu·e']);
 });
 
 test('a mail address is refused when it is obviously not one', () => {

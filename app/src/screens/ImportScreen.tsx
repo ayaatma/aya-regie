@@ -18,6 +18,7 @@ import {
   existingCodes,
   fmtHours,
   keptByDefault,
+  resubmittedCancelled,
   importVolunteers,
   foldIssuesIntoFiches,
   surveyForm,
@@ -116,6 +117,8 @@ export function ImportScreen() {
   };
   const mapping: FormMapping = session?.mapping ?? plan.formMapping;
   const flipped = useMemo<ReadonlySet<string>>(() => new Set(session?.flipped ?? []), [session?.flipped]);
+  /** Cancelled people who filled the form in again, ticked to come back as inscriptions. */
+  const [reinstated, setReinstated] = useState<ReadonlySet<string>>(() => new Set());
   /** Whose reading is being corrected, before any of it is applied. */
   const [correcting, setCorrecting] = useState<string | null>(null);
   /**
@@ -375,7 +378,10 @@ export function ImportScreen() {
     try {
       apply(
         withBuddyFixes(
-          setFormMapping(applyReconciliation(plan, imported.result, reconciliation, { keep: kept }), mapping),
+          setFormMapping(
+            applyReconciliation(plan, imported.result, reconciliation, { keep: kept, reinstate: reinstated }),
+            mapping,
+          ),
           session?.fixes ?? {},
         ),
         `import: ${summary}`,
@@ -696,6 +702,40 @@ export function ImportScreen() {
                       </span>
                       {volunteer.email !== '' && <span className="chip">{volunteer.email}</span>}
                     </div>
+                  ))}
+                </section>
+              )}
+
+              {/*
+                A cancelled person who filled the form in again, since 2026-10-22: asked, never
+                decided. Unticked, they stay cancelled, as every cancelled person always did.
+              */}
+              {resubmittedCancelled(reconciliation).length > 0 && (
+                <section className="setup-group">
+                  <div className="setup-group-head">
+                    <span className="setup-group-title">
+                      Annulé·es qui ont rempli le formulaire à nouveau (
+                      {resubmittedCancelled(reconciliation).length})
+                    </span>
+                  </div>
+                  {resubmittedCancelled(reconciliation).map((update) => (
+                    <label key={update.key} className="import-removal">
+                      <input
+                        type="checkbox"
+                        name={`reinstate-${update.key}`}
+                        checked={reinstated.has(update.key)}
+                        onChange={(event) => {
+                          const next = new Set(reinstated);
+                          if (event.target.checked) next.add(update.key);
+                          else next.delete(update.key);
+                          setReinstated(next);
+                        }}
+                      />
+                      <span className="import-removal-name">{update.name}</span>
+                      <span className="people-meta">
+                        Réintégrer ? Coché, la personne repasse en « Inscription »; sinon elle reste annulée.
+                      </span>
+                    </label>
                   ))}
                 </section>
               )}

@@ -27,7 +27,7 @@ import type { MailFact, RegistrantKind, RenderedMail, ReplyFact } from '../engin
 import { getSupabase, supabaseConfigured } from '../persistence/supabaseClient.ts';
 
 /** `test`: one person's mail sent to the régisseur's test address. It counts for nobody. */
-export type MailReason = 'validation' | 'renvoi' | 'etape' | 'relance' | 'test';
+export type MailReason = 'validation' | 'renvoi' | 'etape' | 'relance' | 'test' | 'annulation';
 
 export interface MailEntry {
   id: number;
@@ -94,7 +94,7 @@ const changed = (book: Book): void => {
 
 const message = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
-const REASONS: readonly MailReason[] = ['validation', 'renvoi', 'etape', 'relance', 'test'];
+const REASONS: readonly MailReason[] = ['validation', 'renvoi', 'etape', 'relance', 'test', 'annulation'];
 
 const entryOf = (row: Record<string, unknown>): MailEntry => ({
   id: Number(row.id),
@@ -196,7 +196,9 @@ function logOf(book: Book | null): MailLog {
     error: book?.error ?? null,
     entriesOf: (kind, key) => entries.filter((e) => e.personKind === kind && e.personKey === key),
     lastOf: (kind, key) => entries.find((e) => e.personKind === kind && e.personKey === key) ?? null,
-    lastValidationOf: (kind, key) => entries.find((e) => e.personKind === kind && e.personKey === key && !isStep(e)) ?? null,
+    // The validation and its resends only: a cancellation mail is not « the » mail of a fiche.
+    lastValidationOf: (kind, key) =>
+      entries.find((e) => e.personKind === kind && e.personKey === key && (e.reason === 'validation' || e.reason === 'renvoi')) ?? null,
     factsOf: (volunteerKey) => ({
       mails: entries
         .filter((e) => e.personKind === 'benevole' && e.personKey === volunteerKey && isStep(e))

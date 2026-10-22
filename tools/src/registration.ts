@@ -15,10 +15,15 @@
  */
 
 import {
+  BUILT_IN_AUDIENCES,
   applicationStatusOf,
+  statusLabel,
   statusOf,
   type ApplicationStatus,
+  type AudienceMail,
   type MailAudience,
+  type MailKind,
+  type MailSet,
   type MailTemplate,
 } from './model.js';
 import type { Plan } from './plan.js';
@@ -43,7 +48,7 @@ export interface Registrant {
   requestedHours: number;
 }
 
-export const MAIL_AUDIENCE_LABEL: Record<MailAudience, string> = {
+export const MAIL_AUDIENCE_LABEL: Record<string, string> = {
   benevole: 'Bénévole',
   orga: 'Orga',
   responsable: 'Responsable de pôle',
@@ -51,6 +56,20 @@ export const MAIL_AUDIENCE_LABEL: Record<MailAudience, string> = {
   prestataire: 'Prestataire',
   autre: 'Autre invitation',
 };
+
+/** Every kind a mail can be for on this event: the computed ones, then its guest types. */
+export function audienceOptions(plan: Pick<Plan, 'ticketing'>): Array<{ key: MailAudience; label: string }> {
+  return [
+    ...BUILT_IN_AUDIENCES.map((key) => ({ key, label: MAIL_AUDIENCE_LABEL[key] ?? key })),
+    ...plan.ticketing.guestTypes.map((g) => ({ key: g.key, label: g.label })),
+  ];
+}
+
+/** The name of a kind, a guest type's included. */
+export const audienceLabel = (plan: Pick<Plan, 'ticketing'>, audience: MailAudience): string =>
+  MAIL_AUDIENCE_LABEL[audience] && BUILT_IN_AUDIENCES.includes(audience)
+    ? MAIL_AUDIENCE_LABEL[audience]!
+    : statusLabel(audience, plan.ticketing.guestTypes);
 
 /** Everybody who can be validated, in the order the Personnes tab lists them. */
 export function registrants(plan: Plan): Registrant[] {
@@ -82,7 +101,7 @@ export function registrants(plan: Plan): Registrant[] {
   for (const x of plan.ticketing.extras) {
     out.push({
       kind: 'extra', key: x.key, firstName: x.firstName, lastName: x.lastName, email: x.email ?? '',
-      status: applicationStatusOf(x), audience: x.status === 'prestataire' ? 'prestataire' : 'autre', accessCode: '', actName: '',
+      status: applicationStatusOf(x), audience: x.status, accessCode: '', actName: '',
       requestedHours: 0,
     });
   }
@@ -145,7 +164,7 @@ export const MAIL_PLACEHOLDERS: readonly { token: string; label: string }[] = [
  * prestataires, who are not. No gendered agreement anywhere: half the people written to are
  * women, and « validée » agrees with « inscription », not with them.
  */
-export const DEFAULT_MAIL_TEMPLATES: Record<MailAudience, MailTemplate> = {
+export const DEFAULT_MAIL_TEMPLATES: Record<string, MailTemplate> = {
   benevole: {
     subject: '{evenement} : ton inscription bénévole est validée',
     body:
@@ -206,28 +225,107 @@ export const DEFAULT_MAIL_TEMPLATES: Record<MailAudience, MailTemplate> = {
   },
 };
 
-/** The message an audience gets on this event: the régisseur's text, else the default. */
-export function mailTemplateFor(plan: Pick<Plan, 'mailTemplates'>, audience: MailAudience): MailTemplate {
-  return plan.mailTemplates[audience] ?? DEFAULT_MAIL_TEMPLATES[audience];
+const fromDefault = (key: string, audiences: MailAudience[]): AudienceMail => ({
+  key,
+  audiences,
+  subject: DEFAULT_MAIL_TEMPLATES[key]!.subject,
+  body: DEFAULT_MAIL_TEMPLATES[key]!.body,
+});
+
+/**
+ * What every event starts with, since 2026-10-22. The validation: one mail per kind the tool
+ * knows, the prestataire's, and one for the invitations (Partenaire and Autre invitation). The
+ * cancellation: one for the team, tutoyée, one for everybody else, vouvoyée.
+ */
+export const DEFAULT_MAILS: Record<MailKind, readonly AudienceMail[]> = {
+  validation: [
+    fromDefault('benevole', ['benevole']),
+    fromDefault('orga', ['orga']),
+    fromDefault('responsable', ['responsable']),
+    fromDefault('artiste', ['artiste']),
+    fromDefault('prestataire', ['prestataire']),
+    { ...fromDefault('autre', ['partenaire', 'autre']), key: 'invitation' },
+  ],
+  annulation: [
+    {
+      key: 'equipe',
+      audiences: ['benevole', 'orga', 'responsable'],
+      subject: '{evenement} : ton inscription est annulée',
+      body:
+        'Bonjour {prenom},\n\n' +
+        "C'est noté : ta participation à {evenement} ({date}) est annulée. Merci de nous avoir prévenu·e·s.\n\n" +
+        "S'il s'agit d'une erreur, il suffit de répondre à ce mail.\n\n" +
+        'Peut-être à une prochaine fois,\n' +
+        "L'équipe d'organisation",
+    },
+    {
+      key: 'invites',
+      audiences: ['artiste', 'partenaire', 'prestataire', 'autre'],
+      subject: '{evenement} : annulation confirmée',
+      body:
+        'Bonjour {prenom},\n\n' +
+        'Nous vous confirmons l’annulation de votre venue à {evenement}, le {date}.\n' +
+        "S'il s'agit d'une erreur, il suffit de répondre à ce mail.\n\n" +
+        'Cordialement,\n' +
+        "L'équipe d'organisation",
+    },
+  ],
+};
+
+export const MAIL_KIND_LABEL: Record<MailKind, string> = { validation: 'Validation', annulation: 'Annulation' };
+
+/** The event's mails of one kind: its own list once touched, the defaults until then. */
+export const mailsOf = (plan: Pick<Plan, 'mailTemplates'>, kind: MailKind): readonly AudienceMail[] =>
+  plan.mailTemplates[kind] ?? DEFAULT_MAILS[kind];
+
+/** The mail one kind of person gets, or null when no mail of the list is for them. */
+export function mailFor(plan: Pick<Plan, 'mailTemplates'>, kind: MailKind, audience: MailAudience): AudienceMail | null {
+  return mailsOf(plan, kind).find((m) => m.audiences.includes(audience)) ?? null;
+}
+
+const sameMails = (a: readonly AudienceMail[], b: readonly AudienceMail[]): boolean =>
+  a.length === b.length &&
+  a.every(
+    (m, i) =>
+      m.key === b[i]!.key &&
+      m.subject === b[i]!.subject &&
+      m.body === b[i]!.body &&
+      m.audiences.length === b[i]!.audiences.length &&
+      m.audiences.every((x) => b[i]!.audiences.includes(x)),
+  );
+
+/**
+ * Stores a list, or forgets it when it is the defaults again: a list equal to the defaults is not
+ * a disagreement, and storing it would freeze today's defaults into the event.
+ */
+export function withMails(set: MailSet, kind: MailKind, mails: readonly AudienceMail[] | null): MailSet {
+  const next: MailSet = { ...set };
+  if (mails === null || sameMails(mails, DEFAULT_MAILS[kind])) delete next[kind];
+  else next[kind] = mails.map((m) => ({ ...m, audiences: [...m.audiences] }));
+  return next;
 }
 
 /**
- * Stores a rewritten message, or forgets it when it is the default again: a template equal to
- * the default is not a disagreement, and storing it would freeze today's default into the event.
+ * Puts a kind of person on a mail, or takes it off. A KIND IS ON ONE MAIL AT MOST: putting it on
+ * one takes it off the others, so who gets which text never depends on the order of the list.
  */
-export function withMailTemplate(
-  templates: Partial<Record<MailAudience, MailTemplate>>,
+export function withAudience(
+  mails: readonly AudienceMail[],
+  mailKey: string,
   audience: MailAudience,
-  template: MailTemplate | null,
-): Partial<Record<MailAudience, MailTemplate>> {
-  const next = { ...templates };
-  const fallback = DEFAULT_MAIL_TEMPLATES[audience];
-  if (template === null || (template.subject === fallback.subject && template.body === fallback.body)) {
-    delete next[audience];
-  } else {
-    next[audience] = template;
-  }
-  return next;
+  on: boolean,
+): AudienceMail[] {
+  return mails.map((m) => {
+    const without = m.audiences.filter((a) => a !== audience);
+    if (m.key !== mailKey) return on ? { ...m, audiences: without } : m;
+    return { ...m, audiences: on ? [...without, audience] : without };
+  });
+}
+
+/** The kinds of this event no mail of the list is for: they get nothing, and the screen says so. */
+export function audiencesWithoutMail(plan: Pick<Plan, 'mailTemplates' | 'ticketing'>, kind: MailKind): string[] {
+  const covered = new Set(mailsOf(plan, kind).flatMap((m) => m.audiences));
+  return audienceOptions(plan).filter((o) => !covered.has(o.key)).map((o) => o.label);
 }
 
 /** « samedi 13 mars 2027 », in the event's own time zone. */
@@ -247,13 +345,18 @@ export interface RenderedMail {
   empty: string[];
 }
 
-/** The validation message of one person, filled. See `renderTemplate`. */
+/**
+ * The validation (or the cancellation) message of one person, filled. See `renderTemplate`.
+ * Null when no mail of the event's list is for their kind.
+ */
 export function renderMail(
   plan: Pick<Plan, 'name' | 'startISO' | 'address' | 'mailTemplates'>,
   person: Registrant,
   siteUrl: string,
-): RenderedMail {
-  return renderTemplate(plan, person, mailTemplateFor(plan, person.audience), siteUrl);
+  kind: MailKind = 'validation',
+): RenderedMail | null {
+  const mail = mailFor(plan, kind, person.audience);
+  return mail ? renderTemplate(plan, person, mail, siteUrl) : null;
 }
 
 /** « 6 » or « 4,5 », for a blank. */

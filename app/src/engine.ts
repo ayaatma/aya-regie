@@ -168,6 +168,7 @@ export {
   mergeWithManual,
   reconcileVolunteers,
   summariseReconciliation,
+  resubmittedCancelled,
 } from '@engine/reconcile.ts';
 
 /** Bénévole ↔ orga, as one pure function with its consequences listed. See `@engine/convert.ts`. */
@@ -383,20 +384,27 @@ export type { ApplicationStatus, ApplicationStep, EnergyProfile, StepMail, StepR
 export { STEP_REPLIES, STEP_REPLY_LABEL } from '@engine/model.ts';
 
 // Validation of everybody and the validation mails, 2026-10-22.
-export { MAIL_AUDIENCES, applicationStatusOf } from '@engine/model.ts';
-export type { MailAudience, MailTemplate } from '@engine/model.ts';
+export { BUILT_IN_AUDIENCES, MAIL_AUDIENCES, applicationStatusOf } from '@engine/model.ts';
+export type { AudienceMail, MailAudience, MailKind, MailSet, MailTemplate } from '@engine/model.ts';
 export {
+  DEFAULT_MAILS,
   DEFAULT_MAIL_TEMPLATES,
   MAIL_AUDIENCE_LABEL,
+  MAIL_KIND_LABEL,
   MAIL_PLACEHOLDERS,
+  audienceLabel,
+  audienceOptions,
+  audiencesWithoutMail,
   isMailAddress,
-  mailTemplateFor,
+  mailFor,
+  mailsOf,
   registrantOf,
   registrants,
   renderMail,
   renderTemplate,
   setRegistrationStatus,
-  withMailTemplate,
+  withAudience,
+  withMails,
 } from '@engine/registration.ts';
 
 // The follow-up by mail after the validation, 2026-10-22.

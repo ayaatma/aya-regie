@@ -1221,12 +1221,42 @@ export const DEFAULT_APPLICATION_STEPS: readonly ApplicationStep[] = [
 ];
 
 /**
- * Who a validation mail speaks to, since 2026-10-22: one message per kind of person, because a
- * bénévole is told something else than a band. A responsable is an orga holding a pole.
+ * Who a mail speaks to: a kind of person, because a bénévole is told something else than a band.
+ * A responsable is an orga holding a pole. SINCE 2026-10-22 A GUEST TYPE'S KEY IS ONE TOO (see
+ * `GuestType`): « prestataire » and « autre » were fixed kinds before, and are now the keys of
+ * two default guest types.
  */
-export type MailAudience = 'benevole' | 'orga' | 'responsable' | 'artiste' | 'prestataire' | 'autre';
+export type MailAudience = string;
 
+/** The kinds the tool computes. The event's guest types come after them. */
+export const BUILT_IN_AUDIENCES: readonly MailAudience[] = ['benevole', 'orga', 'responsable', 'artiste'];
+
+/** The fixed kinds of before 2026-10-22, read from a stored plan that still has them. */
 export const MAIL_AUDIENCES: readonly MailAudience[] = ['benevole', 'orga', 'responsable', 'artiste', 'prestataire', 'autre'];
+
+/** What a mail is sent for, from a fiche: the validation, and since 2026-10-22 the cancellation. */
+export type MailKind = 'validation' | 'annulation';
+
+/**
+ * One message and the kinds of person it goes to, since 2026-10-22. One mail may serve several
+ * kinds (« Partenaire » and « Autre invitation »), and each kind has its own if the régisseur
+ * wants: a kind is on one mail of a list at most.
+ */
+export interface AudienceMail {
+  key: string;
+  audiences: MailAudience[];
+  subject: string;
+  body: string;
+}
+
+/**
+ * The event's mails by what they are sent for. A list ABSENT IS THE DEFAULTS, so a better default
+ * text reaches every event that never touched it; once touched, the list is stored whole.
+ */
+export interface MailSet {
+  validation?: AudienceMail[];
+  annulation?: AudienceMail[];
+}
 
 /** One message, with `{prenom}`-style blanks filled at sending time. See `registration.ts`. */
 export interface MailTemplate {

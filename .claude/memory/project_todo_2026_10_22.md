@@ -40,7 +40,7 @@ organiserDrinksFixed, guestTypes, TicketType.bracelet, braceletKeys, free extra 
 checks on extra_person.status and bracelet_default.status). schema-check flags them. PLAN_FORMAT
 goes to 29 with it. The developer deploys everything at the end of the batch (answer 17).
 
-**Mails, decided, not built yet:**
+**Mails: 8 (popups) BUILT; 7 validation lists per kind + 6 cancellation mail and « réintégrer ? » in the import BUILT 2026-10-23 (`mailsOf`, `withAudience`, `resubmittedCancelled`), mail_log reason « annulation » needs migration 38. LEFT: 7 step variants per kind + orgas getting planning/infos, 9 planning fingerprint + « souci » comment, migration 38, PLAN_FORMAT 29. Decisions:**
 - 6 cancelled = status « Annulée » in the tool (already kept across a re-sync by
   `mergeWithManual`); a re-submitted form of a cancelled person is a « réintégrer ? » line in the
   import review; a cancellation mail per kind, checked by default in the popup.

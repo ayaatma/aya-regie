@@ -31,8 +31,7 @@ import {
   type Team,
   type SideActivity,
   type EquipmentItem,
-  type MailAudience,
-  type MailTemplate,
+  type MailSet,
 } from './model.js';
 import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
 import {
@@ -327,7 +326,7 @@ export interface Plan {
    * never touched it. Since 2026-10-22. What was sent, and whether it went, is NOT here: see
    * `mail_log` in `db/schema.sql`, written by the server that sent it.
    */
-  mailTemplates: Partial<Record<MailAudience, MailTemplate>>;
+  mailTemplates: MailSet;
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *

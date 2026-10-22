@@ -13,6 +13,11 @@
  * failed and why, with the history folded under it. « Renvoyer le mail » sends again whatever the
  * last outcome, through the same preview.
  *
+ * CANCELLING GOES THROUGH THE SAME WINDOW since 2026-10-22, with the event's cancellation mail
+ * for that kind of person, « Envoyer ce mail » ticked: the régisseur asked for one, sent on a box
+ * left ticked. A kind with no mail of that list is cancelled or validated without one, and the
+ * window says so.
+ *
  * READ-ONLY (an orga's code): the status only. The mail record needs a régisseur's session.
  */
 
@@ -21,7 +26,7 @@ import { useState } from 'react';
 import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_LABEL,
-  MAIL_AUDIENCE_LABEL,
+  audienceLabel,
   followUpOf,
   isMailAddress,
   registrantOf,
@@ -49,7 +54,7 @@ export function RegistrationSection({
   const { plan, edit } = useLoadedPlan();
   const { id: eventId } = usePlan();
   const log = useMailLog(readOnly ? null : eventId);
-  const [confirming, setConfirming] = useState<null | 'validation' | 'renvoi'>(null);
+  const [confirming, setConfirming] = useState<null | 'validation' | 'renvoi' | 'annulation'>(null);
   const [withMail, setWithMail] = useState(true);
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -59,8 +64,9 @@ export function RegistrationSection({
 
   const who = `${person.firstName} ${person.lastName}`.trim() || 'cette personne';
   const status = person.status;
-  const mail = renderMail(plan, person, siteUrl());
-  const addressOk = isMailAddress(mail.to);
+  // The mail of the window open, or of the validation when none is: the cancellation has its own.
+  const mail = renderMail(plan, person, siteUrl(), confirming === 'annulation' ? 'annulation' : 'validation');
+  const addressOk = mail !== null && isMailAddress(mail.to);
   const history = log.entriesOf(kind, personKey);
   const last = log.lastValidationOf(kind, personKey);
   const stepLabels = new Map(plan.applicationSteps.map((st) => [st.key, st.label]));
@@ -72,16 +78,17 @@ export function RegistrationSection({
   const setStatus = (next: ApplicationStatus): void =>
     edit((p) => setRegistrationStatus(p, kind, personKey, next), `inscription de ${who}: ${APPLICATION_STATUS_LABEL[next].toLowerCase()}`);
 
-  const open = (mode: 'validation' | 'renvoi'): void => {
+  const open = (mode: 'validation' | 'renvoi' | 'annulation'): void => {
     setConfirming(mode);
-    setWithMail(addressOk);
+    setWithMail(true);
   };
 
   const confirm = async (): Promise<void> => {
     const mode = confirming;
     if (mode === null) return;
     if (mode === 'validation') setStatus('valide');
-    if ((mode === 'renvoi' || withMail) && addressOk && eventId !== null) {
+    if (mode === 'annulation') setStatus('annule');
+    if ((mode === 'renvoi' || withMail) && mail !== null && addressOk && eventId !== null) {
       setSending(true);
       await sendMail(eventId, kind, personKey, mail, mode);
       setSending(false);
@@ -96,7 +103,7 @@ export function RegistrationSection({
         {APPLICATION_STATUS_LABEL[status]}
         {status === 'candidature' && <span className="registration-hint">, pas encore validée</span>}
       </span>
-      <span className="registration-audience">{MAIL_AUDIENCE_LABEL[person.audience]}</span>
+      <span className="registration-audience">{audienceLabel(plan, person.audience)}</span>
       {followUp && status === 'valide' && followUp.stage.label !== 'Validé·e' && (
         <span className="registration-stage">{followUp.stage.label}</span>
       )}
@@ -126,7 +133,7 @@ export function RegistrationSection({
             </button>
           )}
           {status === 'valide' && (
-            <button type="button" className="btn is-small" onClick={() => open('renvoi')} disabled={!addressOk}>
+            <button type="button" className="btn is-small" onClick={() => open('renvoi')} disabled={!isMailAddress(person.email)}>
               {last ? 'Renvoyer le mail' : 'Envoyer le mail'}
             </button>
           )}
@@ -138,8 +145,9 @@ export function RegistrationSection({
               aria-label={`Statut de ${who}`}
               onChange={(event) => {
                 const next = event.target.value as ApplicationStatus;
-                // Validating goes through the preview, whichever control asked for it.
+                // Validating and cancelling go through the window, whichever control asked.
                 if (next === 'valide') open('validation');
+                else if (next === 'annule') open('annulation');
                 else setStatus(next);
               }}
             >
@@ -159,15 +167,30 @@ export function RegistrationSection({
       */}
       {confirming !== null && (
         <SendDialog
-          title={confirming === 'validation' ? `Valider ${who}` : `Renvoyer le mail à ${who}`}
+          title={
+            confirming === 'validation'
+              ? `Valider ${who}`
+              : confirming === 'annulation'
+                ? `Annuler l'inscription de ${who}`
+                : `Renvoyer le mail à ${who}`
+          }
           intro={
             <>
-              {mail.empty.length > 0 && addressOk && (
-                <p className="people-meta is-bad">
-                  Vide dans ce message: {mail.empty.join(', ')}. Le texte se change dans Réglages, Mails de validation.
+              {confirming === 'annulation' && kind === 'benevole' && (
+                <p>Ses places restent où elles sont: elles passent en rouge sur la grille, à libérer depuis sa fiche.</p>
+              )}
+              {mail === null && (
+                <p className="people-meta is-warn">
+                  Aucun mail {confirming === 'annulation' ? "d'annulation" : 'de validation'} n'est prévu pour «{' '}
+                  {audienceLabel(plan, person.audience)} » (Réglages, Mails).
                 </p>
               )}
-              {confirming === 'validation' && addressOk && (
+              {mail !== null && mail.empty.length > 0 && addressOk && (
+                <p className="people-meta is-bad">
+                  Vide dans ce message: {mail.empty.join(', ')}. Le texte se change dans Réglages, Mails.
+                </p>
+              )}
+              {confirming !== 'renvoi' && addressOk && (
                 <label className="fiche-step">
                   <input
                     type="checkbox"
@@ -184,14 +207,24 @@ export function RegistrationSection({
             {
               id: `${kind}|${personKey}`,
               name: who,
-              mail: confirming === 'validation' && !withMail ? null : mail,
+              mail: confirming !== 'renvoi' && !withMail ? null : mail,
               kind,
               key: personKey,
             },
           ]}
-          withoutMailNote={confirming === 'validation' ? 'validé·e sans mail' : undefined}
+          withoutMailNote={
+            confirming === 'validation' ? 'validé·e sans mail' : confirming === 'annulation' ? 'annulé·e sans mail' : undefined
+          }
           confirmLabel={(mailed) =>
-            confirming === 'renvoi' ? 'Envoyer' : mailed > 0 ? 'Valider et envoyer' : 'Valider sans mail'
+            confirming === 'renvoi'
+              ? 'Envoyer'
+              : confirming === 'annulation'
+                ? mailed > 0
+                  ? 'Annuler et envoyer'
+                  : 'Annuler sans mail'
+                : mailed > 0
+                  ? 'Valider et envoyer'
+                  : 'Valider sans mail'
           }
           onConfirm={() => void confirm()}
           onClose={() => {
@@ -233,6 +266,8 @@ function MailLine({ entry, stepLabels }: { entry: MailEntry; stepLabels: Map<str
   const what =
     entry.reason === 'renvoi'
       ? 'Mail renvoyé'
+      : entry.reason === 'annulation'
+        ? "Mail d'annulation envoyé"
       : entry.reason === 'etape'
         ? `Mail « ${step} » envoyé`
         : entry.reason === 'relance'

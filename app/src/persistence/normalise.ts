@@ -20,8 +20,9 @@ import {
   type EquipmentStatus,
   APPLICATION_STATUSES,
   MAIL_AUDIENCES,
-  type MailAudience,
-  type MailTemplate,
+  DEFAULT_MAILS,
+  type AudienceMail,
+  type MailSet,
   DEFAULT_APPLICATION_STEPS,
   DEFAULT_PHASE_OPTIONS,
   DEFAULT_GUEST_TYPES,
@@ -144,12 +145,32 @@ const applicationStatus = (value: unknown): ApplicationStatus =>
   (APPLICATION_STATUSES as readonly unknown[]).includes(value) ? (value as ApplicationStatus) : 'candidature';
 
 /** The validation mails the régisseur rewrote, by audience; anything else is dropped. */
-const mailTemplates = (value: unknown): Partial<Record<MailAudience, MailTemplate>> => {
+const audienceMails = (value: unknown): AudienceMail[] =>
+  array<unknown>(value)
+    .filter((m): m is Record<string, unknown> => m !== null && typeof m === 'object')
+    .map((m) => ({ key: text(m.key), audiences: keys(m.audiences), subject: text(m.subject), body: text(m.body) }))
+    .filter((m) => m.key !== '');
+
+/**
+ * The event's mails. Two lists since 2026-10-22, each absent while it is the defaults. BEFORE,
+ * one rewritten text per fixed kind (`{ orga: {subject, body} }`): those texts are put back on the
+ * default mail of their kind, so a message the régisseur wrote is never lost in the change.
+ */
+const mailTemplates = (value: unknown): MailSet => {
   const loose = (value ?? {}) as Record<string, unknown>;
-  const out: Partial<Record<MailAudience, MailTemplate>> = {};
-  for (const audience of MAIL_AUDIENCES) {
-    const t = loose[audience] as Record<string, unknown> | undefined;
-    if (t && typeof t === 'object') out[audience] = { subject: text(t.subject), body: text(t.body) };
+  const out: MailSet = {};
+  if (Array.isArray(loose.validation)) out.validation = audienceMails(loose.validation);
+  if (Array.isArray(loose.annulation)) out.annulation = audienceMails(loose.annulation);
+  const legacy = MAIL_AUDIENCES.filter((a) => {
+    const t = loose[a];
+    return t !== null && typeof t === 'object' && !Array.isArray(t);
+  });
+  if (out.validation === undefined && legacy.length > 0) {
+    out.validation = DEFAULT_MAILS.validation.map((mail) => {
+      const own = legacy.find((a) => mail.audiences.includes(a));
+      const t = own ? (loose[own] as Record<string, unknown>) : null;
+      return t ? { ...mail, audiences: [...mail.audiences], subject: text(t.subject), body: text(t.body) } : { ...mail, audiences: [...mail.audiences] };
+    });
   }
   return out;
 };

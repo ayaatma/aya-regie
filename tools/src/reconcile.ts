@@ -466,6 +466,21 @@ export interface ApplyOptions {
    * mistake should not cost somebody their evening.
    */
   keep?: ReadonlySet<string>;
+  /**
+   * Keys of cancelled people who filled the form in again, that the régisseur chose to put back
+   * among the inscriptions (`resubmittedCancelled`). Since 2026-10-22. Anybody else cancelled
+   * stays cancelled whatever the export says, as before.
+   */
+  reinstate?: ReadonlySet<string>;
+}
+
+/**
+ * The cancelled people whose answers changed on this import: they filled the form in again after
+ * the régisseur cancelled them. Never put back on their own, only offered (`ApplyOptions.reinstate`):
+ * a cancellation is the régisseur's decision, and a second form is a question, not an answer.
+ */
+export function resubmittedCancelled(reconciliation: Reconciliation): VolunteerUpdate[] {
+  return reconciliation.updated.filter((update) => update.before.status === 'annule');
 }
 
 /**
@@ -486,6 +501,7 @@ export function applyReconciliation(
   options: ApplyOptions = {},
 ): Plan {
   const keep = options.keep ?? new Set<string>();
+  const reinstate = options.reinstate ?? new Set<string>();
   const dropped = new Set(
     reconciliation.removed.filter((r) => !keep.has(r.volunteer.key)).map((r) => r.volunteer.key),
   );
@@ -499,7 +515,10 @@ export function applyReconciliation(
     const before = byKey.get(volunteer.key);
     // The access code, and every field the régisseur corrected by hand. Both are things a
     // re-import must never undo; `mergeWithManual` is the single place that says so.
-    volunteers.push(before ? mergeWithManual(before, volunteer) : volunteer);
+    const merged = before ? mergeWithManual(before, volunteer) : volunteer;
+    volunteers.push(
+      before && reinstate.has(volunteer.key) && before.status === 'annule' ? { ...merged, status: 'candidature' } : merged,
+    );
   }
   for (const volunteer of plan.volunteers) {
     if (byKeyPresent(imported.volunteers, volunteer.key)) continue;

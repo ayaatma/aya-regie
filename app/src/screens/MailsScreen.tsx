@@ -195,7 +195,7 @@ export function MailsScreen() {
                       const name = `${r.firstName} ${r.lastName}`.trim();
                       return {
                         id: `${r.kind}|${r.key}`, kind: r.kind, key: r.key, name, mail,
-                        job: isMailAddress(mail.to)
+                        job: mail !== null && isMailAddress(mail.to)
                           ? { kind: r.kind, key: r.key, name, mail, reason: 'renvoi' as const, stepKey: '', planning: '' }
                           : null,
                       };
