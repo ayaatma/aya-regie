@@ -644,18 +644,6 @@ function parseLevel(value: string): SkillLevel | null {
   return null;
 }
 
-/** Matches a pole by full path first, then by leaf name when that name is unambiguous. */
-function findPole(value: string, poles: readonly Pole[]): Pole | null {
-  const v = normalise(value);
-  if (v === '' || v === 'tout me va' || v === 'aucun') return null;
-
-  const byPath = poles.find((p) => normalise(p.path) === v);
-  if (byPath) return byPath;
-
-  const byName = poles.filter((p) => normalise(p.name) === v);
-  return byName.length === 1 ? byName[0]! : null;
-}
-
 /**
  * Splits a checkbox answer back into the options that were ticked.
  *
@@ -664,11 +652,20 @@ function findPole(value: string, poles: readonly Pole[]): Pole | null {
  * et billetterie" would be torn in half and then matched against nothing. Google Forms joins
  * ticked options with ", ", and no option in this form contains a comma.
  */
-const splitAnswers = (value: string): string[] =>
-  value
-    .split(/[,;]|\n/)
-    .map((s) => s.trim())
-    .filter((s) => s !== '' && !/^aucun|^tout me va/.test(normalise(s)));
+const splitAnswers = (value: string): string[] => {
+  const parts = value.split(/[,;]|\n/).map((s) => s.trim()).filter((s) => s !== '');
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    if (!/^aucun|^tout me va/.test(normalise(parts[i]!))) {
+      out.push(parts[i]!);
+      continue;
+    }
+    // The one option with a comma of its own, since 2026-10-22: « 💪 AUCUN, JE SUIS ULTRA CHAUD ».
+    // What follows a « none » and starts with « je » is the rest of that sentence, never a pole.
+    if (i + 1 < parts.length && /^je\b/.test(normalise(parts[i + 1]!))) i += 1;
+  }
+  return out;
+};
 
 const splitList = (value: string): string[] =>
   value.split(/[,;]|\bet\b|\n/).map((s) => s.trim()).filter((s) => s !== '');
@@ -1337,7 +1334,15 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     for (const raw of refusedRaw) {
       const decided = decidedAnswer('pole', raw);
       if (decided === '') continue;
-      const found = decided !== undefined ? poles.find((p) => p.key === decided) ?? null : findPole(raw, poles);
+      /*
+       * Read like a choice since 2026-10-22, not by exact label: « 🛠️ VOLANTE (Bénévole
+       * polyvalent) » found the Volante as a choice and nothing as a refusal. An answer naming no
+       * pole on purpose (« peu importe ») is no refusal and no signalement either.
+       */
+      const reading = decided !== undefined ? null : parsePoleAnswer(raw, poles);
+      if (reading && reading.value === '' && reading.confident) continue;
+      const key = decided ?? reading!.value;
+      const found = poles.find((p) => p.key === key) ?? null;
       if (found) refusedPoles.push(found);
       else {
         issues.push({
@@ -1455,6 +1460,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
 
     const artistKeys: string[] = [];
     for (const raw of splitList(cell(row, 'artist'))) {
+      // « Ça n'a pas d'importance », the form's own way of naming no artist.
+      if (/pas d importance|peu importe|^aucun|^rien|^personne|^non$|tout me va/.test(normalise(raw))) continue;
       const artist = artists.find((a) => normalise(a.name) === normalise(raw));
       if (artist) artistKeys.push(artist.key);
       else issues.push({ severity: 'warning', code: 'artiste-inconnu', row: rowNumber, person, message: `Artiste introuvable dans la programmation: "${raw}".` });
@@ -1708,7 +1715,11 @@ function resolveBuddies(
         message: unregistered
           ? `Binôme demandé avec "${mention.label}" (${unregistered}): personne ne correspond ` +
             "dans les inscriptions. Cette personne n'a probablement pas rempli le formulaire."
-          : `Demande de binôme "${mention.label}" non résolue (${match.via}).`,
+          : match.via.includes('ambigu')
+            ? `Binôme demandé avec "${mention.label}": plusieurs personnes peuvent correspondre. ` +
+              'À relier à la main sur la fiche (« Ajouter un binôme »).'
+            : `Binôme demandé avec "${mention.label}": aucune inscription ne correspond à ce nom. ` +
+              'À relier à la main sur la fiche (« Ajouter un binôme »), ou à laisser si cette personne ne vient pas.',
         suggestions,
       });
     }

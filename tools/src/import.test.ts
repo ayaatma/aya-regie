@@ -750,3 +750,24 @@ test('a first choice on a refused pole is imported anyway, the refusal winning, 
   ok(v.needsReview);
   ok(v.refusedPoleKeys.length > 0, 'le refus est gardé');
 });
+
+test('the 2026-10 form\'s « none » answers name no refusal and no artist, and raise nothing', () => {
+  const result = importOne({ 24: '💪 AUCUN, JE SUIS ULTRA CHAUD', 27: "Ça n'a pas d'importance" });
+  deepStrictEqual(result.volunteers[0]!.refusedPoleKeys, []);
+  deepStrictEqual(result.volunteers[0]!.artistKeys, []);
+  ok(!result.issues.some((i) => i.code === 'pole-inconnu' || i.code === 'artiste-inconnu'), JSON.stringify(result.issues));
+});
+
+test('a refused pole is read like a choice, emoji and parenthesis included', () => {
+  const result = importOne({ 24: '🛠️ VOLANTE (Bénévole polyvalent), 🌳 BRIGADE VERTE' });
+  const volante = poles.find((p) => p.name === 'Volante')!;
+  ok(result.volunteers[0]!.refusedPoleKeys.includes(volante.key));
+  ok(result.issues.some((i) => i.code === 'pole-inconnu' && /BRIGADE VERTE/.test(i.message)), 'un pôle absent reste signalé');
+  ok(!result.issues.some((i) => i.code === 'pole-inconnu' && /VOLANTE/.test(i.message)));
+});
+
+test('an unresolved buddy says nobody was found and that the régisseur links it by hand', () => {
+  const raised = importPair('Anita, Ariane, Hypo').issues.filter((i) => i.code === 'binome-non-resolu');
+  ok(raised.length > 0);
+  ok(raised.every((i) => /aucune inscription ne correspond/.test(i.message) && /à la main/.test(i.message)));
+});
