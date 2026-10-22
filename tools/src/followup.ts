@@ -20,7 +20,15 @@
  * Pure, like the rest of the engine: no clock, no network.
  */
 
-import { statusOf, type ApplicationStep, type StepMail, type Volunteer } from './model.js';
+import {
+  applicationStatusOf,
+  statusOf,
+  type ApplicationStatus,
+  type ApplicationStep,
+  type MailTemplate,
+  type StepMail,
+  type Volunteer,
+} from './model.js';
 import type { Plan } from './plan.js';
 
 /*
@@ -104,23 +112,92 @@ export const isPlaced = (plan: Plan, kind: PlannedKind, key: string): boolean =>
  * ---------------------------------------------------------------------------------------------
  */
 
+/** Who a step can be sent to: anybody holding an inscription, since 2026-10-22. */
+export type StepPersonKind = 'benevole' | 'orga' | 'artiste' | 'extra';
+
+export interface StepPerson {
+  kind: StepPersonKind;
+  key: string;
+  /** Their kind as a mail sees it: `benevole`, `orga`, `responsable`, `artiste` or a guest type. */
+  audience: string;
+  status: ApplicationStatus;
+  requestedHours: number;
+  /** The steps ticked by hand on their fiche. Bénévoles only. */
+  statusSteps: readonly string[];
+}
+
+/** A bénévole as a step sees them. The functions below also take a `Volunteer` directly. */
+export const volunteerAsStepPerson = (v: Volunteer): StepPerson => ({
+  kind: 'benevole',
+  key: v.key,
+  audience: 'benevole',
+  status: statusOf(v),
+  requestedHours: v.requestedHours ?? 0,
+  statusSteps: v.statusSteps ?? [],
+});
+
+const asPerson = (who: Volunteer | StepPerson): StepPerson =>
+  'audience' in who && 'kind' in who ? (who as StepPerson) : volunteerAsStepPerson(who as Volunteer);
+
+/** Everybody a step could go to: bénévoles, orgas (responsables apart), members of an act, guests. */
+export function stepPersons(plan: Plan): StepPerson[] {
+  const leaders = new Set((plan.leaderRoles ?? []).map((r) => r.organiserKey));
+  const out: StepPerson[] = (plan.volunteers ?? []).map(volunteerAsStepPerson);
+  for (const o of plan.organisers ?? []) {
+    out.push({ kind: 'orga', key: o.key, audience: leaders.has(o.key) ? 'responsable' : 'orga', status: applicationStatusOf(o), requestedHours: 0, statusSteps: [] });
+  }
+  for (const a of plan.artists ?? []) {
+    for (const m of a.members) {
+      out.push({ kind: 'artiste', key: m.key, audience: 'artiste', status: applicationStatusOf(m), requestedHours: 0, statusSteps: [] });
+    }
+  }
+  for (const x of plan.ticketing?.extras ?? []) {
+    out.push({ kind: 'extra', key: x.key, audience: x.status, status: applicationStatusOf(x), requestedHours: 0, statusSteps: [] });
+  }
+  return out;
+}
+
+/** The kinds a step's mail goes to: its own list, the bénévoles when it has none. */
+export const stepAudiences = (mail: StepMail): string[] => {
+  const own = mail.audiences ?? ['benevole'];
+  return [...new Set([...own, ...(mail.variants ?? []).flatMap((v) => v.audiences)])];
+};
+
+/** The text one kind of person gets: the first variant naming them, the step's own otherwise. */
+export function stepTextFor(mail: StepMail, audience: string): MailTemplate {
+  const variant = (mail.variants ?? []).find((v) => v.audiences.includes(audience));
+  return variant ? { subject: variant.subject, body: variant.body } : { subject: mail.subject, body: mail.body };
+}
+
+/** The planning of somebody who can hold one; nothing for a member of an act or a guest. */
+const planningOf = (plan: Plan, person: StepPerson): string =>
+  person.kind === 'benevole' || person.kind === 'orga' ? planningText(plan, person.kind, person.key) : '';
+
+/** Only a bénévole has a page to answer on. */
+const canAnswer = (person: StepPerson): boolean => person.kind === 'benevole';
+
 /** Whether the mail says something about the person's créneaux, which can then go stale. */
-export const usesPlanning = (mail: StepMail): boolean => `${mail.subject}${mail.body}`.includes('{planning}');
+export const usesPlanning = (mail: StepMail): boolean =>
+  [mail, ...(mail.variants ?? [])].some((m) => `${m.subject}${m.body}`.includes('{planning}'));
 
 /**
- * Whether a bénévole is one a step's mail is for: validated, and inside its target. Being
- * cancelled, or still an inscription, always leaves somebody out.
+ * Whether somebody is one a step's mail is for: of a kind it goes to, validated, and inside its
+ * target. Being cancelled, or still an inscription, always leaves somebody out. A minimum of
+ * hours asked only lets bénévoles in; « placed only » only those who can be placed.
  */
-export function inTarget(plan: Plan, step: ApplicationStep, volunteer: Volunteer): boolean {
-  if (!step.mail || statusOf(volunteer) !== 'valide') return false;
-  if (step.mail.minRequestedHours > 0 && (volunteer.requestedHours ?? 0) < step.mail.minRequestedHours) return false;
-  if (step.mail.placedOnly && !isPlaced(plan, 'benevole', volunteer.key)) return false;
+export function inTarget(plan: Plan, step: ApplicationStep, who: Volunteer | StepPerson): boolean {
+  const person = asPerson(who);
+  if (!step.mail || person.status !== 'valide') return false;
+  if (!stepAudiences(step.mail).includes(person.audience)) return false;
+  if (step.mail.minRequestedHours > 0 && person.requestedHours < step.mail.minRequestedHours) return false;
+  if (step.mail.placedOnly && planningOf(plan, person) === '') return false;
   return true;
 }
 
-/** « Validé·es placé·es, 6 h demandées ou plus », for the head of a step. */
-export function targetLabel(mail: StepMail): string {
-  const parts = ['Bénévoles validé·es'];
+/** « Bénévoles, orgas validé·es, avec au moins un créneau », for the head of a step. */
+export function targetLabel(mail: StepMail, labelOf: (audience: string) => string = (a) => a): string {
+  const kinds = stepAudiences(mail).map(labelOf).join(', ');
+  const parts = [`${kinds.charAt(0).toUpperCase()}${kinds.slice(1)} validé·es`];
   if (mail.placedOnly) parts.push('avec au moins un créneau');
   if (mail.minRequestedHours > 0) parts.push(`ayant demandé ${mail.minRequestedHours} h ou plus`);
   return parts.join(', ');
@@ -183,6 +260,8 @@ export type StepState =
 
 export interface StepProgress {
   step: ApplicationStep;
+  personKind: StepPersonKind;
+  /** The person's key, whatever their kind. Named for the bénévoles it was first written for. */
   volunteerKey: string;
   state: StepState;
   inTarget: boolean;
@@ -207,18 +286,19 @@ const newestFirst = <T extends { at: string }>(a: T, b: T): number => b.at.local
 export function stepProgress(
   plan: Plan,
   step: ApplicationStep,
-  volunteer: Volunteer,
+  who: Volunteer | StepPerson,
   mails: readonly MailFact[],
   replies: readonly ReplyFact[],
 ): StepProgress {
+  const person = asPerson(who);
   const mine = mails
     .filter((m) => m.stepKey === step.key)
     .map((m) => ({ ...m, at: m.sentAt }))
     .sort(newestFirst);
   const lastTry = mine[0] ?? null;
   const lastSent = mine.find((m) => m.outcome === 'envoye') ?? null;
-  const target = inTarget(plan, step, volunteer);
-  const ticked = (volunteer.statusSteps ?? []).includes(step.key);
+  const target = inTarget(plan, step, person);
+  const ticked = person.statusSteps.includes(step.key);
   const planningBound = step.mail !== undefined && usesPlanning(step.mail);
   const latest =
     replies
@@ -228,10 +308,10 @@ export function stepProgress(
   const reply =
     latest && !(planningBound && lastSent !== null && latest.answeredAt < lastSent.sentAt) ? latest : null;
   const planningChanged =
-    planningBound && lastSent !== null && lastSent.planning !== planningText(plan, 'benevole', volunteer.key);
+    planningBound && lastSent !== null && lastSent.planning !== planningOf(plan, person);
 
   let state: StepState;
-  const wantsReply = step.mail !== undefined && step.mail.reply !== 'aucune';
+  const wantsReply = step.mail !== undefined && step.mail.reply !== 'aucune' && canAnswer(person);
   if (wantsReply && reply) state = reply.answer;
   else if (lastSent) state = wantsReply ? 'en-attente' : 'envoye';
   else if (ticked) state = 'fait-main';
@@ -246,7 +326,8 @@ export function stepProgress(
   };
   return {
     step,
-    volunteerKey: volunteer.key,
+    personKind: person.kind,
+    volunteerKey: person.key,
     state,
     inTarget: target,
     lastSent: strip(lastSent) as MailFact | null,
@@ -313,12 +394,13 @@ const toneOf = (state: StepState): Tone =>
  */
 export function followUpOf(
   plan: Plan,
-  volunteer: Volunteer,
+  who: Volunteer | StepPerson,
   mails: readonly MailFact[],
   replies: readonly ReplyFact[],
 ): FollowUp {
-  const steps = (plan.applicationSteps ?? []).map((step) => stepProgress(plan, step, volunteer, mails, replies));
-  const status = statusOf(volunteer);
+  const person = asPerson(who);
+  const steps = (plan.applicationSteps ?? []).map((step) => stepProgress(plan, step, person, mails, replies));
+  const status = person.status;
   let stage: FollowUpMark =
     status === 'valide'
       ? { label: 'Validé·e', tone: 'ok' }
@@ -369,6 +451,7 @@ export function batchMembers(progress: readonly StepProgress[], kind: BatchKind)
       return progress.filter((p) => p.inTarget && (p.state === 'a-envoyer' || p.state === 'echec'));
     case 'relance':
       return progress.filter((p) => p.inTarget && p.state === 'en-attente' && !p.planningChanged);
+    // An orga sent a planning has nothing to answer: 'envoye', and a moved planning still counts.
     case 'modifie':
       return progress.filter((p) => p.inTarget && p.planningChanged);
   }

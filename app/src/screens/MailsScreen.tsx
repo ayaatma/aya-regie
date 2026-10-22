@@ -14,7 +14,11 @@
 import { useState } from 'react';
 
 import {
+  audienceLabel,
   batchMembers,
+  stepAudiences,
+  stepPersons,
+  stepTextFor,
   isMailAddress,
   placedPending,
   planningText,
@@ -61,16 +65,17 @@ interface Pending {
 /** The jobs of one sending of a step, each mail rendered now, as the list will show it. */
 function stepJobs(plan: Plan, step: ApplicationStep & { mail: StepMail }, members: readonly StepProgress[], kind: BatchKind): Pending['people'] {
   return members.flatMap((p) => {
-    const person = registrantOf(plan, 'benevole', p.volunteerKey);
+    const person = registrantOf(plan, p.personKind, p.volunteerKey);
     if (!person) return [];
-    const rendered = renderTemplate(plan, person, step.mail, siteUrl());
+    // Each kind of person its own text since 2026-10-22: an orga is told hours, not asked to confirm.
+    const rendered = renderTemplate(plan, person, stepTextFor(step.mail, person.audience), siteUrl());
     const mail = kind === 'relance' ? { ...rendered, subject: `Rappel : ${rendered.subject}` } : rendered;
     const name = `${person.firstName} ${person.lastName}`.trim() || 'Sans nom';
     const ok = isMailAddress(mail.to);
-    const planning = planningText(plan, 'benevole', person.key);
+    const planning = person.kind === 'benevole' || person.kind === 'orga' ? planningText(plan, person.kind, person.key) : '';
     return [{
-      id: person.key,
-      kind: 'benevole' as const,
+      id: `${person.kind}|${person.key}`,
+      kind: person.kind,
       key: person.key,
       stepKey: step.key,
       planning,
@@ -78,7 +83,7 @@ function stepJobs(plan: Plan, step: ApplicationStep & { mail: StepMail }, member
       mail,
       job: ok
         ? {
-            kind: 'benevole' as const, key: person.key, name, mail,
+            kind: person.kind, key: person.key, name, mail,
             reason: kind === 'relance' ? ('relance' as const) : ('etape' as const),
             stepKey: step.key, planning,
           }
@@ -87,10 +92,11 @@ function stepJobs(plan: Plan, step: ApplicationStep & { mail: StepMail }, member
   });
 }
 
+/** Everybody a step could go to, bénévoles first: orgas and others since 2026-10-22. */
 function progressOf(plan: Plan, step: ApplicationStep, log: MailLog): StepProgress[] {
-  return plan.volunteers.map((v) => {
-    const { mails, replies } = log.factsOf(v.key);
-    return stepProgress(plan, step, v, mails, replies);
+  return stepPersons(plan).map((person) => {
+    const { mails, replies } = log.factsOfPerson(person.kind, person.key);
+    return stepProgress(plan, step, person, mails, replies);
   });
 }
 
@@ -294,7 +300,8 @@ function StepCard({
       <header className="mails-step-head">
         <h2>{step.label}</h2>
         <span className="people-meta">
-          {targetLabel(step.mail)}. {STEP_REPLY_LABEL[step.mail.reply]}.
+          {targetLabel(step.mail, (a) => audienceLabel(plan, a).toLowerCase())}. {STEP_REPLY_LABEL[step.mail.reply]}
+          {step.mail.reply !== 'aucune' && stepAudiences(step.mail).some((a) => a !== 'benevole') ? ' (les bénévoles seulement)' : ''}.
         </span>
       </header>
       <ul className="mails-figures">
@@ -306,7 +313,7 @@ function StepCard({
       </ul>
       {count('non') > 0 && (
         <p className="people-meta">
-          Non: {concerned.filter((p) => p.state === 'non').map((p) => nameOf(plan, p.volunteerKey)).join(', ')}
+          Non: {concerned.filter((p) => p.state === 'non').map((p) => nameOf(plan, p)).join(', ')}
         </p>
       )}
       <div className="registration-actions">
@@ -339,7 +346,7 @@ function StepCard({
   );
 }
 
-const nameOf = (plan: Plan, key: string): string => {
-  const v = plan.volunteers.find((x) => x.key === key);
-  return v ? `${v.firstName} ${v.lastName}`.trim() : key;
+const nameOf = (plan: Plan, p: StepProgress): string => {
+  const person = registrantOf(plan, p.personKind, p.volunteerKey);
+  return person ? `${person.firstName} ${person.lastName}`.trim() : p.volunteerKey;
 };

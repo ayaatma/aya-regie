@@ -15,6 +15,8 @@ import {
   planningLines,
   planningText,
   stepProgress,
+  stepPersons,
+  stepTextFor,
   type MailFact,
   type ReplyFact,
 } from './followup.js';
@@ -177,4 +179,26 @@ test('the three sendings of a step: first, reminder, moved planning', () => {
   const moved = [stepProgress(plan, planningStep, lea, [sent('planning', '2026-11-01T10:00:00Z', 'old')], [])];
   assert.equal(batchMembers(moved, 'modifie').length, 1);
   assert.equal(batchMembers(moved, 'relance').length, 0, 'a moved planning is resent, not reminded');
+});
+
+test('a step may go to the orgas too, with their own text, and asks them nothing', () => {
+  const plan = makePlan();
+  const sam = stepPersons(plan).find((p) => p.kind === 'orga' && p.key === 'o1')!;
+  assert.equal(inTarget(plan, planningStep, sam), false, 'still an inscription');
+  const validated = { ...sam, status: 'valide' as const };
+  assert.equal(inTarget(plan, planningStep, validated), true, 'planning goes to the orgas since 2026-10-22');
+  assert.equal(inTarget(plan, hours, validated), false, 'the extra hours are a bénévole question');
+  assert.match(stepTextFor(planningStep.mail!, 'orga').subject, /tes horaires/);
+  assert.match(stepTextFor(planningStep.mail!, 'benevole').subject, /ton planning bénévole/);
+  const progress = stepProgress(plan, planningStep, validated, [sent('planning', '2026-11-01T10:00:00Z', planningText(plan, 'orga', 'o1'))], []);
+  assert.equal(progress.state, 'envoye', 'sent, and no answer is waited for');
+  assert.equal(progress.personKind, 'orga');
+});
+
+test('a step with no list of kinds goes to the bénévoles only, as before', () => {
+  const plan = makePlan();
+  const { audiences: _a, variants: _v, ...oldMail } = planningStep.mail!;
+  const old = { ...planningStep, mail: oldMail };
+  const sam = { ...stepPersons(plan).find((p) => p.kind === 'orga')!, status: 'valide' as const };
+  assert.equal(inTarget(plan, old, sam), false);
 });

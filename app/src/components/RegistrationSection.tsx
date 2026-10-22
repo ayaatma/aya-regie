@@ -28,6 +28,7 @@ import {
   APPLICATION_STATUS_LABEL,
   audienceLabel,
   followUpOf,
+  stepPersons,
   isMailAddress,
   registrantOf,
   renderMail,
@@ -71,9 +72,10 @@ export function RegistrationSection({
   const last = log.lastValidationOf(kind, personKey);
   const stepLabels = new Map(plan.applicationSteps.map((st) => [st.key, st.label]));
   // A bénévole's frise: « Planning : confirmé » says validated and mailed already.
-  const volunteer = kind === 'benevole' ? plan.volunteers.find((v) => v.key === personKey) : undefined;
-  const facts = volunteer ? log.factsOf(volunteer.key) : null;
-  const followUp = volunteer && facts ? followUpOf(plan, volunteer, facts.mails, facts.replies) : null;
+  // An orga's too since 2026-10-22, now that a step can be sent to them.
+  const stepPerson = kind === 'benevole' || kind === 'orga' ? stepPersons(plan).find((p) => p.kind === kind && p.key === personKey) : undefined;
+  const facts = stepPerson ? log.factsOfPerson(kind, personKey) : null;
+  const followUp = stepPerson && facts ? followUpOf(plan, stepPerson, facts.mails, facts.replies) : null;
 
   const setStatus = (next: ApplicationStatus): void =>
     edit((p) => setRegistrationStatus(p, kind, personKey, next), `inscription de ${who}: ${APPLICATION_STATUS_LABEL[next].toLowerCase()}`);

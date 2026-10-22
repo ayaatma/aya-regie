@@ -380,7 +380,7 @@ export {
   ENERGY_PROFILES,
   statusOf,
 } from '@engine/model.ts';
-export type { ApplicationStatus, ApplicationStep, EnergyProfile, StepMail, StepReply } from '@engine/model.ts';
+export type { ApplicationStatus, ApplicationStep, EnergyProfile, StepMail, StepMailVariant, StepReply } from '@engine/model.ts';
 export { STEP_REPLIES, STEP_REPLY_LABEL } from '@engine/model.ts';
 
 // Validation of everybody and the validation mails, 2026-10-22.
@@ -417,11 +417,16 @@ export {
   placedPending,
   planningText,
   stateLabel,
+  stepAudiences,
+  stepPersons,
   stepProgress,
+  stepTextFor,
   targetLabel,
   usesPlanning,
 } from '@engine/followup.ts';
 export type {
+  StepPerson,
+  StepPersonKind,
   BatchKind,
   FollowUp,
   FollowUpMark,

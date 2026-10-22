@@ -18,6 +18,10 @@ import { useEffect, useState } from 'react';
 
 import {
   MAIL_PLACEHOLDERS,
+  audienceLabel,
+  audienceOptions,
+  stepAudiences,
+  stepPersons,
   STEP_REPLIES,
   STEP_REPLY_LABEL,
   blankStepMail,
@@ -28,6 +32,7 @@ import {
   targetLabel,
   type ApplicationStep,
   type StepMail,
+  type StepMailVariant,
   type StepReply,
 } from '../engine.ts';
 import {
@@ -182,12 +187,48 @@ function StepMailEditor({ step }: { step: ApplicationStep }) {
     edit((p) => setStepMail(p, step.key, next), `${step.label}: ${what}`);
   };
 
-  const sample = plan.volunteers.find((v) => inTarget(plan, step, v)) ?? null;
-  const person = sample ? registrantOf(plan, 'benevole', sample.key) : null;
+  // The preview is of the step's own text: somebody in the target that no variant takes.
+  const variants = stored.variants ?? [];
+  const audiences = stored.audiences ?? ['benevole'];
+  const sample =
+    stepPersons(plan).find((p) => inTarget(plan, step, p) && !variants.some((v) => v.audiences.includes(p.audience))) ?? null;
+  const person = sample ? registrantOf(plan, sample.kind, sample.key) : null;
   const preview = person ? renderTemplate(plan, person, { subject, body }, typeof window === 'undefined' ? '' : window.location.origin) : null;
+  const label = (a: string): string => audienceLabel(plan, a);
 
   return (
     <div className="step-mail mail-template">
+      {/*
+        WHO THE STEP GOES TO, since 2026-10-22: the bénévoles until then, and only them. A kind
+        ticked here gets the step's text below, unless one of the other texts names it.
+      */}
+      <div className="setup-bracelet-statuses" role="group" aria-label={`Destinataires de ${step.label}`}>
+        <span className="field-label">Pour</span>
+        {audienceOptions(plan).map((option) => (
+          <label key={option.key} className="checkline">
+            <input
+              type="checkbox"
+              name={`step-audience-${step.key}-${option.key}`}
+              checked={audiences.includes(option.key) || variants.some((v) => v.audiences.includes(option.key))}
+              disabled={variants.some((v) => v.audiences.includes(option.key))}
+              onChange={(event) =>
+                commit(
+                  {
+                    audiences: event.target.checked
+                      ? [...audiences.filter((a) => a !== option.key), option.key]
+                      : audiences.filter((a) => a !== option.key),
+                  },
+                  'destinataires',
+                )
+              }
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      {stored.reply !== 'aucune' && stepAudiences(stored).some((a) => a !== 'benevole') && (
+        <p className="people-meta">Seuls les bénévoles peuvent répondre par leur lien: les autres reçoivent le mail, sans question.</p>
+      )}
       <div className="step-mail-target">
         <label className="fiche-step">
           <input
@@ -211,7 +252,7 @@ function StepMailEditor({ step }: { step: ApplicationStep }) {
           />
           <span className="people-meta">h (0: tout le monde)</span>
         </label>
-        <p className="people-meta">Pour: {targetLabel(stored)}.</p>
+        <p className="people-meta">Pour: {targetLabel(stored, (a) => label(a).toLowerCase())}.</p>
       </div>
       <label className="field">
         <span className="field-label">Réponse</span>
@@ -281,18 +322,48 @@ function StepMailEditor({ step }: { step: ApplicationStep }) {
           <p>
             <TestMailButton
               eventId={eventId}
-              kind="benevole"
+              kind={person.kind}
               personKey={person.key}
               who={`${person.firstName} ${person.lastName}`.trim()}
               mail={preview}
               stepKey={step.key}
-              planning={planningText(plan, 'benevole', person.key)}
+              planning={person.kind === 'benevole' || person.kind === 'orga' ? planningText(plan, person.kind, person.key) : ''}
             />
           </p>
         </>
       ) : (
         <p className="people-meta">Personne dans la cible pour l'instant: pas d'aperçu.</p>
       )}
+
+      {/* Another text for some kinds of person, since 2026-10-22. See `StepMail.variants`. */}
+      {variants.map((variant, index) => (
+        <VariantEditor
+          key={index}
+          variant={variant}
+          label={label}
+          options={audienceOptions(plan)}
+          onChange={(next) =>
+            commit(
+              {
+                variants: variants.map((v, i) => (i === index ? next : v)),
+                // A kind given to a variant leaves the step's own list: one kind, one text.
+                audiences: audiences.filter((a) => !next.audiences.includes(a)),
+              },
+              'autre texte',
+            )
+          }
+          onRemove={() => commit({ variants: variants.filter((_, i) => i !== index) }, 'autre texte retiré')}
+        />
+      ))}
+      <button
+        type="button"
+        className="btn is-small"
+        onClick={() =>
+          commit({ variants: [...variants, { audiences: [], subject: stored.subject, body: stored.body }] }, 'autre texte ajouté')
+        }
+      >
+        Ajouter un texte pour un autre type de personne
+      </button>
       <button
         type="button"
         className="btn is-danger"
@@ -300,6 +371,77 @@ function StepMailEditor({ step }: { step: ApplicationStep }) {
       >
         Ne plus envoyer par mail
       </button>
+    </div>
+  );
+}
+
+/** One other text of a step: the kinds it is for, and its words. Drafts committed on blur. */
+function VariantEditor({
+  variant,
+  label,
+  options,
+  onChange,
+  onRemove,
+}: {
+  variant: StepMailVariant;
+  label(audience: string): string;
+  options: ReadonlyArray<{ key: string; label: string }>;
+  onChange(next: StepMailVariant): void;
+  onRemove(): void;
+}) {
+  const [subject, setSubject] = useState(variant.subject);
+  const [body, setBody] = useState(variant.body);
+  useEffect(() => {
+    setSubject(variant.subject);
+    setBody(variant.body);
+  }, [variant.subject, variant.body]);
+  const commit = (): void => {
+    if (subject !== variant.subject || body !== variant.body) onChange({ ...variant, subject, body });
+  };
+  return (
+    <div className="mail-template step-variant">
+      <div className="setup-bracelet-statuses" role="group" aria-label="Pour qui">
+        <span className="field-label">Autre texte pour</span>
+        {options.map((option) => (
+          <label key={option.key} className="checkline">
+            <input
+              type="checkbox"
+              checked={variant.audiences.includes(option.key)}
+              onChange={(event) =>
+                onChange({
+                  ...variant,
+                  audiences: event.target.checked
+                    ? [...variant.audiences.filter((a) => a !== option.key), option.key]
+                    : variant.audiences.filter((a) => a !== option.key),
+                })
+              }
+            />
+            {option.label}
+          </label>
+        ))}
+        <button type="button" className="btn is-icon is-danger" title="Retirer ce texte" onClick={onRemove}>
+          ✕
+        </button>
+      </div>
+      {variant.audiences.length === 0 && <p className="people-meta is-warn">Ce texte n'est pour personne.</p>}
+      <label className="field">
+        <span className="field-label">Objet</span>
+        <input
+          className="select"
+          autoComplete="off"
+          value={subject}
+          aria-label={`Objet pour ${variant.audiences.map(label).join(', ')}`}
+          onChange={(event) => setSubject(event.target.value)}
+          onBlur={commit}
+        />
+      </label>
+      <textarea
+        className="select"
+        aria-label={`Texte pour ${variant.audiences.map(label).join(', ')}`}
+        value={body}
+        onChange={(event) => setBody(event.target.value)}
+        onBlur={commit}
+      />
     </div>
   );
 }

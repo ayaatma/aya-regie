@@ -162,6 +162,8 @@ export interface MailLog {
   lastValidationOf: (kind: RegistrantKind, key: string) => MailEntry | null;
   /** A bénévole's mails of the follow-up and answers, as `followup.ts` reads them. */
   factsOf: (volunteerKey: string) => { mails: MailFact[]; replies: ReplyFact[] };
+  /** The same for anybody a step can go to, since 2026-10-22. Only a bénévole has replies. */
+  factsOfPerson: (kind: RegistrantKind, key: string) => { mails: MailFact[]; replies: ReplyFact[] };
   repliesOf: (volunteerKey: string) => ReplyEntry[];
   /** Mails the server accepted in the last hour, from this book. */
   sentLastHour: () => number;
@@ -206,6 +208,17 @@ function logOf(book: Book | null): MailLog {
       replies: replies
         .filter((r) => r.volunteerKey === volunteerKey)
         .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source })),
+    }),
+    factsOfPerson: (kind, key) => ({
+      mails: entries
+        .filter((e) => e.personKind === kind && e.personKey === key && isStep(e))
+        .map((e) => ({ id: e.id, stepKey: e.stepKey, outcome: e.outcome, sentAt: e.sentAt, planning: e.planning })),
+      replies:
+        kind === 'benevole'
+          ? replies
+              .filter((r) => r.volunteerKey === key)
+              .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source }))
+          : [],
     }),
     repliesOf: (volunteerKey) => replies.filter((r) => r.volunteerKey === volunteerKey),
     // Tests included: OVH counts every mail the mailbox sends.

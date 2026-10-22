@@ -1150,6 +1150,25 @@ export interface StepMail {
   reply: StepReply;
   /** The question on their page, `{heures}` filled with their hours. Unused without a reply. */
   question: string;
+  /**
+   * The kinds of person the step goes to (`MailAudience`), since 2026-10-22. ABSENT MEANS THE
+   * BÉNÉVOLES ONLY, what every step did before. Only a bénévole can answer by the link: anybody
+   * else is sent the mail and nothing is asked of them.
+   */
+  audiences?: string[];
+  /**
+   * Another text for some of those kinds: the orgas told their montage and démontage hours,
+   * without being asked to confirm on a page they do not have. A kind on no variant gets the
+   * step's own text.
+   */
+  variants?: StepMailVariant[];
+}
+
+/** See `StepMail.variants`. */
+export interface StepMailVariant {
+  audiences: string[];
+  subject: string;
+  body: string;
 }
 
 /*
@@ -1181,6 +1200,21 @@ export const DEFAULT_APPLICATION_STEPS: readonly ApplicationStep[] = [
     key: 'planning',
     label: 'Planning',
     mail: {
+      // The orgas too since 2026-10-22, with their own words: they confirm nothing by a link.
+      audiences: ['benevole', 'orga', 'responsable'],
+      variants: [
+        {
+          audiences: ['orga', 'responsable'],
+          subject: '{evenement} : tes horaires',
+          body:
+            'Bonjour {prenom},\n\n' +
+            'Voici tes horaires pour {evenement}, montage et démontage compris :\n\n' +
+            '{planning}\n\n' +
+            "S'il y a quelque chose qui ne va pas, dis-le nous vite.\n\n" +
+            'Merci !\n' +
+            "L'équipe d'organisation",
+        },
+      ],
       subject: '{evenement} : ton planning bénévole',
       body:
         'Bonjour {prenom},\n\n' +
@@ -1201,6 +1235,7 @@ export const DEFAULT_APPLICATION_STEPS: readonly ApplicationStep[] = [
     key: 'infos',
     label: 'Infos pratiques',
     mail: {
+      audiences: ['benevole', 'orga', 'responsable'],
       subject: '{evenement} : infos pratiques et planning définitif',
       body:
         'Bonjour {prenom},\n\n' +

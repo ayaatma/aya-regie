@@ -730,6 +730,15 @@ function stepMail(value: unknown): StepMail | undefined {
     minRequestedHours: Number.isFinite(hours) && hours > 0 ? hours : 0,
     reply: (STEP_REPLIES as readonly unknown[]).includes(m.reply) ? (m.reply as StepReply) : 'aucune',
     question: text(m.question),
+    // Both absent from anything written before 2026-10-22: the bénévoles, one text.
+    ...(Array.isArray(m.audiences) ? { audiences: keys(m.audiences) } : {}),
+    ...(Array.isArray(m.variants)
+      ? {
+          variants: (m.variants as unknown[])
+            .filter((v): v is Record<string, unknown> => v !== null && typeof v === 'object')
+            .map((v) => ({ audiences: keys(v.audiences), subject: text(v.subject), body: text(v.body) })),
+        }
+      : {}),
   };
 }
 
