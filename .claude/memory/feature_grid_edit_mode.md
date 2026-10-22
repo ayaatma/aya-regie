@@ -61,3 +61,18 @@ in them.
   sub-pole copies its parent's length only if the parent was set by hand. The migration nulls
   every pole holding exactly the event's value (2), so only poles at another length stay green.
   The phase grid's new événements take the event's value.
+
+## 2026-10-22, third round: the last place, sliding, and a gap (exploit grid only)
+
+- **The last « − » deletes the créneau** (`removePlace` in GridScreen, `cases <= 1`). It used to
+  leave a créneau of 0 places, which the store then refused to save. Whoever held that last place
+  goes with it in the same edit; a locked place still refuses. The « − » is never disabled now.
+  `deleteShift` also drops the créneau's `organiserShifts`, which it used to leave orphaned.
+- **Press and hold a créneau, then move: it slides** (`beginMove`, `moveLimits`). Becomes a slide
+  only past 4 px, so a plain click still selects; the click fired on release after a real slide is
+  swallowed. Neighbours are walls, glued or not: a slide never pushes another créneau.
+- **Alt while pulling a grip unglues** (`edgeLimits(..., free)`): the touching neighbour stays put
+  and the edge can come inward, leaving a gap. Read live on every move, so Alt can be pressed
+  mid-pull. Alt was my choice, stated to the régisseur.
+- Not done on the phase grid's événements (montage/démontage), where a headcount of 0 means « as
+  many as turn up » and is legitimate.

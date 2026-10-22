@@ -64,6 +64,10 @@ export function ghostWindow(
  * second with it, both ways, and each keeps at least a quarter of an hour. A neighbour with a gap
  * is a wall: the edge stops where it starts. `from` and `to` bound the whole pull (the event, or
  * the day the window is drawn on).
+ *
+ * `free` UNGLUES, since 2026-10-22: the neighbour that touches becomes a wall like any other, so
+ * the edge can be pulled inward and leave a gap. Without it, two créneaux that once touched could
+ * never be parted again. The grids pass it while Alt is held.
  */
 export function edgeLimits<W extends { key: string; start: number; end: number }>(
   window: W,
@@ -71,19 +75,40 @@ export function edgeLimits<W extends { key: string; start: number; end: number }
   edge: 'start' | 'end',
   from: number,
   to: number,
+  free = false,
 ): { min: number; max: number; glued: W | null } {
   const eps = 1e-6;
   const rest = others.filter((o) => o.key !== window.key);
   if (edge === 'end') {
     const after = rest.filter((o) => o.start >= window.end - eps).sort((a, b) => a.start - b.start)[0];
-    const glued = after && Math.abs(after.start - window.end) < eps ? after : null;
+    const glued = !free && after && Math.abs(after.start - window.end) < eps ? after : null;
     const min = window.start + MIN_WINDOW_HOURS;
     const max = glued ? glued.end - MIN_WINDOW_HOURS : Math.min(after ? after.start : to, to);
     return { min, max: Math.max(min, max), glued };
   }
   const before = rest.filter((o) => o.end <= window.start + eps).sort((a, b) => b.end - a.end)[0];
-  const glued = before && Math.abs(before.end - window.start) < eps ? before : null;
+  const glued = !free && before && Math.abs(before.end - window.start) < eps ? before : null;
   const max = window.end - MIN_WINDOW_HOURS;
   const min = glued ? glued.start + MIN_WINDOW_HOURS : Math.max(before ? before.end : from, from);
   return { min: Math.min(min, max), max, glued };
+}
+
+/**
+ * Where a whole window may start when it is slid sideways, keeping its length.
+ *
+ * Its neighbours are walls on both sides, glued or not: sliding one créneau never pushes another,
+ * since that would retime a créneau the régisseur did not touch. `from` and `to` bound the slide.
+ */
+export function moveLimits<W extends { key: string; start: number; end: number }>(
+  window: W,
+  others: readonly W[],
+  from: number,
+  to: number,
+): { min: number; max: number } {
+  const eps = 1e-6;
+  const rest = others.filter((o) => o.key !== window.key);
+  const min = rest.filter((o) => o.end <= window.start + eps).reduce((m, o) => Math.max(m, o.end), from);
+  const next = rest.filter((o) => o.start >= window.end - eps).reduce((m, o) => Math.min(m, o.start), to);
+  const max = next - (window.end - window.start);
+  return { min: Math.min(min, window.start), max: Math.max(max, window.start) };
 }

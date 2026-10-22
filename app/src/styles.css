@@ -5220,6 +5220,16 @@ textarea.select,
   color: var(--ok);
 }
 
+/* Un créneau se saisit tout entier pour le glisser vers la gauche ou la droite. */
+.shift.is-editing {
+  cursor: grab;
+  touch-action: none;
+}
+
+.shift.is-editing:active {
+  cursor: grabbing;
+}
+
 /* Les deux bords d'un créneau, à tirer. */
 .shift-grip {
   position: absolute;

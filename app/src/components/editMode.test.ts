@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { edgeLimits, ghostWindow, MIN_WINDOW_HOURS } from './EditModeButton.tsx';
+import { edgeLimits, ghostWindow, MIN_WINDOW_HOURS, moveLimits } from './EditModeButton.tsx';
 
 const bar = [
   { key: 'a', start: 0, end: 2 },
@@ -54,4 +54,29 @@ test('no créneau is offered over an existing one, nor in a gap under a quarter 
     { key: 'y', start: 2.25, end: 4 },
   ];
   assert.equal(ghostWindow(tight, 2.2, 2, 0, 18), null, '9 minutes ne font pas un créneau');
+});
+
+test('with Alt, a glued neighbour stays put and the edge can be pulled in to leave a gap', () => {
+  const end = edgeLimits(bar[0]!, bar, 'end', 0, 18, true);
+  assert.equal(end.glued, null, 'le suivant ne suit plus');
+  assert.equal(end.max, 2, 'le bord ne passe pas sur le suivant');
+  assert.equal(end.min, MIN_WINDOW_HOURS, 'mais il peut rentrer et laisser un blanc');
+  const start = edgeLimits(bar[1]!, bar, 'start', 0, 18, true);
+  assert.equal(start.glued, null);
+  assert.equal(start.min, 2);
+  assert.equal(start.max, 4 - MIN_WINDOW_HOURS);
+});
+
+test('a créneau slides between its neighbours, keeping its length, and never pushes one', () => {
+  // b (2h-4h) sits between a (ends 2h) and c (starts 6h): it may start from 2h to 4h.
+  assert.deepEqual(moveLimits(bar[1]!, bar, 0, 18), { min: 2, max: 4 });
+  // c is last: up to the end of the event.
+  assert.deepEqual(moveLimits(bar[2]!, bar, 0, 18), { min: 4, max: 16 });
+  // a glued on both sides cannot move at all, rather than overlapping.
+  const packed = [
+    { key: 'x', start: 0, end: 2 },
+    { key: 'y', start: 2, end: 4 },
+    { key: 'z', start: 4, end: 6 },
+  ];
+  assert.deepEqual(moveLimits(packed[1]!, packed, 0, 18), { min: 2, max: 2 });
 });

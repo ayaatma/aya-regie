@@ -741,3 +741,21 @@ test('a frise drop for somebody who is not an orga writes nothing', () => {
   const nobody = assignOrganiserToPoleAt(plan, 'personne-de-ce-nom', aRoot.key, 0, 2);
   assert.equal(nobody, plan, 'le plan est rendu tel quel');
 });
+
+test('deleting a shift also takes off the orgas standing in it', () => {
+  const target = plan.shifts[0]!;
+  const other = plan.shifts[1]!;
+  const withOrgas: Plan = {
+    ...plan,
+    organiserShifts: [
+      { key: 'r1', organiserKey: 'o1', shiftKey: target.key },
+      { key: 'r2', organiserKey: 'o1', shiftKey: other.key },
+    ],
+  };
+  const after = deleteShift(withOrgas, target.key);
+  assert.deepEqual(
+    after.organiserShifts.map((r) => r.shiftKey),
+    [other.key],
+    'l’orga reste sur son autre créneau, et seulement là',
+  );
+});

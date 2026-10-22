@@ -476,12 +476,17 @@ export function addShift(plan: Plan, poleKey: string, start: number, end?: numbe
   return { ...plan, shifts: [...plan.shifts, created] };
 }
 
-/** Deleting a shift removes the people standing in it. Nobody is moved elsewhere. */
+/**
+ * Deleting a shift removes the people standing in it, orgas included. Nobody is moved elsewhere.
+ *
+ * The orgas were left behind until 2026-10-22, pointing at a créneau that no longer existed.
+ */
 export function deleteShift(plan: Plan, shiftKey: string): Plan {
   return {
     ...plan,
     shifts: plan.shifts.filter((s) => s.key !== shiftKey),
     assignments: plan.assignments.filter((a) => a.shiftKey !== shiftKey),
+    organiserShifts: plan.organiserShifts.filter((r) => r.shiftKey !== shiftKey),
   };
 }
 

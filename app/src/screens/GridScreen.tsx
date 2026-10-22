@@ -35,7 +35,13 @@ import {
   swap,
   unassign,
 } from '../store/edits.ts';
-import { EditModeButton, MIN_WINDOW_HOURS, edgeLimits, ghostWindow } from '../components/EditModeButton.tsx';
+import {
+  EditModeButton,
+  MIN_WINDOW_HOURS,
+  edgeLimits,
+  ghostWindow,
+  moveLimits,
+} from '../components/EditModeButton.tsx';
 import { useLoadedPlan } from '../store/store.tsx';
 import { ShiftBlock, type VolumeBand } from '../components/ShiftBlock.tsx';
 import { LaneRuler, OrganiserBand, TimeRuler } from '../components/TimeRuler.tsx';
@@ -66,6 +72,7 @@ import {
   addShift,
   assignOrganiserToPoleAt,
   defaultShiftHours,
+  deleteShift,
   setOrganiserWindow,
   setPoleLocked,
   setShiftWindow,
@@ -112,6 +119,9 @@ const RESPONSABLE_SNAP = 0.25;
 
 /** Pixels left over when the grid is fitted to the screen, so no scrollbar appears on the nose. */
 const FIT_SLACK = 4;
+
+/** How far the pointer travels on a pressed créneau before the press becomes a slide. */
+const SLIDE_THRESHOLD_PX = 4;
 
 /** A créneau's edge being pulled in « mode édition », and the glued neighbour that follows it. */
 interface Retime {
@@ -813,10 +823,13 @@ export function GridScreen({
       if (!track) return;
       const left = track.getBoundingClientRect().left;
       const lane = plan.shifts.filter((s) => s.poleKey === shift.poleKey);
-      const { min, max, glued } = edgeLimits(shift, lane, edge, 0, eventHours);
+      // Both readings up front, so Alt can be pressed or let go in the middle of the pull.
+      const together = edgeLimits(shift, lane, edge, 0, eventHours);
+      const apart = edgeLimits(shift, lane, edge, 0, eventHours, true);
 
       let last: Retime | null = null;
       const move = (event: PointerEvent) => {
+        const { min, max, glued } = event.altKey ? apart : together;
         const raw = Math.round((event.clientX - left) / pxPerHour / MIN_WINDOW_HOURS) * MIN_WINDOW_HOURS;
         const hour = Math.min(max, Math.max(min, raw));
         last = {
@@ -853,6 +866,56 @@ export function GridScreen({
     [edit, eventHours, index, plan.shifts, pxPerHour, readOnly],
   );
 
+  /**
+   * The créneau itself pressed and held: slide it left or right, its length and its people kept.
+   *
+   * It only becomes a slide once the pointer has travelled a few pixels, so a plain click still
+   * selects the créneau, and a press on « + » or « − » that did not move stays a click on them.
+   * After a real slide, the click the browser fires on release is swallowed, since it would
+   * otherwise land on whatever box happens to be under the pointer.
+   */
+  const beginMove = useCallback(
+    (shift: Shift, down: React.PointerEvent<HTMLElement>) => {
+      if (readOnly || down.button !== 0) return;
+      const track = down.currentTarget.closest('.lane-track');
+      if (!track) return;
+      down.preventDefault();
+      const originX = down.clientX;
+      const lane = plan.shifts.filter((s) => s.poleKey === shift.poleKey);
+      const { min, max } = moveLimits(shift, lane, 0, eventHours);
+      const length = shift.end - shift.start;
+
+      let sliding = false;
+      let last: Retime | null = null;
+      const move = (event: PointerEvent) => {
+        if (!sliding && Math.abs(event.clientX - originX) < SLIDE_THRESHOLD_PX) return;
+        sliding = true;
+        const delta = Math.round((event.clientX - originX) / pxPerHour / MIN_WINDOW_HOURS) * MIN_WINDOW_HOURS;
+        const start = Math.min(max, Math.max(min, shift.start + delta));
+        last = { shiftKey: shift.key, start, end: start + length, neighbour: null };
+        setRetime(last);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        if (!sliding) return;
+        const swallow = (event: MouseEvent) => event.stopPropagation();
+        window.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0);
+        setRetime(null);
+        const done = last as Retime | null;
+        if (!done || done.start === shift.start) return;
+        const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
+        edit((p) => setShiftWindow(p, done.shiftKey, done.start, done.end), `créneau de ${where} déplacé`);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    },
+    [edit, eventHours, index, plan.shifts, pxPerHour, readOnly],
+  );
+
   const addPlace = useCallback(
     (shiftKey: string) => {
       const shift = index.shiftByKey.get(shiftKey);
@@ -867,6 +930,10 @@ export function GridScreen({
    * « − »: one place fewer. An empty place goes first; when every place is taken, the last person
    * drawn is taken off the créneau with it, in one edit, and the toolbar says who. A locked place
    * refuses, like Suppr does, since the lock is exactly a promise that nothing moves that box.
+   *
+   * THE LAST PLACE TAKES THE CRÉNEAU WITH IT, since 2026-10-22. A créneau of zero places stayed on
+   * the grid as an empty frame, needing nobody, which the store then refused to save. Whoever held
+   * that last place goes with it, in the same single edit, and the toolbar says so.
    */
   const removePlace = useCallback(
     (shiftKey: string, last: { kind: 'orga' | 'benevole'; key: string } | null) => {
@@ -876,6 +943,29 @@ export function GridScreen({
       const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
       const cases = Math.max(shift.headcount, shiftReport.stars.length + shiftReport.orgas.length);
       const headcount = Math.max(0, Math.min(shift.headcount, cases - 1));
+
+      if (cases <= 1) {
+        let name: string | null = null;
+        if (last?.kind === 'benevole') {
+          name = index.volunteerName(last.key);
+          if (lockedKeys.has(`${last.key}|${shiftKey}`)) {
+            setKeyNote(`La place de ${name} est verrouillée. Déverrouillez-la pour la retirer.`);
+            return;
+          }
+        } else if (last?.kind === 'orga') {
+          const orga = plan.organisers.find((o) => o.key === last.key);
+          name = orga ? organiserName(orga) : 'orga';
+        }
+        if (cursor?.shiftKey === shiftKey) setCursor(null);
+        if (selection?.kind === 'creneau' && selection.shiftKey === shiftKey) setSelection(null);
+        edit((p) => deleteShift(p, shiftKey), `créneau supprimé sur ${where}`);
+        setKeyNote(
+          name
+            ? `${name} retiré·e, et le créneau avec sa dernière place. Ctrl+Z annule.`
+            : 'Dernière place retirée: le créneau est supprimé. Ctrl+Z annule.',
+        );
+        return;
+      }
 
       if (last === null) {
         edit((p) => setHeadcount(p, shiftKey, Math.max(0, shift.headcount - 1)), `une place de moins sur un créneau de ${where}`);
@@ -899,7 +989,7 @@ export function GridScreen({
       );
       setKeyNote(`${name} retiré·e du créneau avec sa place. Ctrl+Z annule.`);
     },
-    [edit, index, lockedKeys, plan.organisers, shiftReports],
+    [cursor, edit, index, lockedKeys, plan.organisers, selection, shiftReports],
   );
 
   /** The pointer moving over a lane: where a click would create a créneau, if anywhere. */
@@ -1053,8 +1143,9 @@ export function GridScreen({
           <span className="toolbar-note">
             {editing && keyNote === null ? (
               <strong className="edit-mode-note">
-                Mode édition: tirer un bord d'un créneau, « + » pour une place de plus, cliquer dans
-                le vide d'un pôle pour créer un créneau. Échap pour sortir.
+                Mode édition: tirer un bord d'un créneau (Alt pour le décoller de son voisin),
+                glisser un créneau pour le déplacer, « + » ou « − » pour ses places, cliquer dans le
+                vide d'un pôle pour créer un créneau. Échap pour sortir.
               </strong>
             ) : keyNote ?? (
               <>
@@ -1364,6 +1455,7 @@ export function GridScreen({
                                   readOnly={readOnly}
                                   editing={editing}
                                   onBeginRetime={beginRetime}
+                                  onBeginMove={beginMove}
                                   onAddPlace={addPlace}
                                   onRemovePlace={removePlace}
                                 />

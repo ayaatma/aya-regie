@@ -131,6 +131,8 @@ export interface ShiftBlockProps {
   editing?: boolean;
   /** A grip pressed. The grid follows the pointer, since only the lane knows the neighbours. */
   onBeginRetime?(shift: Shift, edge: 'start' | 'end', event: React.PointerEvent<HTMLElement>): void;
+  /** The créneau itself pressed in « mode édition »: held and moved, it slides sideways. */
+  onBeginMove?(shift: Shift, event: React.PointerEvent<HTMLElement>): void;
   /** The « + » under the places: one more person needed on this créneau. */
   onAddPlace?(shiftKey: string): void;
   /**
@@ -180,6 +182,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     slots,
     editing = false,
     onBeginRetime,
+    onBeginMove,
     onAddPlace,
     onRemovePlace,
   } = props;
@@ -269,6 +272,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
       // A click on the créneau's own background, between or beside its boxes. Every box inside
       // stops the event, so this only ever fires for the créneau itself.
       onClick={() => onSelectShift(shift.key, false)}
+      onPointerDown={editing && !readOnly ? (event) => onBeginMove?.(shift, event) : undefined}
     >
       {/*
         The orgas first, above the volunteers. They are the places already held: reading the
@@ -529,21 +533,23 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
                   : lastOrga
                     ? { kind: 'orga' as const, key: lastOrga.key, name: lastOrga.name }
                     : null;
+              // The last place goes with the créneau itself: a créneau needing nobody is not one.
+              const lastPlace = cases <= 1;
               return (
                 <div
-                  className={`box is-add is-remove${cases === 0 ? ' is-disabled' : ''}`}
+                  className="box is-add is-remove"
                   role="button"
-                  aria-disabled={cases === 0}
                   title={
-                    cases === 0
-                      ? 'Plus aucune place à retirer'
+                    lastPlace
+                      ? last
+                        ? `Supprimer le créneau, et en retirer ${last.name}`
+                        : 'Supprimer le créneau avec sa dernière place'
                       : last
                         ? `Retirer la dernière place, et ${last.name} qui l'occupe`
                         : 'Retirer une place vide'
                   }
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (cases === 0) return;
                     onRemovePlace?.(shift.key, last && { kind: last.kind, key: last.key });
                   }}
                 >
@@ -554,13 +560,13 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           </div>
           <span
             className="shift-grip is-start"
-            title="Tirer pour changer le début"
+            title="Tirer pour changer le début. Avec Alt, le créneau d'avant ne suit pas."
             onPointerDown={(event) => onBeginRetime?.(shift, 'start', event)}
             onClick={(event) => event.stopPropagation()}
           />
           <span
             className="shift-grip is-end"
-            title="Tirer pour changer la fin"
+            title="Tirer pour changer la fin. Avec Alt, le créneau d'après ne suit pas."
             onPointerDown={(event) => onBeginRetime?.(shift, 'end', event)}
             onClick={(event) => event.stopPropagation()}
           />
