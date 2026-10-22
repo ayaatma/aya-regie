@@ -121,7 +121,7 @@ Tier 2, a real problem, reported not blocked: `sans-affectation`, `plancher-non-
 `artiste-manque`, `creneau-trop-long`, `reserve-injustifiee`, `reserve-affectee`, `tranche-evitee` (2026-09-15, see [[feature-avoided-slots]]).
 
 Import codes: `reponse-en-double` (2026-09-15), `colonne-manquante`, `identite-incomplete`, `reponse-illisible`,
-`volume-impossible`, `choix-contradictoire`, `pole-inconnu`, `artiste-inconnu`, `choix-identique`,
+`volume-impossible`, `choix-contradictoire`, `pole-inconnu`, `artiste-inconnu`, (`choix-identique` gone 2026-10-22: a repeated pole is dropped silently),
 `homonyme`, `binome-soi-meme`, `binome-ambigu`, `binome-non-resolu`.
 
 Proposal kinds: `reserve`, `move`, `remove`, `unreserve`, `add`, sorted in that order because

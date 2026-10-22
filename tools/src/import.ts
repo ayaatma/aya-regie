@@ -991,6 +991,11 @@ export interface ImportOptions {
   volume?: VolumeSettings;
   /** Which rhythm rules block, for the volume ceiling. Defaults to all of them. */
   constraints?: ConstraintSettings;
+  /**
+   * The people already on the plan, since 2026-10-22, so a binôme naming somebody entered by
+   * hand (who has no row in the file) is found. Only searched; nobody here is imported.
+   */
+  roster?: readonly Volunteer[];
 }
 
 export function importVolunteers(csvText: string, options: ImportOptions): ImportResult {
@@ -1377,6 +1382,20 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       }
     }
 
+    /*
+     * The same pole named twice is the first choice and no second, since 2026-10-22, without a
+     * signalement: nothing is in doubt, the person simply wants that pole. Same for « peu
+     * importe » twice. A choice nothing was read in is kept, since two of those are two answers.
+     */
+    const seenChoices = new Set<string>();
+    for (let i = 0; i < choiceEntries.length; i++) {
+      const entry = choiceEntries[i]!;
+      const same = entry.pole ? entry.pole.key : entry.anyPole ? '*' : null;
+      if (same === null) continue;
+      if (seenChoices.has(same)) choiceEntries.splice(i--, 1);
+      else seenChoices.add(same);
+    }
+
     // A CHECKBOX QUESTION, so this is a list. Reading only the first answer, which is what the
     // model held until 2026-09-08, left the other refusals off the plan entirely: a hard rule
     // silently dropped, and somebody standing in a pole they wrote down that they would not do.
@@ -1497,15 +1516,6 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
         });
         reviewReasons.push(`${label} "${choice!.path}" et refus de "${clash.path}" se contredisent. ${consequence}`);
       }
-    }
-
-    const seenChoices = new Set<string>();
-    for (const { pole } of choiceEntries) {
-      if (!pole) continue;
-      if (seenChoices.has(pole.key)) {
-        issues.push({ severity: 'warning', code: 'choix-identique', row: rowNumber, person, message: `Le même pôle est choisi deux fois ("${pole.path}").` });
-      }
-      seenChoices.add(pole.key);
     }
 
     const artistKeys: string[] = [];
@@ -1639,7 +1649,10 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     }
   }
 
-  const buddies = resolveBuddies(rawBuddies, volunteers, rowOf, issues);
+  // The people already on the plan count too: somebody entered by hand has no row to match.
+  const inFile = new Set(volunteers.map((v) => v.key));
+  const roster = [...volunteers, ...(options.roster ?? []).filter((v) => !inFile.has(v.key))];
+  const buddies = resolveBuddies(rawBuddies, roster, rowOf, issues);
   // Every line raised on a row that became somebody is that somebody's. See `ImportIssue.key`.
   const keyOfRow = new Map([...rowOf].map(([key, row]) => [row, key]));
   for (const issue of issues) {
@@ -1699,7 +1712,7 @@ function resolveBuddies(
   // The row number is what separates two real homonyms on the régisseur's review screen. It is
   // carried alongside now that the key is an identity rather than a position in the file.
   const label = (c: MatchCandidate<Volunteer>) =>
-    `${c.item.firstName} ${c.item.lastName} (ligne ${rowOf.get(c.item.key) ?? '?'})`;
+    `${c.item.firstName} ${c.item.lastName} (${rowOf.has(c.item.key) ? `ligne ${rowOf.get(c.item.key)}` : 'déjà dans le plan'})`;
   const resolved: ResolvedBuddy[] = [];
 
   for (const entry of raw) {

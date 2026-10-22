@@ -404,6 +404,37 @@ async function main() {
         await page.evaluate(() => document.querySelector('.import-todo')?.scrollIntoView());
         await shot('57-import-apres-personnes');
       }
+      if (want('binomes')) {
+        // 2026-10-22: a binôme settled on a fiche still being imported; a pole chosen twice.
+        await tab('Import/Export');
+        const q = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+        const rows = [
+          ['Horodateur', 'Adresse e-mail', 'Nom', 'Prénom', 'Ton premier choix.', 'Ton deuxième choix.', 'Avec qui veux-tu être en binôme ?'],
+          ['01/06/2026 10:00:00', 'a@exemple.org', 'Alpha', 'Ana', 'Bar', 'Bar', 'la grande du bar'],
+          ['02/06/2026 10:00:00', 'b@exemple.org', 'Beta', 'Ben', 'Bar', '', ''],
+        ];
+        const file = path.join(require('node:os').tmpdir(), 'aya-regie-binomes.csv');
+        require('node:fs').writeFileSync(file, rows.map((r) => r.map(q).join(',')).join('\n'));
+        const input = await page.$('input[type="file"][accept=".csv,text/csv"]');
+        await input.uploadFile(file);
+        await sleep(800);
+        await page.evaluate(() => [...document.querySelectorAll('.import-todo-people button')].at(-1)?.click());
+        await sleep(900);
+        await page.evaluate(() => {
+          const select = document.querySelector('.import-buddies select');
+          const ben = [...select.options].find((o) => /Ben/.test(o.textContent));
+          select.value = ben.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await sleep(200);
+        await page.evaluate(() => [...document.querySelectorAll('.import-buddies button')].find((b) => b.textContent === 'Ajouter')?.click());
+        await sleep(400);
+        await page.evaluate(() => document.querySelector('.import-buddies')?.scrollIntoView({ block: 'center' }));
+        await sleep(300);
+        problems.push(`${scheme} binomes: ${await page.evaluate(() => document.querySelector('.import-buddies')?.textContent ?? 'absent')}`);
+        problems.push(`${scheme} binomes: choix identique ${await page.evaluate(() => (/choisi deux fois/.test(document.body.textContent) ? 'encore signalé' : 'plus signalé'))}`);
+        await shot('58-import-binome');
+      }
       if (want('historique')) {
         await tab('Historique');
         await page.evaluate(() => [...document.querySelectorAll('.stack-head button')].forEach((b) => b.click()));

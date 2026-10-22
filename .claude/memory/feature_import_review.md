@@ -54,3 +54,20 @@ to be cleared fiche by fiche.
   fields (model + PLAN_FORMAT + migration). Raised to the developer on 2026-10-22.
 
 See [[feature-free-text-answers]], [[feature-generic-event]], [[feature-form-import]].
+
+## Follow-up the same day: doubles and binômes
+
+- **A pole chosen twice is choice 1 and no choice 2**, without a signalement (`choix-identique` is
+  gone, on request). Same for « peu importe » twice; two unread answers stay two.
+- **Binômes are settled on a fiche still being imported** (`screens/ImportBuddies.tsx`): the
+  resolved pairs, the unresolved answer with its « Peut-être » candidates, and a picker over this
+  file's people AND the plan's people not in the file. Held on `FicheFix.buddies {added, removed}`
+  and laid on the plan after the reconciliation by `withBuddyFixes` (manual pairs via `addBuddy`,
+  form pairs taken off via `removeBuddy`, so dismissed). Shown when the person answered the
+  question, has a buddy fix, or the editor is open.
+- **The engine resolves binômes against the plan too**: `ImportOptions.roster` (the app passes
+  `plan.volunteers`), searched only, never imported; a candidate off-file is labelled « déjà dans
+  le plan ».
+- The rule, unchanged since the brief: one-way requests, reciprocity assumed, several per person,
+  each a PAIR (A with B and A with C never pairs B with C), weight 5000 when honoured.
+- `npm run shots -- binomes` replays it.

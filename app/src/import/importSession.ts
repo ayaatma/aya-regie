@@ -18,10 +18,18 @@ import type { FormMapping, Volunteer } from '../engine.ts';
 
 export type ImportSource = { kind: 'sheet'; url: string } | { kind: 'file'; name: string };
 
+/** The binômes changed on a fiche before applying: people added by hand, form pairs taken off. */
+export interface BuddyFix {
+  added: string[];
+  removed: string[];
+}
+
 /** What the régisseur did to one fiche before applying: the fields corrected, and the doubt cleared. */
 export interface FicheFix {
   changes: Partial<Volunteer>;
   validated: boolean;
+  /** Absent until a binôme is touched, and in sessions saved before 2026-10-22. */
+  buddies?: BuddyFix;
 }
 
 export interface ImportSession {

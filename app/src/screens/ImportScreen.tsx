@@ -43,10 +43,12 @@ import { FormMappingCard } from './FormMappingCard.tsx';
 import { SetupFromFormCard } from './SetupFromFormCard.tsx';
 import { OrganiserImportCard } from './OrganiserImportCard.tsx';
 import { ImportReview } from './ImportReview.tsx';
+import { ImportBuddies, withBuddyFixes } from './ImportBuddies.tsx';
 import { photosAvailable, syncFormPhotos, type PhotoSyncReport } from '../photos/photoStore.ts';
 import {
   loadImportSession,
   saveImportSession,
+  type BuddyFix,
   type FicheFix,
   type ImportSession,
   type ImportSource as Source,
@@ -176,6 +178,14 @@ export function ImportScreen() {
     });
   };
 
+  /** A fiche's binômes changed before applying; laid on the plan by `withBuddyFixes` on apply. */
+  const changeBuddies = (key: string, buddies: BuddyFix): void => {
+    updateSession((current) => {
+      const fix = current.fixes[key] ?? { changes: {}, validated: false };
+      return { ...current, fixes: { ...current.fixes, [key]: { ...fix, buddies } } };
+    });
+  };
+
   /** "J'ai lu, c'est bon": the doubt is cleared, the reasons stay as the record of it. */
   const validate = (key: string): void => {
     updateSession((current) => {
@@ -233,6 +243,8 @@ export function ImportScreen() {
     skills: plan.skills,
     // The side activities, each read from a column whose header names it.
     sideActivities: plan.sideActivities,
+    // A binôme may name somebody already on the plan, entered by hand for instance.
+    roster: plan.volunteers,
   });
 
   /*
@@ -362,7 +374,10 @@ export function ImportScreen() {
     const summary = summariseReconciliation(reconciliation);
     try {
       apply(
-        setFormMapping(applyReconciliation(plan, imported.result, reconciliation, { keep: kept }), mapping),
+        withBuddyFixes(
+          setFormMapping(applyReconciliation(plan, imported.result, reconciliation, { keep: kept }), mapping),
+          session?.fixes ?? {},
+        ),
         `import: ${summary}`,
       );
       setSession(null);
@@ -401,6 +416,12 @@ export function ImportScreen() {
 
   /** The fiches the importer was not sure of, which are the ones worth a human's eyes. */
   const toRead = imported?.result.volunteers.filter((v) => v.needsReview) ?? [];
+  /** Whom a binôme may name: this file's people, then the plan's people the file does not carry. */
+  const buddyPeople = useMemo(() => {
+    const inFile = imported?.result.volunteers ?? [];
+    const keys = new Set(inFile.map((v) => v.key));
+    return [...inFile, ...plan.volunteers.filter((v) => !keys.has(v.key))];
+  }, [imported, plan.volunteers]);
 
   const blocking = imported?.result.issues.filter((i) => i.severity === 'error') ?? [];
   /** The signalements about nobody in particular; the others are on their fiche, see `ImportReview`. */
@@ -766,6 +787,19 @@ export function ImportScreen() {
                       ))}
                       <RawAnswer label="Montage" value={v.montage.note} />
                       <RawAnswer label="Démontage" value={v.demontage.note} />
+                      <RawAnswer label="Binômes" value={v.buddyRawNames.join(', ')} />
+
+                      {(correcting === v.key ||
+                        v.buddyRawNames.length > 0 ||
+                        session?.fixes[v.key]?.buddies !== undefined) && (
+                        <ImportBuddies
+                          volunteer={v}
+                          resolved={imported.result.buddies.filter((b) => b.fromKey === v.key)}
+                          people={buddyPeople}
+                          fix={session?.fixes[v.key]?.buddies}
+                          onChange={(next) => changeBuddies(v.key, next)}
+                        />
+                      )}
 
                       {correcting === v.key ? (
                         <VolunteerEdit

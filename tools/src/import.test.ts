@@ -822,3 +822,31 @@ test('folding keeps every signalement about somebody on their fiche, once', () =
   ok(!folded.reviewReasons.some((r) => /Pôle du choix 1 non reconnu/.test(r)), JSON.stringify(folded.reviewReasons));
   deepStrictEqual(foldIssuesIntoFiches({ ...result, volunteers: [folded] }).volunteers[0]!.reviewReasons, folded.reviewReasons);
 });
+
+test('the same pole chosen twice is the first choice and no second, without a signalement', () => {
+  const result = importOne({ 20: 'Bar / Service', 22: 'Bar / Service' });
+  const person = result.volunteers[0]!;
+  strictEqual(person.choices.length, 1);
+  strictEqual(person.choices[0]!.raw, 'Bar / Service');
+  strictEqual(person.needsReview, false, JSON.stringify(person.reviewReasons));
+  deepStrictEqual(result.issues.filter((i) => i.row !== null), []);
+});
+
+test('a binôme naming somebody already on the plan, and not in the file, is found', () => {
+  const onPlan = {
+    ...importOne().volunteers[0]!,
+    key: 'saisi-a-la-main',
+    firstName: 'Zoé',
+    lastName: 'Lambert',
+    email: 'zoe@example.org',
+    phone: '',
+  };
+  const csv = rowCsv({ 29: 'Zoé Lambert' });
+  const alone = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO });
+  strictEqual(alone.buddies[0]!.toKey, null);
+  const withRoster = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO, roster: [onPlan] });
+  strictEqual(withRoster.buddies[0]!.toKey, 'saisi-a-la-main');
+  deepStrictEqual(withRoster.issues.filter((i) => i.code.startsWith('binome')), []);
+  // Searched, never imported.
+  strictEqual(withRoster.volunteers.length, 1);
+});

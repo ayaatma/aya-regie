@@ -2856,3 +2856,34 @@ test('a pole choice corrected by hand shows the answer given to the form beside 
   const untouched = infoOf(plan, { kind: 'benevole', volunteerKey: someone.key });
   assert.ok(!shows(untouched, 'réponse au formulaire'), 'un choix lu tel quel ne répète rien');
 });
+
+test('a binôme is settled on a fiche still being imported, against the file and the plan', async () => {
+  const { ImportBuddies, withBuddyFixes } = await import('./ImportBuddies.tsx');
+  const { importVolunteers } = await import('../engine.ts');
+  const csv = [
+    'Horodateur,Adresse e-mail,Nom,Prénom,Ton premier choix.,Avec qui veux-tu être en binôme ?',
+    '01/06/2026 10:00:00,a@exemple.org,Alpha,Ana,Bar,la grande du bar',
+    '02/06/2026 10:00:00,b@exemple.org,Beta,Ben,Bar,',
+  ].join('\n');
+  const result = importVolunteers(csv, { poles: plan.poles, artists: plan.artists, startISO: plan.startISO });
+  const [ana, ben] = result.volunteers;
+  const onPlan = plan.volunteers[0]!;
+  const html = render(
+    <ImportBuddies
+      volunteer={ana!}
+      resolved={result.buddies.filter((b) => b.fromKey === ana!.key)}
+      people={[...result.volunteers, onPlan]}
+      fix={{ added: [ben!.key], removed: [] }}
+      onChange={noop}
+    />,
+  );
+  assert.ok(shows(html, 'Ben Beta'), 'le binôme ajouté est montré');
+  assert.ok(shows(html, '« la grande du bar »'), 'la réponse non reliée reste visible');
+  assert.ok(html.includes(`value="${onPlan.key}"`), 'une personne déjà dans le plan est proposée');
+  const applied = withBuddyFixes(
+    { ...plan, volunteers: [...plan.volunteers, ana!, ben!] },
+    { [ana!.key]: { buddies: { added: [ben!.key, 'parti'], removed: [] } } },
+  );
+  assert.ok(applied.buddies.some((b) => b.fromKey === ana!.key && b.toKey === ben!.key && b.manual));
+  assert.ok(!applied.buddies.some((b) => b.toKey === 'parti'), 'personne qui ne reste pas: pas de binôme');
+});
