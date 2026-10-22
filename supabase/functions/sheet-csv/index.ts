@@ -2,6 +2,11 @@
  * `sheet-csv`, the one Supabase Edge Function of AyaRégie, 2026-09-15.
  *
  *   POST { url }  with the régisseur's session  →  200 text/csv  |  4xx/5xx { error, serviceAccount }
+ *   POST { serviceAccount: true }                →  200 { serviceAccount }
+ *
+ * The second form, 2026-10-22, gives the import screen the address to share the sheet with, so
+ * the régisseur reads it there instead of hunting for it in Google Cloud. The address is not a
+ * secret (the key is), but it is still only told to a signed-in régisseur.
  *
  * Reads a PRIVATE Google Sheet shared with the service account whose JSON key is the secret
  * GOOGLE_SERVICE_ACCOUNT. See `core.ts` for why, and `.claude/memory/feature_private_sheet.md` for
@@ -60,12 +65,14 @@ Deno.serve(async (request: Request) => {
     return json(401, { error: 'Connexion régisseur requise: la session a expiré, reconnectez-vous puis réessayez.' });
   }
 
-  let url = '';
+  let body: { url?: unknown; serviceAccount?: unknown };
   try {
-    url = String(((await request.json()) as { url?: unknown }).url ?? '');
+    body = (await request.json()) as typeof body;
   } catch {
     return json(400, { error: 'Corps JSON { url } attendu.' });
   }
+  if (body.serviceAccount === true) return json(200, { serviceAccount: key.client_email });
+  const url = String(body.url ?? '');
   const ref = parseSheetUrl(url);
   if (!ref) return json(400, { error: "Ce lien n'est pas une feuille Google Sheets." });
 

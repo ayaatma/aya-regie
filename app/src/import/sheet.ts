@@ -88,6 +88,24 @@ export const readThroughFunction: PrivateReader = async (url) => {
 };
 
 /**
+ * The address to share a private sheet with, as the `sheet-csv` function knows it from its key, or
+ * null when it cannot say (not deployed, not configured, or deployed before 2026-10-22, which reads
+ * the request as a missing link). Never written into the code: the repository is public.
+ */
+export async function serviceAccountAddress(): Promise<string | null> {
+  if (!supabaseConfigured) return null;
+  try {
+    const { data, error } = await getSupabase().functions.invoke<{ serviceAccount?: unknown }>('sheet-csv', {
+      body: { serviceAccount: true },
+    });
+    if (error || typeof data?.serviceAccount !== 'string' || data.serviceAccount === '') return null;
+    return data.serviceAccount;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetches the sheet as CSV text: privately through the service account when the tool can, through
  * the public link otherwise.
  *

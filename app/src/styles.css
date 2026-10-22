@@ -3352,6 +3352,18 @@ button {
   user-select: all;
 }
 
+/* L'adresse avec qui partager la feuille privée: sélectionnée d'un clic si la copie est refusée. */
+.service-account {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .setup-organiser-fields {
   grid-column: 1 / -1;
   display: flex;

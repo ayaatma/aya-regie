@@ -50,3 +50,12 @@ Create the Google Cloud project / service account / JSON key, set the secret
 `GOOGLE_SERVICE_ACCOUNT` in Supabase, `npx supabase login` then
 `npx supabase functions deploy sheet-csv --project-ref <ref>`, share the sheet (Lecteur) with the
 service account address. Then verify « Rafraîchir » on a sheet with link sharing removed.
+
+## The address on the import screen (2026-10-22)
+
+The hint « partagez-la avec le compte de service de l'outil » did not say which address. `sheet-csv`
+now also answers `POST { serviceAccount: true }` with `{ serviceAccount }` (signed-in régisseur
+only), `serviceAccountAddress()` in `app/src/import/sheet.ts` asks it, and the import screen shows
+the address with a « Copier » button. Until the function is redeployed (or without Supabase) the
+old function answers 400, and the hint falls back to « elle finit par iam.gserviceaccount.com ».
+The address itself is never written into the repo.

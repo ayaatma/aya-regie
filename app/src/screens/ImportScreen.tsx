@@ -35,7 +35,7 @@ import {
 import { useLoadedPlan } from '../store/store.tsx';
 import { VolunteerEdit } from '../components/VolunteerEdit.tsx';
 import { downloadText, today } from '../components/download.ts';
-import { fetchSheetCsv } from '../import/sheet.ts';
+import { fetchSheetCsv, serviceAccountAddress } from '../import/sheet.ts';
 import { rememberSheet, setFormMapping } from '../store/edits.ts';
 import { FormMappingCard } from './FormMappingCard.tsx';
 import { SetupFromFormCard } from './SetupFromFormCard.tsx';
@@ -88,6 +88,28 @@ export function ImportScreen() {
   >(null);
   /** Bumped on each applied setup, so the card is rebuilt against the plan it just changed. */
   const [setupRound, setSetupRound] = useState(0);
+  /**
+   * The address a private sheet is shared with, asked of the `sheet-csv` function since 2026-10-22:
+   * « le compte de service de l'outil » told the régisseur what to do but not with whom.
+   */
+  const [account, setAccount] = useState<string | null>(null);
+  const [accountCopied, setAccountCopied] = useState<'ok' | 'manuel' | null>(null);
+  useEffect(() => {
+    let live = true;
+    void serviceAccountAddress().then((address) => {
+      if (live) setAccount(address);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const copyAccount = (address: string): void => {
+    navigator.clipboard
+      ?.writeText(address)
+      .then(() => setAccountCopied('ok'))
+      .catch(() => setAccountCopied('manuel'));
+    if (!navigator.clipboard) setAccountCopied('manuel');
+  };
 
   /**
    * Correcting a reading BEFORE the import is applied.
@@ -355,9 +377,21 @@ export function ImportScreen() {
             <div className="setup-group-head">
               <span className="setup-group-title">Depuis Google Sheets</span>
               <span className="people-meta">
-                {plan.sheetUrl !== ''
-                  ? 'Lien mémorisé avec le planning. Rafraîchir relit la feuille et montre ce qui a changé.'
-                  : 'Feuille privée: partagez-la en lecture avec le compte de service de l’outil (voir la notice), ou par lien'}
+                {plan.sheetUrl !== '' ? (
+                  'Lien mémorisé avec le planning. Rafraîchir relit la feuille et montre ce qui a changé.'
+                ) : account !== null ? (
+                  <>
+                    Feuille privée: partagez-la en lecture (« Lecteur ») avec l’adresse de l’outil,{' '}
+                    <code className="service-account">{account}</code>{' '}
+                    <button type="button" className="btn is-small" onClick={() => copyAccount(account)}>
+                      {accountCopied === 'ok' ? 'Copiée' : 'Copier'}
+                    </button>
+                    {accountCopied === 'manuel' && ' (copie refusée par le navigateur: sélectionnez l’adresse)'}, ou
+                    rendez-la lisible par lien.
+                  </>
+                ) : (
+                  'Feuille privée: partagez-la en lecture avec l’adresse Google de l’outil (elle finit par iam.gserviceaccount.com, voir la notice), ou rendez-la lisible par lien.'
+                )}
               </span>
             </div>
 
