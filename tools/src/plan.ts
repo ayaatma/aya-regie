@@ -154,8 +154,11 @@ import {
  * 28: 2026-10-22, `PoleChoice.anyPole` (« Tous les pôles acceptés ») and `Plan.availabilityMode`.
  *    A build that predates this writes « tous acceptés » back as an empty choice and the mode back
  *    as tranches.
+ * 29: 2026-10-23, the ToDo batch: `Plan.phaseOptions`, `PhaseEvent.mirrorOf`,
+ *    `CateringRules.organiserDrinksFixed`, `TicketingSettings.guestTypes`, `TicketType.bracelet`,
+ *    `TicketingChoice.braceletKeys`. A build that predates this writes every one of them away.
  */
-export const PLAN_FORMAT = 28;
+export const PLAN_FORMAT = 29;
 
 /** See `Plan.availabilityMode`. */
 export type AvailabilityMode = 'tranches' | 'plages';

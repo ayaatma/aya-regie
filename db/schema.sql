@@ -157,6 +157,16 @@ create table event (
   -- Since 2026-10-22. A document for the reason form_mapping is one.
   mail_templates        jsonb not null default '{}'::jsonb
     check (jsonb_typeof(mail_templates) = 'object'),
+  -- What the montage and the demontage share: {eventHours, mirrorEvents, mirrorWords}. Since
+  -- 2026-10-22. An empty object is the defaults written in tools/src/phase.ts.
+  phase_options         jsonb not null default '{}'::jsonb
+    check (jsonb_typeof(phase_options) = 'object'),
+  -- An orga handed exactly organiser_drinks, whatever the hours, rather than that as a floor.
+  organiser_drinks_fixed boolean not null default false,
+  -- The kinds of guest the door knows, [{key, label, drinkTickets, mealTickets}]. 2026-10-22.
+  guest_types           jsonb not null default
+    '[{"key":"partenaire","label":"Partenaire","drinkTickets":0,"mealTickets":0},{"key":"prestataire","label":"Prestataire","drinkTickets":0,"mealTickets":0},{"key":"autre","label":"Autre invitation","drinkTickets":0,"mealTickets":0}]'::jsonb
+    check (jsonb_typeof(guest_types) = 'array'),
 
   -- THE OPTIMISTIC LOCK. Every save states the version it was built on; a save against a stale
   -- version is refused and hands back what the database holds. This is the "quelqu'un a modifie
@@ -759,6 +769,8 @@ create table phase_event (
   end_hours   numeric(6,2) not null,
   -- Zero means "as many as turn up" and is never reported short.
   headcount   int not null default 0 check (headcount >= 0),
+  -- On a demontage evenement: the key of the montage evenement it was copied from. 2026-10-22.
+  mirror_of   text,
   sort_order  int not null default 0,
   unique (phase_id, key),
   check (end_hours > start_hours)
@@ -909,6 +921,8 @@ create table ticket_type (
   label       text not null default '',
   start_hours numeric(6,2) not null,
   end_hours   numeric(6,2) not null,
+  -- The wristband this entry is worth at the door, empty for none. Since 2026-10-22.
+  bracelet    text not null default '',
   sort_order  int not null default 0,
   unique (event_id, key)
 );
@@ -930,8 +944,8 @@ create index bracelet_type_event_idx on bracelet_type (event_id);
 -- artistes ET leurs invites" is two rows and not a list in a text column.
 create table bracelet_default (
   bracelet_id uuid not null references bracelet_type(id) on delete cascade,
-  status      text not null check (status in ('benevole', 'orga', 'responsable', 'artiste',
-                                              'invite-artiste', 'prestataire', 'autre')),
+  -- A computed status or a guest type's key: free since 2026-10-22.
+  status      text not null,
   sort_order  int not null default 0,
   primary key (bracelet_id, status)
 );
@@ -944,7 +958,8 @@ create table extra_person (
   key           text not null,
   first_name    text not null default '',
   last_name     text not null default '',
-  status        text not null default 'autre' check (status in ('prestataire', 'autre')),
+  -- The key of one of event.guest_types since 2026-10-22; 'prestataire' or 'autre' before.
+  status        text not null default 'autre',
   phone         text not null default '',
   drink_tickets int not null default 0 check (drink_tickets >= 0),
   meal_tickets  int not null default 0 check (meal_tickets >= 0),
@@ -969,7 +984,10 @@ create table ticketing_choice (
   person_kind    text not null check (person_kind in ('benevole', 'orga', 'artiste', 'invite', 'extra')),
   person_key     text not null,
   ticket_type_id uuid references ticket_type(id) on delete set null,
+  -- Read only for a choice written before 2026-10-22, when a person held one bracelet.
   bracelet_id    uuid references bracelet_type(id) on delete set null,
+  -- The bracelets chosen by hand, by key, the whole list; null is the defaults. 2026-10-22.
+  bracelet_keys  text[],
   drink_tickets  int check (drink_tickets is null or drink_tickets >= 0),
   note           text not null default '',
   sort_order     int not null default 0,
@@ -1103,7 +1121,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 28,
+values ('min_plan_format', 29,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1561,7 +1579,8 @@ as $fn$
                         'label',     pe.label,
                         'start',     pe.start_hours,
                         'end',       pe.end_hours,
-                        'headcount', pe.headcount)
+                        'headcount', pe.headcount,
+                        'mirrorOf',  pe.mirror_of)
                       order by pe.sort_order, pe.key)
                from phase_event pe where pe.phase_id = ph.id), '[]'::jsonb),
              'assignments', coalesce((
@@ -1593,6 +1612,7 @@ as $fn$
         'drinkCountsPhases', e.drink_counts_phases,
         'organiserMeals',    e.organiser_meals,
         'organiserDrinks',   e.organiser_drinks,
+        'organiserDrinksFixed', e.organiser_drinks_fixed,
         'artistDrinks',      e.artist_drinks,
         'artistDrinksCumulative', e.artist_drinks_cumulative,
         'services', coalesce((
@@ -1636,9 +1656,11 @@ as $fn$
                  'key',   t.key,
                  'label', t.label,
                  'start', t.start_hours,
-                 'end',   t.end_hours)
+                 'end',   t.end_hours,
+                 'bracelet', t.bracelet)
                order by t.sort_order, t.key)
         from ticket_type t where t.event_id = e.id), '[]'::jsonb),
+      'guestTypes', e.guest_types,
       'bracelets', coalesce((
         select jsonb_agg(jsonb_build_object(
                  'key',   b.key,
@@ -1667,6 +1689,7 @@ as $fn$
                  'personKey',     c.person_key,
                  'ticketTypeKey', ct.key,
                  'braceletKey',   cb.key,
+                 'braceletKeys',  to_jsonb(c.bracelet_keys),
                  'drinkTickets',  c.drink_tickets,
                  'note',          c.note)
                order by c.sort_order, c.person_kind, c.person_key)
@@ -1734,6 +1757,7 @@ as $fn$
       'formMapping', e.form_mapping,
       'applicationSteps', e.application_steps,
       'mailTemplates', e.mail_templates,
+      'phaseOptions', e.phase_options,
       'skills', e.skills,
       'sideActivities', e.side_activities,
       'equipment', e.equipment,
@@ -1800,10 +1824,14 @@ begin
     drink_counts_phases   = coalesce((p_plan#>>'{catering,rules,drinkCountsPhases}')::boolean, false),
     organiser_meals       = coalesce((p_plan#>>'{catering,rules,organiserMeals}')::int, 2),
     organiser_drinks      = coalesce((p_plan#>>'{catering,rules,organiserDrinks}')::int, 2),
+    organiser_drinks_fixed = coalesce((p_plan#>>'{catering,rules,organiserDrinksFixed}')::boolean, false),
     artist_drinks         = coalesce((p_plan#>>'{catering,rules,artistDrinks}')::int, 2),
     artist_drinks_cumulative = coalesce((p_plan#>>'{catering,rules,artistDrinksCumulative}')::boolean, false),
     guests_per_artist     = coalesce((p_plan#>>'{ticketing,guestsPerArtist}')::int, 1),
     reserve_on_door_list  = coalesce((p_plan#>>'{ticketing,reserveOnDoorList}')::boolean, false),
+    -- Absent from anything written before PLAN_FORMAT 29: the column keeps what it holds.
+    guest_types           = case when jsonb_typeof(p_plan#>'{ticketing,guestTypes}') = 'array'
+                                 then p_plan#>'{ticketing,guestTypes}' else guest_types end,
     fuel_price_essence    = coalesce((p_plan#>>'{travel,fuelPrices,essence}')::numeric, 1.75),
     fuel_price_diesel     = coalesce((p_plan#>>'{travel,fuelPrices,diesel}')::numeric, 1.70),
     fuel_price_electrique = coalesce((p_plan#>>'{travel,fuelPrices,electrique}')::numeric, 0.22),
@@ -1830,6 +1858,8 @@ begin
                                  then p_plan->'applicationSteps' else application_steps end,
     mail_templates        = case when jsonb_typeof(p_plan->'mailTemplates') = 'object'
                                  then p_plan->'mailTemplates' else '{}'::jsonb end,
+    phase_options         = case when jsonb_typeof(p_plan->'phaseOptions') = 'object'
+                                 then p_plan->'phaseOptions' else '{}'::jsonb end,
     skills                = case when jsonb_typeof(p_plan->'skills') = 'array'
                                  then p_plan->'skills' else '[]'::jsonb end,
     side_activities       = case when jsonb_typeof(p_plan->'sideActivities') = 'array'
@@ -1843,9 +1873,9 @@ begin
                                  then p_plan->'teams' else '[]'::jsonb end
   where id = p_event_id;
 
-  insert into ticket_type (event_id, key, label, start_hours, end_hours, sort_order)
+  insert into ticket_type (event_id, key, label, start_hours, end_hours, bracelet, sort_order)
   select p_event_id, x->>'key', coalesce(x->>'label', ''),
-         (x->>'start')::numeric, (x->>'end')::numeric, (ord - 1)::int
+         (x->>'start')::numeric, (x->>'end')::numeric, coalesce(x->>'bracelet', ''), (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan#>'{ticketing,ticketTypes}', '[]'::jsonb))
        with ordinality as t(x, ord);
 
@@ -1876,15 +1906,22 @@ begin
 
   -- A choice naming a ticket type or a bracelet the plan no longer holds loses that half; a
   -- choice left with nothing at all is not written, which is what "the default" means.
+  -- Since 2026-10-22 the bracelets are a list (braceletKeys, null for the defaults); the single
+  -- braceletKey of an older tab is still written, as a list of one.
   insert into ticketing_choice (event_id, person_kind, person_key, ticket_type_id, bracelet_id,
-                                drink_tickets, note, sort_order)
-  select p_event_id, x->>'personKind', x->>'personKey', ct.id, cb.id,
+                                bracelet_keys, drink_tickets, note, sort_order)
+  select p_event_id, x->>'personKind', x->>'personKey', ct.id, null,
+         case when jsonb_typeof(x->'braceletKeys') = 'array'
+                then array(select jsonb_array_elements_text(x->'braceletKeys'))
+              when cb.id is not null then array[cb.key]
+              else null end,
          (x->>'drinkTickets')::int, coalesce(x->>'note', ''), (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan#>'{ticketing,choices}', '[]'::jsonb))
        with ordinality as t(x, ord)
   left join ticket_type   ct on ct.event_id = p_event_id and ct.key = x->>'ticketTypeKey'
   left join bracelet_type cb on cb.event_id = p_event_id and cb.key = x->>'braceletKey'
   where num_nonnulls(ct.id, cb.id, (x->>'drinkTickets')::int) >= 1 or coalesce(x->>'note', '') <> ''
+     or jsonb_typeof(x->'braceletKeys') = 'array'
   on conflict do nothing;
 
   insert into catering_service_window (event_id, key, label, from_hour, to_hour, sort_order)
@@ -2253,10 +2290,10 @@ begin
     coalesce(p_plan->ph.phase_key->'poles', '[]'::jsonb)) with ordinality as t(x, ord)
   where ph.event_id = p_event_id;
 
-  insert into phase_event (phase_id, key, label, start_hours, end_hours, headcount, sort_order)
+  insert into phase_event (phase_id, key, label, start_hours, end_hours, headcount, mirror_of, sort_order)
   select ph.id, x->>'key', coalesce(x->>'label', ''),
          (x->>'start')::numeric, (x->>'end')::numeric,
-         coalesce((x->>'headcount')::int, 0), (ord - 1)::int
+         coalesce((x->>'headcount')::int, 0), nullif(x->>'mirrorOf', ''), (ord - 1)::int
   from phase ph
   cross join lateral jsonb_array_elements(
     coalesce(p_plan->ph.phase_key->'events', '[]'::jsonb)) with ordinality as t(x, ord)
@@ -2915,7 +2952,7 @@ create table mail_log (
   -- (migration 36) also a step of the follow-up ('etape'), a reminder of one ('relance'), or a
   -- test sent to the regisseur's own address in the person's place ('test': counts for nobody).
   reason      text not null default 'validation'
-    constraint mail_log_reason_check check (reason in ('validation', 'renvoi', 'etape', 'relance', 'test')),
+    constraint mail_log_reason_check check (reason in ('validation', 'renvoi', 'etape', 'relance', 'test', 'annulation')),
   -- The follow-up step this mail is (event.application_steps key), '' for a validation mail.
   step_key    text not null default '',
   -- The {planning} lines the mail carried, '' when it carried none: what « planning modifie
@@ -2950,13 +2987,18 @@ create table step_reply (
   event_id      uuid not null references event(id) on delete cascade,
   volunteer_key text not null,
   step_key      text not null,
-  answer        text not null check (answer in ('oui', 'non')),
+  answer        text not null check (answer in ('oui', 'non', 'souci')),
   -- The mail answered (the last one sent for this step when the answer came); null for an answer
   -- the regie noted by hand.
   mail_id       bigint references mail_log(id) on delete set null,
   source        text not null default 'regie' check (source in ('lien', 'regie')),
   answered_at   timestamptz not null default now(),
-  answered_by   uuid default auth.uid()
+  answered_by   uuid default auth.uid(),
+  -- The planning on the page when it was confirmed, as private.planning_fingerprint writes it;
+  -- empty for an answer from before 2026-10-22. The app compares it with today's.
+  planning      text not null default '',
+  -- What a « souci » says, for the regie. 2026-10-22.
+  comment       text not null default ''
 );
 
 create index step_reply_person_idx on step_reply (event_id, volunteer_key, step_key, id desc);
@@ -2974,6 +3016,41 @@ create policy step_reply_organiser_insert on step_reply for insert to authentica
 -- filtered in the browser. Contact details of other volunteers are never returned; only the
 -- responsable's are.
 -- ---------------------------------------------------------------------------
+
+-- The planning of one benevole as a string of keys and instants, since 2026-10-22: what
+-- « Je confirme » records in step_reply.planning, and what the app compares with today's to tell
+-- « confirme » from « confirme, puis modifie ». One line per box, debut|fin|ou, whole seconds since
+-- 1970, then s:<creneau>, or <phase>:p:<pole> / <phase>:e:<evenement>; sorted in byte order and
+-- joined by ';'. WRITTEN TWICE ON PURPOSE: tools/src/followup.ts planningFingerprint computes the
+-- same string from the plan, and the two must agree character for character.
+create or replace function private.planning_fingerprint(p_volunteer uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $fn$
+  select coalesce(string_agg(line, ';' order by line collate "C"), '')
+  from (
+    select distinct
+           floor(extract(epoch from ev.starts_at) + s.start_hours * 3600)::bigint::text || '|' ||
+           floor(extract(epoch from ev.starts_at) + s.end_hours   * 3600)::bigint::text || '|s:' || s.key as line
+    from assignment a
+    join shift s  on s.id = a.shift_id
+    join pole  p  on p.id = s.pole_id
+    join event ev on ev.id = p.event_id
+    where a.volunteer_id = p_volunteer
+    union
+    select floor(extract(epoch from ph.starts_at) + pa.start_hours * 3600)::bigint::text || '|' ||
+           floor(extract(epoch from ph.starts_at) + pa.end_hours   * 3600)::bigint::text || '|' ||
+           ph.phase_key || ':' || case when pp.key is not null then 'p:' || pp.key else 'e:' || pe.key end
+    from phase_assignment pa
+    join phase ph on ph.id = pa.phase_id and ph.enabled
+    left join phase_pole  pp on pp.id = pa.phase_pole_id
+    left join phase_event pe on pe.id = pa.phase_event_id
+    where pa.volunteer_id = p_volunteer
+  ) lines;
+$fn$;
 
 create or replace function public.get_volunteer_schedule(p_code text)
 returns jsonb
@@ -3051,7 +3128,8 @@ as $fn$
                'reply',      st.s->'mail'->>'reply',
                'sentAt',     m.sent_at,
                'answer',     r.answer,
-               'answeredAt', r.answered_at)
+               'answeredAt', r.answered_at,
+               'comment',    r.comment)
              order by st.ord)
       from event e
       cross join lateral jsonb_array_elements(e.application_steps) with ordinality as st(s, ord)
@@ -3064,11 +3142,15 @@ as $fn$
         limit 1
       ) m on true
       left join lateral (
-        select sr.answer, sr.answered_at
+        -- Since 2026-10-22 an answer carrying the planning it confirmed holds while that is still
+        -- the planning; a « souci » always shows; an older answer is read by its date, as before.
+        select sr.answer, sr.answered_at, sr.comment
         from step_reply sr
         where sr.event_id = e.id and sr.volunteer_key = me.key and sr.step_key = st.s->>'key'
-          and (sr.answered_at >= m.sent_at
-               or position('{planning}' in coalesce(st.s->'mail'->>'subject', '') || coalesce(st.s->'mail'->>'body', '')) = 0)
+          and (sr.answer = 'souci'
+               or position('{planning}' in coalesce(st.s->'mail'->>'subject', '') || coalesce(st.s->'mail'->>'body', '')) = 0
+               or (sr.planning <> '' and sr.planning = private.planning_fingerprint(me.id))
+               or (sr.planning = '' and sr.answered_at >= m.sent_at))
         order by sr.id desc
         limit 1
       ) r on true
@@ -3220,7 +3302,7 @@ create policy photos_organiser_delete on storage.objects
 -- A ceiling of 50 answers per person and step keeps a code from filling the table.
 -- ---------------------------------------------------------------------------
 
-create or replace function public.answer_step(p_code text, p_step text, p_answer text)
+create or replace function public.answer_step(p_code text, p_step text, p_answer text, p_comment text default '')
 returns jsonb
 language plpgsql
 security definer
@@ -3234,7 +3316,7 @@ declare
   v_at    timestamptz;
 begin
   -- An empty code is the state of a benevole nobody issued one to: it opens nothing.
-  if p_answer is null or p_answer not in ('oui', 'non') or btrim(coalesce(p_code, '')) = '' then
+  if p_answer is null or p_answer not in ('oui', 'non', 'souci') or btrim(coalesce(p_code, '')) = '' then
     return null;
   end if;
 
@@ -3253,7 +3335,11 @@ begin
   if v_reply is null or v_reply not in ('confirmer', 'oui-non') then
     return null;
   end if;
-  if v_reply = 'confirmer' and p_answer <> 'oui' then
+  -- A confirmation is a yes or a « souci », never a no; a souci always says something.
+  if v_reply = 'confirmer' and p_answer = 'non' then
+    return null;
+  end if;
+  if p_answer = 'souci' and btrim(coalesce(p_comment, '')) = '' then
     return null;
   end if;
 
@@ -3272,13 +3358,16 @@ begin
     return null;
   end if;
 
-  insert into step_reply (event_id, volunteer_key, step_key, answer, mail_id, source, answered_by)
-  values (v_event, v_key, p_step, p_answer, v_mail, 'lien', null)
+  insert into step_reply (event_id, volunteer_key, step_key, answer, mail_id, source, answered_by, planning, comment)
+  values (v_event, v_key, p_step, p_answer, v_mail, 'lien', null,
+          private.planning_fingerprint((select id from volunteer where event_id = v_event and key = v_key)),
+          left(btrim(coalesce(p_comment, '')), 1000))
   returning answered_at into v_at;
 
   return jsonb_build_object('key', p_step, 'answer', p_answer, 'answeredAt', v_at);
 end;
 $fn$;
 
-revoke all on function public.answer_step(text, text, text) from public, anon, authenticated;
-grant execute on function public.answer_step(text, text, text) to anon, authenticated;
+revoke all on function public.answer_step(text, text, text, text) from public, anon, authenticated;
+grant execute on function public.answer_step(text, text, text, text) to anon, authenticated;
+revoke all on function private.planning_fingerprint(uuid) from public, anon, authenticated;
