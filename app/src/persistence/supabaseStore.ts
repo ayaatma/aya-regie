@@ -330,8 +330,13 @@ export class SupabasePlanStore implements PlanStore {
   }
 
   /** The second call a bénévole makes without an account: one answer, checked by Postgres. */
-  async answerStep(code: string, stepKey: string, answer: 'oui' | 'non'): Promise<{ answeredAt: string } | null> {
-    const found = (await this.call('answer_step', { p_code: code, p_step: stepKey, p_answer: answer })) as
+  async answerStep(
+    code: string,
+    stepKey: string,
+    answer: 'oui' | 'non' | 'souci',
+    comment = '',
+  ): Promise<{ answeredAt: string } | null> {
+    const found = (await this.call('answer_step', { p_code: code, p_step: stepKey, p_answer: answer, p_comment: comment })) as
       | { answeredAt?: string }
       | null;
     return found?.answeredAt ? { answeredAt: found.answeredAt } : null;

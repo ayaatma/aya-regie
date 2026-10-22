@@ -13,6 +13,7 @@ import {
   isPlaced,
   placedPending,
   planningLines,
+  planningFingerprint,
   planningText,
   stepProgress,
   stepPersons,
@@ -146,7 +147,7 @@ test('a planning that moved after the mail is flagged, and a new mail asks the c
   assert.equal(moved.planningChanged, true);
   const resent = [...old, sent('planning', '2026-11-03T10:00:00Z', planningText(plan, 'benevole', 'lea'), 'envoye', 2)];
   const again = stepProgress(plan, planningStep, lea, resent, [yes]);
-  assert.equal(again.state, 'en-attente', 'the old « oui » answered the old planning');
+  assert.equal(again.state, 'perime', 'the old « oui » answered the old planning: confirmé, puis modifié');
   assert.equal(again.planningChanged, false);
 });
 
@@ -201,4 +202,22 @@ test('a step with no list of kinds goes to the bénévoles only, as before', () 
   const old = { ...planningStep, mail: oldMail };
   const sam = { ...stepPersons(plan).find((p) => p.kind === 'orga')!, status: 'valide' as const };
   assert.equal(inTarget(plan, old, sam), false);
+});
+
+test('a confirmation holds for the exact planning it confirmed, and a souci is never one', () => {
+  const plan = makePlan();
+  const lea = plan.volunteers[0]!;
+  const fingerprint = planningFingerprint(plan, 'benevole', 'lea');
+  assert.match(fingerprint, /^\d+\|\d+\|(s:bar@\d|montage:p:general)(;\d+\|\d+\|(s:bar@\d|montage:p:general))+$/);
+  const mail = [sent('planning', '2026-11-03T10:00:00Z', planningText(plan, 'benevole', 'lea'))];
+  const yes: ReplyFact = { stepKey: 'planning', answer: 'oui', answeredAt: '2026-11-01T08:00:00Z', source: 'lien', planning: fingerprint };
+  assert.equal(stepProgress(plan, planningStep, lea, mail, [yes]).state, 'oui', 'older than the mail, but the very same planning');
+
+  const moved = { ...plan, assignments: plan.assignments.filter((a) => a.shiftKey !== 'bar@2') };
+  assert.equal(stepProgress(moved, planningStep, lea, mail, [yes]).state, 'perime');
+
+  const souci: ReplyFact = { stepKey: 'planning', answer: 'souci', answeredAt: '2026-11-04T08:00:00Z', source: 'lien', planning: fingerprint, comment: 'Pas le samedi soir' };
+  const f = followUpOf(plan, lea, mail, [yes, souci]);
+  assert.equal(f.steps.find((s) => s.step.key === 'planning')!.state, 'souci');
+  assert.ok(f.alerts.some((a) => a.label.includes('Pas le samedi soir')));
 });

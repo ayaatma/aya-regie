@@ -50,9 +50,12 @@ export interface ReplyEntry {
   id: number;
   volunteerKey: string;
   stepKey: string;
-  answer: 'oui' | 'non';
+  answer: 'oui' | 'non' | 'souci';
   source: 'lien' | 'regie';
   answeredAt: string;
+  /** The fingerprint of the planning confirmed, and the comment of a « souci ». 2026-10-22. */
+  planning: string;
+  comment: string;
 }
 
 /** Under OVH's 200 an hour, with room for the mails the association sends by hand. */
@@ -73,7 +76,7 @@ interface Book {
 
 const books = new Map<string, Book>();
 const COLUMNS = 'id, person_kind, person_key, recipient, subject, outcome, error, reason, step_key, planning, sent_at';
-const REPLY_COLUMNS = 'id, volunteer_key, step_key, answer, source, answered_at';
+const REPLY_COLUMNS = 'id, volunteer_key, step_key, answer, source, answered_at, planning, comment';
 
 function bookOf(eventId: string): Book {
   let book = books.get(eventId);
@@ -114,9 +117,11 @@ const replyOf = (row: Record<string, unknown>): ReplyEntry => ({
   id: Number(row.id),
   volunteerKey: String(row.volunteer_key ?? ''),
   stepKey: String(row.step_key ?? ''),
-  answer: row.answer === 'non' ? 'non' : 'oui',
+  answer: row.answer === 'non' ? 'non' : row.answer === 'souci' ? 'souci' : 'oui',
   source: row.source === 'lien' ? 'lien' : 'regie',
   answeredAt: String(row.answered_at ?? ''),
+  planning: String(row.planning ?? ''),
+  comment: String(row.comment ?? ''),
 });
 
 function loadBook(eventId: string): Promise<void> {
@@ -207,7 +212,7 @@ function logOf(book: Book | null): MailLog {
         .map((e) => ({ id: e.id, stepKey: e.stepKey, outcome: e.outcome, sentAt: e.sentAt, planning: e.planning })),
       replies: replies
         .filter((r) => r.volunteerKey === volunteerKey)
-        .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source })),
+        .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source, planning: r.planning, comment: r.comment })),
     }),
     factsOfPerson: (kind, key) => ({
       mails: entries
@@ -217,7 +222,7 @@ function logOf(book: Book | null): MailLog {
         kind === 'benevole'
           ? replies
               .filter((r) => r.volunteerKey === key)
-              .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source }))
+              .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source, planning: r.planning, comment: r.comment }))
           : [],
     }),
     repliesOf: (volunteerKey) => replies.filter((r) => r.volunteerKey === volunteerKey),
@@ -334,15 +339,17 @@ export async function recordReply(
   volunteerKey: string,
   stepKey: string,
   answer: 'oui' | 'non',
+  /** The fingerprint of the planning the régie confirms for them (`planningFingerprint`). */
+  planning = '',
 ): Promise<string | null> {
   const book = bookOf(eventId);
   let entry: ReplyEntry = {
-    id: -Date.now(), volunteerKey, stepKey, answer, source: 'regie', answeredAt: new Date().toISOString(),
+    id: -Date.now(), volunteerKey, stepKey, answer, source: 'regie', answeredAt: new Date().toISOString(), planning, comment: '',
   };
   if (supabaseConfigured) {
     const { data, error } = await getSupabase()
       .from('step_reply')
-      .insert({ event_id: eventId, volunteer_key: volunteerKey, step_key: stepKey, answer, source: 'regie' })
+      .insert({ event_id: eventId, volunteer_key: volunteerKey, step_key: stepKey, answer, source: 'regie', planning })
       .select(REPLY_COLUMNS)
       .single();
     if (error) return `Réponse non enregistrée: ${error.message}`;

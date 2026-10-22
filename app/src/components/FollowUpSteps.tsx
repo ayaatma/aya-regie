@@ -15,6 +15,7 @@ import { useState } from 'react';
 
 import {
   isMailAddress,
+  planningFingerprint,
   planningText,
   registrantOf,
   renderTemplate,
@@ -112,7 +113,8 @@ function StepRow({ step, volunteer, progress }: { step: ApplicationStep; volunte
   const note = async (answer: 'oui' | 'non'): Promise<void> => {
     if (eventId === null) return;
     setBusy(true);
-    setError(await recordReply(eventId, volunteer.key, step.key, answer));
+    // The planning confirmed is today's, as the link would have recorded it.
+    setError(await recordReply(eventId, volunteer.key, step.key, answer, planningFingerprint(plan, 'benevole', volunteer.key)));
     setBusy(false);
   };
 
@@ -120,7 +122,7 @@ function StepRow({ step, volunteer, progress }: { step: ApplicationStep; volunte
   if (progress.lastSent) detail.push(`envoyé ${sentAtLabel(progress.lastSent.sentAt)}`);
   if (progress.reply) {
     detail.push(
-      `${progress.reply.answer === 'oui' ? (mailStep.reply === 'confirmer' ? 'confirmé' : 'oui') : 'non'} ${sentAtLabel(progress.reply.answeredAt)}${progress.reply.source === 'lien' ? ' par le lien' : ', noté par la régie'}`,
+      `${progress.reply.answer === 'souci' ? 'souci signalé' : progress.reply.answer === 'oui' ? (mailStep.reply === 'confirmer' ? 'confirmé' : 'oui') : 'non'} ${sentAtLabel(progress.reply.answeredAt)}${progress.reply.source === 'lien' ? ' par le lien' : ', noté par la régie'}`,
     );
   }
 
@@ -131,6 +133,14 @@ function StepRow({ step, volunteer, progress }: { step: ApplicationStep; volunte
         <span className={TONE_CHIP[toneOf(progress)]}>{stateLabel(progress)}</span>
         {detail.length > 0 && <span className="people-meta">{detail.join(', ')}</span>}
       </div>
+      {progress.state === 'souci' && (
+        <p className="people-meta is-bad">
+          Souci signalé{progress.reply?.comment ? `: « ${progress.reply.comment} »` : ', sans commentaire'}. À rappeler.
+        </p>
+      )}
+      {progress.state === 'perime' && !progress.planningChanged && (
+        <p className="people-meta is-warn">A confirmé un planning qui a changé depuis: à lui redemander.</p>
+      )}
       {progress.planningChanged && (
         <p className="people-meta is-warn">
           Planning modifié depuis {progress.reply ? 'sa confirmation' : "l'envoi"}: à lui renvoyer.

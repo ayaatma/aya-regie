@@ -162,8 +162,10 @@ export interface VolunteerQuestion {
   question: string;
   reply: 'confirmer' | 'oui-non';
   sentAt: string;
-  answer: 'oui' | 'non' | null;
+  answer: 'oui' | 'non' | 'souci' | null;
   answeredAt: string | null;
+  /** What the person wrote with a « souci », since 2026-10-22. */
+  comment?: string;
 }
 
 /**
@@ -252,7 +254,7 @@ export interface PlanStore {
    * Answers a question of the follow-up with a bénévole's code (`answer_step`). Null when refused:
    * a wrong code, or a question this person was never sent.
    */
-  answerStep?(code: string, stepKey: string, answer: 'oui' | 'non'): Promise<{ answeredAt: string } | null>;
+  answerStep?(code: string, stepKey: string, answer: 'oui' | 'non' | 'souci', comment?: string): Promise<{ answeredAt: string } | null>;
   /**
    * The whole planning, read only, for a pole organiser's access code.
    *

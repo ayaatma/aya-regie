@@ -190,9 +190,9 @@ export function VolunteerView({ onLeave }: { onLeave(): void }) {
   }
 
   const answer = store.answerStep
-    ? async (key: string, reply: 'oui' | 'non'): Promise<string | null> => {
+    ? async (key: string, reply: 'oui' | 'non' | 'souci', comment = ''): Promise<string | null> => {
         try {
-          const done = await store.answerStep!(code, key, reply);
+          const done = await store.answerStep!(code, key, reply, comment);
           if (!done) return "Réponse refusée: ce lien ne correspond plus à une question en cours. Rechargez la page.";
           look(code);
           return null;
@@ -221,7 +221,7 @@ export function VolunteerShifts({
   schedule: VolunteerSchedule;
   onForget(): void;
   /** Resolves to an error sentence, or null. Absent: the questions show, unanswerable. */
-  onAnswer?: (key: string, answer: 'oui' | 'non') => Promise<string | null>;
+  onAnswer?: (key: string, answer: 'oui' | 'non' | 'souci', comment?: string) => Promise<string | null>;
 }) {
   const total = schedule.creneaux.reduce((sum, c) => sum + hoursBetween(c.debut, c.fin), 0);
 
@@ -353,7 +353,10 @@ export function VolunteerShifts({
  * One question of the follow-up, 2026-10-22: « Tu confirmes vouloir faire 8 h ? », answered in one
  * tap. The answer goes to Postgres (`answer_step`), which only takes it for a question that was
  * sent to this code; the page then reads itself again. A yes or no can be changed; a
- * confirmation stays until a new planning is sent, which asks it again.
+ * confirmation holds for the planning confirmed, and is asked again when it changes.
+ *
+ * « IL Y A UN SOUCI », since 2026-10-22, beside « Je confirme »: a sentence for the régie instead
+ * of a phone call, shown on the fiche. It confirms nothing.
  */
 function Question({
   question,
@@ -362,32 +365,71 @@ function Question({
 }: {
   question: VolunteerQuestion;
   hours: number;
-  onAnswer?: (key: string, answer: 'oui' | 'non') => Promise<string | null>;
+  onAnswer?: (key: string, answer: 'oui' | 'non' | 'souci', comment?: string) => Promise<string | null>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
+  const [writing, setWriting] = useState(false);
+  const [comment, setComment] = useState('');
   const text = question.question.replace(/\{heures\}/g, String(hours).replace('.', ','));
   const answered = question.answer !== null && !changing;
 
-  const send = async (answer: 'oui' | 'non'): Promise<void> => {
+  const send = async (answer: 'oui' | 'non' | 'souci', note = ''): Promise<void> => {
     if (!onAnswer) return;
     setBusy(true);
-    setError(await onAnswer(question.key, answer));
+    setError(await onAnswer(question.key, answer, note));
     setBusy(false);
     setChanging(false);
+    setWriting(false);
   };
 
   return (
     <div className={`card benevole-question${answered ? ' is-answered' : ''}`}>
       <span className="benevole-question-label">{question.label}</span>
       {question.reply === 'confirmer' ? (
-        answered ? (
+        answered && question.answer === 'souci' ? (
+          <p className="benevole-question-done">
+            Ton message est bien arrivé, on revient vers toi.{' '}
+            <button type="button" className="btn is-link" onClick={() => setChanging(true)}>
+              Finalement, je confirme
+            </button>
+          </p>
+        ) : answered ? (
           <p className="benevole-question-done">✓ C'est confirmé, merci !</p>
+        ) : writing ? (
+          <div className="benevole-question-souci">
+            <textarea
+              className="select"
+              aria-label="Ce qui ne va pas"
+              placeholder="Dis-nous ce qui ne va pas : un horaire, un jour, un poste…"
+              maxLength={1000}
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+            />
+            <div className="benevole-question-buttons">
+              <button
+                type="button"
+                className="btn is-primary"
+                disabled={busy || !onAnswer || comment.trim() === ''}
+                onClick={() => void send('souci', comment.trim())}
+              >
+                {busy ? 'Envoi…' : 'Envoyer'}
+              </button>
+              <button type="button" className="btn" disabled={busy} onClick={() => setWriting(false)}>
+                Annuler
+              </button>
+            </div>
+          </div>
         ) : (
-          <button type="button" className="btn is-primary" disabled={busy || !onAnswer} onClick={() => void send('oui')}>
-            {busy ? 'Envoi…' : text || 'Je confirme'}
-          </button>
+          <div className="benevole-question-buttons">
+            <button type="button" className="btn is-primary" disabled={busy || !onAnswer} onClick={() => void send('oui')}>
+              {busy ? 'Envoi…' : text || 'Je confirme'}
+            </button>
+            <button type="button" className="btn" disabled={busy || !onAnswer} onClick={() => setWriting(true)}>
+              Il y a un souci
+            </button>
+          </div>
         )
       ) : (
         <>

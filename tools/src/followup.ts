@@ -100,6 +100,39 @@ export function planningLines(plan: Plan, kind: PlannedKind, key: string): strin
   return lines.sort((a, b) => a.at - b.at || a.text.localeCompare(b.text)).map((l) => l.text);
 }
 
+/**
+ * The planning as the server reads it, to tell whether a confirmation is still the planning of
+ * today, since 2026-10-22. One line per box, `début|fin|où`: the two instants in whole seconds
+ * since 1970, then `s:<créneau>`, or `<phase>:p:<pôle>` or `<phase>:e:<événement>`; sorted by
+ * code point and joined by `;`.
+ *
+ * WRITTEN TWICE, ON PURPOSE: `private.planning_fingerprint` in db/schema.sql computes the same
+ * string from the tables when somebody clicks « Je confirme », and the two must agree character
+ * for character. Keys, not names, so renaming a pole does not undo every confirmation.
+ */
+export function planningFingerprint(plan: Plan, kind: PlannedKind, key: string): string {
+  const lines = new Set<string>();
+  const at = (startISO: string, hours: number): number => Math.floor(Date.parse(startISO) / 1000 + hours * 3600 + 1e-6);
+  const shifts = new Map((plan.shifts ?? []).map((s) => [s.key, s]));
+  const shiftKeys =
+    kind === 'benevole'
+      ? (plan.assignments ?? []).filter((a) => a.volunteerKey === key).map((a) => a.shiftKey)
+      : (plan.organiserShifts ?? []).filter((o) => o.organiserKey === key).map((o) => o.shiftKey);
+  for (const shiftKey of shiftKeys) {
+    const shift = shifts.get(shiftKey);
+    if (shift) lines.add(`${at(plan.startISO, shift.start)}|${at(plan.startISO, shift.end)}|s:${shift.key}`);
+  }
+  for (const phase of [plan.montage, plan.demontage]) {
+    if (!phase?.enabled) continue;
+    for (const a of phase.assignments) {
+      if (a.personKind !== kind || a.personKey !== key) continue;
+      const where = a.eventKey !== '' ? `e:${a.eventKey}` : `p:${a.poleKey}`;
+      lines.add(`${at(phase.startISO, a.start)}|${at(phase.startISO, a.end)}|${phase.id}:${where}`);
+    }
+  }
+  return [...lines].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(';');
+}
+
 /** The same, as the block a mail holds. Empty for somebody placed nowhere. */
 export const planningText = (plan: Plan, kind: PlannedKind, key: string): string => planningLines(plan, kind, key).join('\n');
 
@@ -238,7 +271,14 @@ export interface MailFact {
 /** A row of `step_reply`: given from the personal page (`lien`) or noted by the régie. */
 export interface ReplyFact {
   stepKey: string;
-  answer: 'oui' | 'non';
+  /** « souci » since 2026-10-22: the person says something is wrong, in `comment`. */
+  answer: 'oui' | 'non' | 'souci';
+  /**
+   * The planning confirmed, as `planningFingerprint` writes it, since 2026-10-22. Empty for an
+   * answer given before, which then counts by its date against the last mail, as it used to.
+   */
+  planning?: string;
+  comment?: string;
   /** ISO. */
   answeredAt: string;
   source: 'lien' | 'regie';
@@ -255,6 +295,10 @@ export type StepState =
   | 'en-attente'
   | 'oui'
   | 'non'
+  /** Confirmed, then the planning moved: the confirmation was of another planning. 2026-10-22. */
+  | 'perime'
+  /** « Il y a un souci », with a comment for the régie. 2026-10-22. */
+  | 'souci'
   /** Ticked by hand: done outside the tool. */
   | 'fait-main';
 
@@ -277,11 +321,13 @@ export interface StepProgress {
 const newestFirst = <T extends { at: string }>(a: T, b: T): number => b.at.localeCompare(a.at);
 
 /**
- * Where one bénévole stands on one step. `mails` and `replies` are this person's, any order.
+ * Where one person stands on one step. `mails` and `replies` are this person's, any order.
  *
- * A REPLY COUNTS FOR THE PLANNING IT ANSWERED: for a mail holding `{planning}`, an answer older
- * than the last mail sent is an answer to an older planning and is not this one's. For any other
- * step, the latest answer stands, whenever it came.
+ * A CONFIRMATION COUNTS FOR THE PLANNING IT CONFIRMED, since 2026-10-22: the reply carries the
+ * fingerprint of the planning on the page when it was given, and it holds while the planning
+ * today has the same one; otherwise the person « a confirmé, puis le planning a changé ». A reply
+ * from before carries none and is read as it used to be: an answer older than the last mail sent
+ * answered an older planning. For a step without `{planning}`, the latest answer stands.
  */
 export function stepProgress(
   plan: Plan,
@@ -305,14 +351,23 @@ export function stepProgress(
       .filter((r) => r.stepKey === step.key)
       .map((r) => ({ ...r, at: r.answeredAt }))
       .sort(newestFirst)[0] ?? null;
-  const reply =
-    latest && !(planningBound && lastSent !== null && latest.answeredAt < lastSent.sentAt) ? latest : null;
+  const fresh =
+    latest === null || !planningBound
+      ? true
+      : latest.planning
+        ? person.kind === 'benevole' || person.kind === 'orga'
+          ? latest.planning === planningFingerprint(plan, person.kind, person.key)
+          : true
+        : !(lastSent !== null && latest.answeredAt < lastSent.sentAt);
+  const reply = latest;
   const planningChanged =
     planningBound && lastSent !== null && lastSent.planning !== planningOf(plan, person);
 
   let state: StepState;
   const wantsReply = step.mail !== undefined && step.mail.reply !== 'aucune' && canAnswer(person);
-  if (wantsReply && reply) state = reply.answer;
+  if (wantsReply && reply && reply.answer === 'souci') state = 'souci';
+  else if (wantsReply && reply && !fresh) state = 'perime';
+  else if (wantsReply && reply) state = reply.answer;
   else if (lastSent) state = wantsReply ? 'en-attente' : 'envoye';
   else if (ticked) state = 'fait-main';
   else if (!target) state = 'hors-cible';
@@ -355,6 +410,10 @@ export function stateLabel(progress: StepProgress): string {
       return reply === 'confirmer' ? 'confirmé' : 'oui';
     case 'non':
       return 'non';
+    case 'perime':
+      return 'confirmé, puis modifié';
+    case 'souci':
+      return 'souci signalé';
     case 'fait-main':
       return 'fait';
   }
@@ -377,14 +436,14 @@ export interface FollowUp {
   steps: StepProgress[];
 }
 
-const REACHED: ReadonlySet<StepState> = new Set(['envoye', 'en-attente', 'oui', 'non', 'fait-main']);
+const REACHED: ReadonlySet<StepState> = new Set(['envoye', 'en-attente', 'oui', 'non', 'perime', 'souci', 'fait-main']);
 
 const toneOf = (state: StepState): Tone =>
   state === 'oui' || state === 'envoye' || state === 'fait-main'
     ? 'ok'
-    : state === 'non' || state === 'echec'
+    : state === 'non' || state === 'echec' || state === 'souci'
       ? 'bad'
-      : state === 'en-attente'
+      : state === 'en-attente' || state === 'perime'
         ? 'warn'
         : 'muted';
 
@@ -420,6 +479,10 @@ export function followUpOf(
     }
     if (progress.state === 'echec') alerts.push({ label: `${progress.step.label} : échec de l'envoi`, tone: 'bad' });
     if (progress.state === 'non' && !conditional) alerts.push({ label: `${progress.step.label} : a répondu non`, tone: 'bad' });
+    if (progress.state === 'souci') {
+      const comment = progress.reply?.comment?.trim() ?? '';
+      alerts.push({ label: `${progress.step.label} : souci signalé${comment !== '' ? ` « ${comment} »` : ''}`, tone: 'bad' });
+    }
     if (progress.planningChanged) {
       alerts.push({
         label: progress.reply
@@ -449,8 +512,9 @@ export function batchMembers(progress: readonly StepProgress[], kind: BatchKind)
   switch (kind) {
     case 'premier':
       return progress.filter((p) => p.inTarget && (p.state === 'a-envoyer' || p.state === 'echec'));
+    // A confirmation of an older planning is asked again, unless a newer planning is to be sent.
     case 'relance':
-      return progress.filter((p) => p.inTarget && p.state === 'en-attente' && !p.planningChanged);
+      return progress.filter((p) => p.inTarget && (p.state === 'en-attente' || p.state === 'perime') && !p.planningChanged);
     // An orga sent a planning has nothing to answer: 'envoye', and a moved planning still counts.
     case 'modifie':
       return progress.filter((p) => p.inTarget && p.planningChanged);

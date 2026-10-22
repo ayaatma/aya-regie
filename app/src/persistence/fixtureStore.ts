@@ -170,7 +170,7 @@ export class FixtureStore implements PlanStore {
   private manifest: Manifest | null = null;
   private readonly pristine = new Map<string, Plan>();
   /** The answers given from the bénévole page, by `code|step`, kept in this tab only. */
-  private readonly answers = new Map<string, { answer: 'oui' | 'non'; answeredAt: string }>();
+  private readonly answers = new Map<string, { answer: 'oui' | 'non' | 'souci'; answeredAt: string; comment: string }>();
 
   private async loadManifest(): Promise<Manifest> {
     if (this.manifest) return this.manifest;
@@ -382,6 +382,7 @@ export class FixtureStore implements PlanStore {
             reply,
             sentAt: plan.startISO,
             answer: given?.answer ?? null,
+            comment: given?.comment ?? '',
             answeredAt: given?.answeredAt ?? null,
           }];
         }),
@@ -391,11 +392,11 @@ export class FixtureStore implements PlanStore {
   }
 
   /** The twin of `answer_step`, without its check that the question was sent: see above. */
-  async answerStep(code: string, stepKey: string, answer: 'oui' | 'non'): Promise<{ answeredAt: string } | null> {
+  async answerStep(code: string, stepKey: string, answer: 'oui' | 'non' | 'souci', comment = ''): Promise<{ answeredAt: string } | null> {
     const wanted = code.trim().toUpperCase();
     if (wanted === '' || !(await this.volunteerSchedule(wanted))) return null;
     const answeredAt = new Date().toISOString();
-    this.answers.set(`${wanted}|${stepKey}`, { answer, answeredAt });
+    this.answers.set(`${wanted}|${stepKey}`, { answer, answeredAt, comment });
     return { answeredAt };
   }
 

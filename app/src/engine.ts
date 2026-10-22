@@ -415,6 +415,7 @@ export {
   inTarget,
   isPlaced,
   placedPending,
+  planningFingerprint,
   planningText,
   stateLabel,
   stepAudiences,
