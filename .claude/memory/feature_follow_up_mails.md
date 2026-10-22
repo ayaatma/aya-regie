@@ -1,6 +1,6 @@
 ---
 name: feature-follow-up-mails
-description: 2026-10-22, the follow-up by mail after validation. Steps carry a mail (target, reply), grouped sendings from Personnes > Mails with a 180/h throttle, bulk validation of placed people, answers via the personal link /?code= (answer_step, step_reply). PLAN_FORMAT 27, migration 36 WRITTEN NOT APPLIED.
+description: 2026-10-22, the follow-up by mail after validation. Steps carry a mail (target, reply), grouped sendings from Personnes > Mails with a 180/h throttle, bulk validation of placed people, answers via the personal link /?code= (answer_step, step_reply). PLAN_FORMAT 27, migration 36 APPLIED, front and send-mail deployed 2026-10-22.
 metadata:
   type: project
 ---
@@ -9,9 +9,12 @@ metadata:
 
 **State: BUILT, green (395 engine, 447 app tests, both typechecks, vite build, sql-check 1513,
 schema-check 273), shots 110-117 read in both schemes (`npm run shots suivi`, 110-118). PLAN_FORMAT 27.
-MIGRATION 36 (`2026-10-22_follow_up_mails.sql`, header sequence 36, after 35) WRITTEN, NOT
-APPLIED, min_plan_format 27: ships with its deploy. `send-mail` changed (stepKey, planning,
-reasons etape/relance): deploy it with the front.** Builds on [[feature-registration-validation]]
+MIGRATION 36 (`2026-10-22_follow_up_mails.sql`, header sequence 36, after 35) APPLIED, front
+deployed and functions send-mail and drive-photo deployed by the developer on 2026-10-22. Not yet
+tried against the real mailbox: the developer will test on their own fiche.** Next session: set
+up a way for Claude to deploy the Edge Functions itself (the developer asked for it, see the
+proposed « Fonctions update » target: CLI supabase in tools, SUPABASE_ACCESS_TOKEN in
+.env.deploy.local). Builds on [[feature-registration-validation]]
 and [[feature-application-tracking]].
 
 ## The developer's need (Loto Tekno, generic for any event)
