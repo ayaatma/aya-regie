@@ -427,7 +427,11 @@ export function PlanProvider({ store, children }: { store: PlanStore; children: 
       if (!currentId || !store.checkpoint) {
         throw new Error("Ce planning ne conserve pas d'historique.");
       }
-      const result = await store.checkpoint(currentId, name, baseVersion);
+      const result = await store.checkpoint(currentId, name, baseVersion).catch((cause: unknown) => {
+        // Kept in the journal, so a failure reported afterwards can be dated and explained.
+        log.error('historique', `Point de sauvegarde "${name}" non posé: ${cause instanceof Error ? cause.message : String(cause)}`);
+        throw cause;
+      });
       if (!result.ok) {
         throw new Error(
           `Le planning a changé entre-temps: vous regardez la version ${baseVersion}, ` +

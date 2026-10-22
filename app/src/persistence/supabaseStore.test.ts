@@ -329,3 +329,12 @@ test('creating a plan states the format too', async () => {
 
   assert.equal(calls[0]?.args?.p_format, PLAN_FORMAT);
 });
+
+test('a request that never reached the server says so in French, not in the browser’s words', async () => {
+  const { db } = stub({}, { fn: 'create_plan_checkpoint', message: 'TypeError: Failed to fetch' });
+  await assert.rejects(new SupabasePlanStore(db).checkpoint('event-1', 'avant import', 3), (error: Error) => {
+    assert.match(error.message, /^Impossible d'enregistrer cette version: le serveur n'a pas pu être joint/);
+    assert.doesNotMatch(error.message, /Failed to fetch/);
+    return true;
+  });
+});

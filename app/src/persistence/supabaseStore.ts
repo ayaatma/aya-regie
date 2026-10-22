@@ -128,6 +128,9 @@ const WHAT: Record<string, string> = {
   get_organiser_planning: 'Impossible de lire le planning',
 };
 
+/** How each browser words a request that never got an answer: Chrome, Firefox, Safari. */
+const NETWORK_FAILURE = /Failed to fetch|NetworkError|Load failed/i;
+
 /** "0 bénévole", "1 bénévole", "2 bénévoles". French takes the singular for zero. */
 const plural = (count: number, one: string, many: string): string =>
   `${count} ${count > 1 ? many : one}`;
@@ -140,7 +143,19 @@ export class SupabasePlanStore implements PlanStore {
 
   private async call(fn: string, args?: Record<string, unknown>): Promise<unknown> {
     const { data, error } = await this.db.rpc(fn, args);
-    if (error) throw new Error(`${WHAT[fn] ?? 'Erreur de la base'}: ${error.message}`);
+    if (error) {
+      const what = WHAT[fn] ?? 'Erreur de la base';
+      // The request never reached the server, so there is no server's word to append: what the
+      // browser says instead ("TypeError: Failed to fetch") told the régisseur nothing on
+      // 2026-10-22, when a named version failed while the connection was down.
+      if (NETWORK_FAILURE.test(error.message)) {
+        throw new Error(
+          `${what}: le serveur n'a pas pu être joint (connexion coupée ou bloquée). ` +
+            'Rien n’a été modifié, vérifiez la connexion et réessayez.',
+        );
+      }
+      throw new Error(`${what}: ${error.message}`);
+    }
     return data;
   }
 
