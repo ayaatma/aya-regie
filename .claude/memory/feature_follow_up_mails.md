@@ -8,7 +8,7 @@ metadata:
 # Suivi par mail (2026-10-22)
 
 **State: BUILT, green (395 engine, 447 app tests, both typechecks, vite build, sql-check 1513,
-schema-check 273), shots 110-117 read in both schemes (`npm run shots suivi`). PLAN_FORMAT 27.
+schema-check 273), shots 110-117 read in both schemes (`npm run shots suivi`, 110-118). PLAN_FORMAT 27.
 MIGRATION 36 (`2026-10-22_follow_up_mails.sql`, header sequence 36, after 35) WRITTEN, NOT
 APPLIED, min_plan_format 27: ships with its deploy. `send-mail` changed (stepKey, planning,
 reasons etape/relance): deploy it with the front.** Builds on [[feature-registration-validation]]
@@ -50,6 +50,13 @@ link (8b) plus reminders (8c); build everything at once.
    a batch of validation mails. Placements untouched.
 7. Campaign steps are bénévoles only. Orgas get only the validation.
 8. Régie can note an answer by hand from the fiche (`recordReply`, source regie).
+9. **Test mails** (asked the same day): « Envoyer un test à … » under every preview (the grouped
+   window, Réglages step editor, validation templates) sends that person's exact mail to the
+   régisseur's test address, subject « [TEST] », a first line naming whose mail it is. Reason
+   `test` in mail_log (added to migration 36 while still pending): excluded from every history and
+   follow-up fact, counted in the hourly limit. The address lives on the ACCOUNT (Supabase user
+   metadata `test_mail_address`, default the login e-mail; localStorage with the fixtures),
+   Réglages card « Mails de test » (`app/src/mail/testMail.tsx`, `TestMailCard.tsx`).
 
 ## Pitfall of this session
 

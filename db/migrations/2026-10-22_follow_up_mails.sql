@@ -8,8 +8,9 @@
 --
 -- WHAT CHANGES.
 --   mail_log: step_key (which step a mail is, '' for a validation), planning (the {planning}
---   lines it carried, what « planning modifie depuis l'envoi » compares against), and two more
---   reasons, 'etape' and 'relance'.
+--   lines it carried, what « planning modifie depuis l'envoi » compares against), and three more
+--   reasons, 'etape', 'relance' and 'test' (a mail sent to the regisseur's test address, which
+--   counts for nobody).
 --   step_reply, a table of its own and NOT part of the plan document, append only: the answers.
 --   answer_step(code, step, answer), the second function an anonymous caller may run: it writes
 --   one answer, only to a question that was sent to the holder of the code.
@@ -29,7 +30,7 @@ alter table mail_log add column if not exists step_key text not null default '';
 alter table mail_log add column if not exists planning text not null default '';
 alter table mail_log drop constraint if exists mail_log_reason_check;
 alter table mail_log add constraint mail_log_reason_check
-  check (reason in ('validation', 'renvoi', 'etape', 'relance'));
+  check (reason in ('validation', 'renvoi', 'etape', 'relance', 'test'));
 
 -- ---------------------------------------------------------------------------
 -- 2. step_reply

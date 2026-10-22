@@ -22,11 +22,13 @@ import {
   withMailTemplate,
   type MailAudience,
 } from '../engine.ts';
-import { useLoadedPlan } from '../store/store.tsx';
+import { TestMailButton } from '../mail/testMail.tsx';
+import { useLoadedPlan, usePlan } from '../store/store.tsx';
 import { SetupSection } from './SetupSection.tsx';
 
 export function MailTemplatesCard() {
   const { plan, edit } = useLoadedPlan();
+  const { id: eventId } = usePlan();
   const [audience, setAudience] = useState<MailAudience>('benevole');
   const stored = mailTemplateFor(plan, audience);
   const [subject, setSubject] = useState(stored.subject);
@@ -129,6 +131,15 @@ export function MailTemplatesCard() {
               <strong>{preview.subject}</strong>
             </p>
             <pre className="registration-mail-body">{preview.body}</pre>
+            <p>
+              <TestMailButton
+                eventId={eventId}
+                kind={sample.kind}
+                personKey={sample.key}
+                who={`${sample.firstName} ${sample.lastName}`.trim()}
+                mail={preview}
+              />
+            </p>
           </>
         )}
       </div>

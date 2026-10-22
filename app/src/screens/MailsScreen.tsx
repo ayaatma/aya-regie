@@ -43,6 +43,7 @@ import {
   type BatchJob,
   type MailLog,
 } from '../mail/mailStore.ts';
+import { useTestAddress } from '../mail/testMail.tsx';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
 
 const siteUrl = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
@@ -66,15 +67,20 @@ function stepJobs(plan: Plan, step: ApplicationStep & { mail: StepMail }, member
     const mail = kind === 'relance' ? { ...rendered, subject: `Rappel : ${rendered.subject}` } : rendered;
     const name = `${person.firstName} ${person.lastName}`.trim() || 'Sans nom';
     const ok = isMailAddress(mail.to);
+    const planning = planningText(plan, 'benevole', person.key);
     return [{
       id: person.key,
+      kind: 'benevole' as const,
+      key: person.key,
+      stepKey: step.key,
+      planning,
       name,
       mail,
       job: ok
         ? {
             kind: 'benevole' as const, key: person.key, name, mail,
             reason: kind === 'relance' ? ('relance' as const) : ('etape' as const),
-            stepKey: step.key, planning: planningText(plan, 'benevole', person.key),
+            stepKey: step.key, planning,
           }
         : null,
     }];
@@ -96,6 +102,7 @@ export function MailsScreen() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const running = batch?.running === true;
+  const testAddress = useTestAddress();
 
   // The validated whose last validation mail failed: one button sends it to them again.
   const failedValidation = registrants(plan).filter(
@@ -115,6 +122,9 @@ export function MailsScreen() {
           <strong>Mails</strong>
           <span className="people-meta">
             {log.sentLastHour()} envoyé(s) dans la dernière heure, au plus {HOURLY_LIMIT} par heure
+          </span>
+          <span className="people-meta" title="Se change dans Réglages, Mails de test">
+            {testAddress === '' ? "Pas d'adresse de test (Réglages, Mails de test)" : `Tests envoyés à ${testAddress}`}
           </span>
           <span className="toolbar-sep" />
           <button
@@ -184,7 +194,7 @@ export function MailsScreen() {
                       const mail = renderMail(plan, r, siteUrl());
                       const name = `${r.firstName} ${r.lastName}`.trim();
                       return {
-                        id: `${r.kind}|${r.key}`, name, mail,
+                        id: `${r.kind}|${r.key}`, kind: r.kind, key: r.key, name, mail,
                         job: isMailAddress(mail.to)
                           ? { kind: r.kind, key: r.key, name, mail, reason: 'renvoi' as const, stepKey: '', planning: '' }
                           : null,

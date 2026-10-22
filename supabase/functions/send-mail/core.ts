@@ -16,10 +16,13 @@
  */
 
 export type PersonKind = 'benevole' | 'orga' | 'artiste' | 'extra';
-/** A validation, a validation sent again, a step of the follow-up, a reminder of one. */
-export type SendReason = 'validation' | 'renvoi' | 'etape' | 'relance';
+/**
+ * A validation, a validation sent again, a step of the follow-up, a reminder of one, or a test:
+ * the mail of one person sent to the régisseur's own address, which counts for nobody.
+ */
+export type SendReason = 'validation' | 'renvoi' | 'etape' | 'relance' | 'test';
 
-const REASONS: readonly SendReason[] = ['validation', 'renvoi', 'etape', 'relance'];
+const REASONS: readonly SendReason[] = ['validation', 'renvoi', 'etape', 'relance', 'test'];
 
 export interface SendRequest {
   eventId: string;

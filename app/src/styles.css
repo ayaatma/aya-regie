@@ -5889,3 +5889,19 @@ textarea.select,
 .dialog-preview .registration-mail-body {
   max-height: none;
 }
+
+/* « Envoyer un test », beside a preview, with what happened. */
+.test-mail {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.people-meta.is-ok {
+  color: var(--ok);
+}
+
+.dialog-test {
+  margin: 8px 0 0;
+}

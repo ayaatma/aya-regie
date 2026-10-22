@@ -26,7 +26,8 @@ import { useEffect, useSyncExternalStore } from 'react';
 import type { MailFact, RegistrantKind, RenderedMail, ReplyFact } from '../engine.ts';
 import { getSupabase, supabaseConfigured } from '../persistence/supabaseClient.ts';
 
-export type MailReason = 'validation' | 'renvoi' | 'etape' | 'relance';
+/** `test`: one person's mail sent to the régisseur's test address. It counts for nobody. */
+export type MailReason = 'validation' | 'renvoi' | 'etape' | 'relance' | 'test';
 
 export interface MailEntry {
   id: number;
@@ -93,7 +94,7 @@ const changed = (book: Book): void => {
 
 const message = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
-const REASONS: readonly MailReason[] = ['validation', 'renvoi', 'etape', 'relance'];
+const REASONS: readonly MailReason[] = ['validation', 'renvoi', 'etape', 'relance', 'test'];
 
 const entryOf = (row: Record<string, unknown>): MailEntry => ({
   id: Number(row.id),
@@ -185,7 +186,9 @@ export function useMailLog(eventId: string | null): MailLog {
 }
 
 function logOf(book: Book | null): MailLog {
-  const entries = book?.entries ?? [];
+  // A test went to the régisseur, not to the person it was written for: it is in nobody's history.
+  const all = book?.entries ?? [];
+  const entries = all.filter((e) => e.reason !== 'test');
   const replies = book?.replies ?? [];
   const isStep = (e: MailEntry): boolean => e.reason === 'etape' || e.reason === 'relance';
   return {
@@ -203,7 +206,8 @@ function logOf(book: Book | null): MailLog {
         .map((r) => ({ stepKey: r.stepKey, answer: r.answer, answeredAt: r.answeredAt, source: r.source })),
     }),
     repliesOf: (volunteerKey) => replies.filter((r) => r.volunteerKey === volunteerKey),
-    sentLastHour: () => sentSince(entries, Date.now() - 3600_000).length,
+    // Tests included: OVH counts every mail the mailbox sends.
+    sentLastHour: () => sentSince(all, Date.now() - 3600_000).length,
   };
 }
 

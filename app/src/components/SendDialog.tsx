@@ -13,13 +13,20 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { isMailAddress, type RenderedMail } from '../engine.ts';
+import { isMailAddress, type RegistrantKind, type RenderedMail } from '../engine.ts';
+import { TestMailButton } from '../mail/testMail.tsx';
+import { usePlan } from '../store/store.tsx';
 
 export interface DialogPerson {
   /** Unique within the list. */
   id: string;
   name: string;
   mail: RenderedMail | null;
+  /** Who the mail is for, so a test of it can be sent (`TestMailButton`). */
+  kind: RegistrantKind;
+  key: string;
+  stepKey?: string;
+  planning?: string;
 }
 
 export function SendDialog({
@@ -43,7 +50,9 @@ export function SendDialog({
   const mailed = people.filter((p) => p.mail !== null && isMailAddress(p.mail.to));
   const unmailed = people.filter((p) => !mailed.includes(p));
   const [shown, setShown] = useState<string | null>(mailed[0]?.id ?? null);
-  const preview = mailed.find((p) => p.id === shown)?.mail ?? null;
+  const shownPerson = mailed.find((p) => p.id === shown) ?? null;
+  const preview = shownPerson?.mail ?? null;
+  const { id: eventId } = usePlan();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -102,6 +111,19 @@ export function SendDialog({
                 Objet: <strong>{preview.subject}</strong>
               </p>
               <pre className="registration-mail-body">{preview.body}</pre>
+              {shownPerson && (
+                <p className="dialog-test">
+                  <TestMailButton
+                    eventId={eventId}
+                    kind={shownPerson.kind}
+                    personKey={shownPerson.key}
+                    who={shownPerson.name}
+                    mail={preview}
+                    stepKey={shownPerson.stepKey}
+                    planning={shownPerson.planning}
+                  />
+                </p>
+              )}
             </div>
           )}
         </div>

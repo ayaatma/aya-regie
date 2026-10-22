@@ -61,6 +61,7 @@ import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
 import { MailTemplatesCard } from './MailTemplatesCard.tsx';
+import { TestMailCard } from './TestMailCard.tsx';
 import { SkillsCard } from './SkillsCard.tsx';
 import { SkillPicker } from '../components/SkillPicker.tsx';
 import { setPoleSkills } from '../store/skillEdits.ts';
@@ -181,6 +182,7 @@ export function SetupScreen() {
           */}
           <ApplicationStepsCard />
           <MailTemplatesCard />
+          <TestMailCard />
 
           <SkillsCard />
 

@@ -576,6 +576,18 @@ async function main() {
         // Le suivi par mail: the Mails tab, the validation of everybody placed with its list of
         // names, a step's sending, a validated fiche, the step's mail in Réglages, then the
         // bénévole page opened by the personal link with its questions. Last, since it leaves the app.
+        // The test address first, so the windows below offer « Envoyer un test ».
+        await tab('Réglages');
+        await page.evaluate(() => {
+          const card = document.querySelector('.setup-test-mail');
+          card?.querySelector('button')?.click();
+          card?.scrollIntoView();
+        });
+        await sleep(300);
+        await page.type('input[name="test-mail-address"]', 'regie@example.org');
+        await page.keyboard.press('Enter');
+        await sleep(400);
+        await shot('118-reglages-mail-test');
         await tab('Mails');
         await shot('110-mails');
         await clickButton(/^Valider les \d+ personnes? placées?$/);
@@ -597,6 +609,8 @@ async function main() {
           [...(planning?.querySelectorAll('button') || [])].find((b) => /^Envoyer aux/.test(b.textContent || ''))?.click();
         });
         await sleep(400);
+        await clickButton(/^Envoyer un test à /).catch(() => {});
+        await sleep(800);
         await shot('113-mails-envoi-planning');
         await page.keyboard.press('Escape');
         await sleep(300);

@@ -22,6 +22,7 @@ import {
   STEP_REPLY_LABEL,
   blankStepMail,
   inTarget,
+  planningText,
   registrantOf,
   renderTemplate,
   targetLabel,
@@ -38,7 +39,8 @@ import {
   renameApplicationStep,
   setStepMail,
 } from '../store/applicationEdits.ts';
-import { useLoadedPlan } from '../store/store.tsx';
+import { TestMailButton } from '../mail/testMail.tsx';
+import { useLoadedPlan, usePlan } from '../store/store.tsx';
 import { SetupSection } from './SetupSection.tsx';
 
 export function ApplicationStepsCard() {
@@ -147,6 +149,7 @@ export function ApplicationStepsCard() {
 
 function StepMailEditor({ step }: { step: ApplicationStep }) {
   const { plan, edit } = useLoadedPlan();
+  const { id: eventId } = usePlan();
   const stored = step.mail;
   const [subject, setSubject] = useState(stored?.subject ?? '');
   const [body, setBody] = useState(stored?.body ?? '');
@@ -275,6 +278,17 @@ function StepMailEditor({ step }: { step: ApplicationStep }) {
             Aperçu pour {`${person.firstName} ${person.lastName}`.trim()}: <strong>{preview.subject}</strong>
           </p>
           <pre className="registration-mail-body">{preview.body}</pre>
+          <p>
+            <TestMailButton
+              eventId={eventId}
+              kind="benevole"
+              personKey={person.key}
+              who={`${person.firstName} ${person.lastName}`.trim()}
+              mail={preview}
+              stepKey={step.key}
+              planning={planningText(plan, 'benevole', person.key)}
+            />
+          </p>
         </>
       ) : (
         <p className="people-meta">Personne dans la cible pour l'instant: pas d'aperçu.</p>

@@ -33,6 +33,7 @@ test('a step of the follow-up names its step, and carries the planning it sent',
   strictEqual(row.step_key, 'planning');
   strictEqual(row.planning, '- samedi 13 mars');
   throws(() => parseSendRequest({ ...ok, reason: 'relance' }), /Étape/);
+  strictEqual(parseSendRequest({ ...ok, reason: 'test' }).reason, 'test', 'a test needs no step');
 });
 
 test('what could smuggle a header or reach nobody is refused before any network', () => {

@@ -2903,9 +2903,10 @@ create table mail_log (
   outcome     text not null check (outcome in ('envoye', 'echec')),
   error       text not null default '',
   -- Sent by validating somebody, or sent again by hand from their fiche; since 2026-10-22
-  -- (migration 36) also a step of the follow-up ('etape'), or a reminder of one ('relance').
+  -- (migration 36) also a step of the follow-up ('etape'), a reminder of one ('relance'), or a
+  -- test sent to the regisseur's own address in the person's place ('test': counts for nobody).
   reason      text not null default 'validation'
-    constraint mail_log_reason_check check (reason in ('validation', 'renvoi', 'etape', 'relance')),
+    constraint mail_log_reason_check check (reason in ('validation', 'renvoi', 'etape', 'relance', 'test')),
   -- The follow-up step this mail is (event.application_steps key), '' for a validation mail.
   step_key    text not null default '',
   -- The {planning} lines the mail carried, '' when it carried none: what « planning modifie
