@@ -24,7 +24,14 @@
  * run over everybody, and everybody includes people the régisseur has already arranged by hand.
  */
 
-import { GENERAL_POLE_KEY, alignPhases, declaredPlacements, phasePeople } from '../engine.ts';
+import {
+  GENERAL_POLE_KEY,
+  alignPhases,
+  declaredPlacements,
+  mirrorLabel,
+  phaseDays,
+  phasePeople,
+} from '../engine.ts';
 import type {
   Organiser,
   PersonKind,
@@ -32,6 +39,7 @@ import type {
   PhaseAssignment,
   PhaseEvent,
   PhaseId,
+  PhaseOptions,
   PhasePole,
   PhasePresence,
   Plan,
@@ -258,6 +266,110 @@ export function slidePhaseEvent(plan: Plan, id: PhaseId, eventKey: string, start
     events: phase.events.map((e) => (e.key === eventKey ? { ...e, start, end: e.end + delta } : e)),
     assignments: phase.assignments.map((a) =>
       a.eventKey === eventKey ? { ...a, start: a.start + delta, end: a.end + delta } : a,
+    ),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// What the two phases share, and the démontage copy of a montage événement
+// ---------------------------------------------------------------------------
+
+/** How long a new événement lasts on either phase, apart from the exploit's créneaux. */
+export const phaseEventHours = (plan: Plan): number =>
+  plan.phaseOptions.eventHours > 0 ? plan.phaseOptions.eventHours : 2;
+
+export function setPhaseOptions(plan: Plan, over: Partial<PhaseOptions>): Plan {
+  const merged = { ...plan.phaseOptions, ...over };
+  return {
+    ...plan,
+    phaseOptions: {
+      eventHours: Number.isFinite(merged.eventHours) && merged.eventHours > 0 ? Math.max(0.25, merged.eventHours) : 2,
+      mirrorEvents: merged.mirrorEvents,
+      mirrorWords: merged.mirrorWords.map((w) => ({ from: w.from, to: w.to })),
+    },
+  };
+}
+
+/**
+ * Where the démontage copy of a montage window goes: the same time of day, on the first day of
+ * the démontage where that hour is worked, as long as the original or what is left of that day.
+ * Null when no day of the démontage works at that hour.
+ */
+export function mirrorWindow(plan: Plan, start: number, end: number): { start: number; end: number } | null {
+  const from = phaseDays(plan.montage).find((day) => day.midnight <= start && start < day.midnight + 24);
+  if (!from) return null;
+  // The montage and the démontage count from different origins: the time of day is read off the
+  // real clock of each, never off the hour numbers.
+  const clockOf = (phase: Phase, hour: number): number => {
+    const at = new Date(new Date(phase.startISO).getTime() + hour * 3600_000);
+    return at.getHours() + at.getMinutes() / 60;
+  };
+  const timeOfDay = clockOf(plan.montage, start);
+  for (const day of phaseDays(plan.demontage)) {
+    const candidate = day.midnight + ((timeOfDay - clockOf(plan.demontage, day.midnight) + 24) % 24);
+    const segment = day.segments.find((s) => s.start <= candidate + 1e-6 && candidate < s.end - 1e-6);
+    if (!segment) continue;
+    const finish = Math.min(candidate + (end - start), segment.end);
+    if (finish - candidate >= 0.25 - 1e-6) return { start: candidate, end: finish };
+  }
+  return null;
+}
+
+/**
+ * Adds an événement and, on the montage with the copy switched on, its démontage twin: the same
+ * number of places, the same time of day, its name with the words swapped (`mirrorLabel`). Since
+ * 2026-10-22. Nothing is copied to a démontage that is switched off, nor from the démontage.
+ * Returns the plan and the key of the événement the régisseur asked for.
+ */
+export function addPhaseEventWithMirror(
+  plan: Plan,
+  id: PhaseId,
+  label: string,
+  start: number,
+  end: number,
+  headcount: number,
+): { plan: Plan; key: string | undefined } {
+  const before = new Set(phaseOf(plan, id).events.map((e) => e.key));
+  const added = addPhaseEvent(plan, id, label, start, end, headcount);
+  const created = phaseOf(added, id).events.find((e) => !before.has(e.key));
+  if (!created || id !== 'montage' || !plan.phaseOptions.mirrorEvents || !plan.demontage.enabled) {
+    return { plan: added, key: created?.key };
+  }
+  const window = mirrorWindow(added, start, end);
+  if (!window) return { plan: added, key: created.key };
+  const others = new Set(added.demontage.events.map((e) => e.key));
+  const withCopy = addPhaseEvent(
+    added,
+    'demontage',
+    mirrorLabel(created.label, plan.phaseOptions.mirrorWords),
+    window.start,
+    window.end,
+    created.headcount,
+  );
+  const copy = withCopy.demontage.events.find((e) => !others.has(e.key));
+  return {
+    plan: copy ? setPhaseEvent(withCopy, 'demontage', copy.key, { mirrorOf: created.key }) : withCopy,
+    key: created.key,
+  };
+}
+
+/**
+ * Renames an événement. On the montage, its démontage copies follow WHILE THEIR NAME IS STILL
+ * THE ONE THE COPY GAVE THEM: an événement created on the grid is « Nouvel événement » and only
+ * gets its real name afterwards, and a copy stuck on that name would be no copy at all. One the
+ * régisseur renamed by hand keeps its name.
+ */
+export function renamePhaseEvent(plan: Plan, id: PhaseId, eventKey: string, label: string): Plan {
+  const event = phaseOf(plan, id).events.find((e) => e.key === eventKey);
+  if (!event) return plan;
+  const renamed = setPhaseEvent(plan, id, eventKey, { label });
+  if (id !== 'montage') return renamed;
+  const words = plan.phaseOptions.mirrorWords;
+  const untouched = mirrorLabel(event.label, words);
+  return edit(renamed, 'demontage', (phase) => ({
+    ...phase,
+    events: phase.events.map((e) =>
+      e.mirrorOf === eventKey && e.label === untouched ? { ...e, label: mirrorLabel(label, words) } : e,
     ),
   }));
 }

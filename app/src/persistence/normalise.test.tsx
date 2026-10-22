@@ -52,7 +52,7 @@ function contextFor(plan: Plan): PlanContextValue {
 const renderSetup = (plan: Plan): string =>
   renderToStaticMarkup(
     <PlanContext.Provider value={contextFor(plan)}>
-      <SetupScreen />
+      <><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>
     </PlanContext.Provider>,
   );
 

@@ -39,7 +39,7 @@ import {
 } from '../engine.ts';
 import { addOrganiserToShift, removeOrganiserFromShift } from '../store/edits.ts';
 import { removeLeaderRole } from '../store/setupEdits.ts';
-import { assignWindow, setPhaseAssignment, setPhaseEvent } from '../store/phaseEdits.ts';
+import { assignWindow, renamePhaseEvent, setPhaseAssignment } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from './labels.ts';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
@@ -809,7 +809,7 @@ function EvenementBody({
             aria-label="Nom de l'événement"
             onChange={(changed) =>
               edit(
-                (p) => setPhaseEvent(p, phaseId, event.key, { label: changed.target.value }),
+                (p) => renamePhaseEvent(p, phaseId, event.key, changed.target.value),
                 `nom de l'événement ${event.label}`,
               )
             }

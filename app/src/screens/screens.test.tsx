@@ -333,7 +333,7 @@ test('the recruitment view shows the engine sentence for every gap', () => {
 });
 
 test('the setup screen groups sub-poles under their root, and names both', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   const index = new PlanIndex(plan);
   for (const root of plan.poles.filter((p) => p.parentKey === null)) {
     assert.ok(shows(html, root.name), `pôle absent: ${root.name}`);
@@ -347,7 +347,7 @@ test('every section of Réglages arrives folded, and says so to a screen reader'
   // 2026-09-12: "ce serait mieux que chaque grande partie soit à dérouler et non déroulé par
   // défaut". Nine cards and fifteen pole groups open at once meant scrolling past everything you
   // did not come for.
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
 
   assert.equal(html.includes('aria-expanded="true"'), false, 'aucune section ouverte à l\'arrivée');
   assert.ok(html.includes('aria-expanded="false"'), 'et elles se disent bien repliées');
@@ -391,7 +391,7 @@ test('the catering screen counts the covers and draws a box per person and per s
 });
 
 test('the catering settings card states the rule in the régisseur own words', () => {
-  const html = render(<SetupScreen />, setCateringRules(plan, { enabled: true }));
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, setCateringRules(plan, { enabled: true }));
   assert.ok(shows(html, 'Repas et tickets boisson'));
   assert.ok(shows(html, 'Un ticket boisson toutes les'));
   assert.ok(shows(html, 'Repas garantis à un·e orga'));
@@ -567,7 +567,7 @@ test('an orga’s code responsable is on their fiche in Personnes, and Réglages
   assert.ok(shows(camille, 'Révoquer'));
   assert.ok(shows(fiche('l2'), 'Générer un code'));
 
-  const setup = render(<SetupScreen />, withOrganisers);
+  const setup = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, withOrganisers);
   assert.ok(!shows(setup, 'ABCDEFGH234567'), 'plus de doublon dans Réglages');
 });
 
@@ -576,7 +576,7 @@ test('no screen shows an em dash to the régisseur', () => {
     render(<GridScreen onSolve={noop} solving={false} solveMode={null} />),
     render(<DashboardScreen onGoToRecruitment={noop} />),
     render(<RecruitmentScreen />),
-    render(<SetupScreen />),
+    render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>),
     render(<ImportScreen />),
     render(<PrintScreen />),
     render(<NightView onLeave={noop} />),
@@ -712,7 +712,7 @@ test('the grid offers both a single run and a run to convergence', () => {
 });
 
 test('the settings screen carries the rules, the shifts and the pole organisers', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   // The four thresholds of the former « Règles de planning » card live on their criterion's row.
   assert.ok(!shows(html, 'Règles de planning'));
   assert.ok(shows(html, 'Réglages avancés'));
@@ -729,7 +729,7 @@ test('the settings screen carries the rules, the shifts and the pole organisers'
 });
 
 test('the settings screen no longer claims anything is missing from it', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   assert.ok(!shows(html, 'Pas encore construit'));
 });
 
@@ -860,7 +860,7 @@ test('the dashboard says how many volunteers have been imported', () => {
 });
 
 test('the settings screen lets the event itself be edited', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   assert.ok(shows(html, "L'événement"));
   assert.ok(html.includes('type="date"'), 'la date de début');
 });
@@ -873,7 +873,7 @@ test('the settings screen lets the event itself be edited', () => {
  * are gone, so this asserts on what replaced them rather than trusting the eye.
  */
 test('every hour in the settings screen is a 24 h clock field', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
 
   assert.ok(!html.includes('datetime-local'), 'plus de contrôle natif qui suit la locale');
   assert.ok(html.includes('class="clock-input"'), 'les heures sont des champs 24 h');
@@ -937,7 +937,7 @@ test('the grid spans the event, not just the shifts', () => {
 });
 
 test('the settings screen lets the form time slots be edited, and prices a removal', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   assert.ok(shows(html, 'Tranches horaires du formulaire'));
   // The two questions, each with its own list. "La soirée commence à" and "Débordement loto
   // accepté jusqu'à" left on 2026-09-13: the loto and the concerts are rows now, with an
@@ -980,7 +980,7 @@ test('a slot removed from the form leaves the answers that named it alone', () =
     shorter.volunteers.filter((v) => v.refusedSlotIds.includes(gone.id)).length,
     held.length,
   );
-  const html = render(<SetupScreen />, shorter);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, shorter);
   assert.ok(!shows(html, gone.label), 'la tranche retirée ne figure plus dans les réglages');
   assert.ok(shows(html, 'Tranches horaires du formulaire'), 'et le reste de la page tient');
 });
@@ -1067,7 +1067,7 @@ test('every screen survives a plan with nothing in it', () => {
     ['grille', <GridScreen onSolve={noop} solving={false} solveMode={null} />],
     ['tableau', <DashboardScreen onGoToRecruitment={noop} />],
     ['recrutement', <RecruitmentScreen />],
-    ['réglages', <SetupScreen />],
+    ['réglages', <><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>],
     ['import', <ImportScreen />],
     ['impression', <PrintScreen />],
     ['nuit', <NightView onLeave={noop} />],
@@ -1725,7 +1725,7 @@ test('the planning screen opens on the exploit and offers the three moments', ()
 
 test('the settings screen carries both phases, and the dashboard reports the montage', () => {
   const withMontage = placeDeclared(planWithMontage(), 'montage');
-  const setup = render(<SetupScreen />, withMontage);
+  const setup = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, withMontage);
   assert.ok(shows(setup, 'Montage'));
   assert.ok(shows(setup, 'Démontage'));
   // The disabled one says so rather than showing an empty form.
@@ -2129,7 +2129,7 @@ test('the montage draws the balances of the day before, in its own hours, on a l
 });
 
 test('the settings screen no longer carries the line-up', () => {
-  const html = render(<SetupScreen />, planWithArtistFile());
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, planWithArtistFile());
   assert.ok(!shows(html, 'Programmation'));
   assert.ok(!html.includes('name="artist-name-'), "les fiches sont dans l'onglet Artistes");
 });
@@ -2186,7 +2186,7 @@ test("a member who is also an orga: the fiche's boxes are the orga's own row, an
 });
 
 test('the catering card offers the cumul of the tickets for somebody with two statuses', () => {
-  const html = render(<SetupScreen />, {
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, {
     ...plan,
     catering: { ...plan.catering, rules: { ...plan.catering.rules, enabled: true } },
   });
@@ -2447,7 +2447,7 @@ test('the info pane of the grids offers the whole fiche only inside the shell', 
 });
 
 test('the Réglages card edits the ticket types, the bracelets and the invitations per artist', () => {
-  const html = render(<SetupScreen />, planWithTicketing());
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, planWithTicketing());
   assert.ok(shows(html, 'Billetterie'));
   assert.ok(html.includes('name="guests-per-artist"'));
   assert.ok(html.includes('name="ticket-label-loto"'));
@@ -2766,7 +2766,7 @@ test('the correction form reads and ticks the montage and démontage days, when 
 });
 
 test('Réglages offers the two ways of holding « ne peut pas travailler »', () => {
-  const html = render(<SetupScreen />);
+  const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   assert.ok(shows(html, 'Indisponibilités des bénévoles'));
   assert.ok(shows(html, 'Tranches proposées') && shows(html, 'Plages libres'));
 });

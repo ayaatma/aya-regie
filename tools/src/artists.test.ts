@@ -79,6 +79,7 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     teamsEnabled: false,
     defaultShiftHours: 2,
     mailTemplates: {},
+    phaseOptions: { eventHours: 2, mirrorEvents: true, mirrorWords: [] },
     teams: [],
     sideActivities: [],
     equipment: [],

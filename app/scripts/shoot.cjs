@@ -119,7 +119,7 @@ async function main() {
       const GROUP_OF = {
         Grille: 'Planning', Propositions: 'Planning', Personnes: 'Personnes',
         Artistes: 'Logistique', Catering: 'Logistique', Magasin: 'Logistique', 'Équipes': 'Logistique', 'Activités annexes': 'Logistique',
-        Mails: 'Personnes', 'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', Import: 'Réglages', Export: 'Réglages',
+        Mails: 'Personnes', 'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', 'Pôles et créneaux': 'Réglages', 'Montage / Démontage': 'Réglages', Import: 'Réglages', Export: 'Réglages',
       };
       const tab = async (label) => {
         const group = GROUP_OF[label];
@@ -303,7 +303,8 @@ async function main() {
         await sleep(300);
         await page.evaluate(() => document.querySelector('input[name="event-default-shift-hours"]')?.scrollIntoView({ block: 'center' }));
         await shot('60-reglages-duree-evenement');
-        // Open the first pole group and set its length by hand.
+        // Open the first pole group and set its length by hand. The poles have their own tab.
+        await tab('Pôles et créneaux');
         await page.evaluate(() => document.querySelector('button[aria-label^="Déplier le pôle"]')?.click());
         await sleep(400);
         await page.evaluate(() => document.querySelector('.setup-pole-head')?.click());
@@ -448,10 +449,10 @@ async function main() {
       if (want('superpose')) {
         // 2026-10-22: two événements created on the same half-day, picked in Réglages, must stack
         // on the montage grid instead of hiding each other.
-        await tab('Réglages');
-        await clickButton(/^▸Montage/);
+        await tab('Montage / Démontage');
+        await clickButton(/^▸Montage(?! et)/);
         await sleep(300);
-        for (const name of ['Camion son', 'Camion lumière']) {
+        for (const name of ['Installation son', 'Chargement lumière']) {
           await page.evaluate((value) => {
             const input = document.querySelector('input[placeholder="Déchargement du camion"]');
             const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
@@ -471,7 +472,15 @@ async function main() {
         await clickButton(/^Montage$/);
         await sleep(800);
         await shot('36-montage-superposes');
+        // Their démontage copies, swapped names and same time of day.
+        await clickButton(/^Démontage$/);
+        await sleep(800);
+        await shot('37-demontage-copies');
         await clickButton(/^Exploit$/);
+        await tab('Montage / Démontage');
+        await clickButton(/^▸Montage et démontage/);
+        await sleep(300);
+        await tall('77-montage-demontage-commun');
       }
       if (want('evenement')) {
         await tab('Réglages');

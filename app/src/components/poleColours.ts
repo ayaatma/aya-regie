@@ -75,3 +75,49 @@ export function poleColours(poles: readonly Pole[]): Map<string, string> {
 
 /** True for a `#rrggbb` string, which is all `<input type="color">` ever produces. */
 export const isColour = (value: string): boolean => /^#[0-9a-fA-F]{6}$/.test(value);
+
+/** A name as compared across the exploit and the phases: no case, no accent, no emoji. */
+const sameName = (name: string): string =>
+  name
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .toLowerCase();
+
+/**
+ * The colour of every pole of the montage and the démontage, by phase and key, since 2026-10-22.
+ *
+ * They were all grey unless picked by hand. Now: the one picked by hand first; then the colour of
+ * the exploit pole of the same name, so « Bar » reads as the bar wherever it is drawn; then one
+ * of the palette, the same for a name found in both phases. Names are compared without case,
+ * accents or emoji.
+ */
+export function phasePoleColours(
+  poles: readonly Pole[],
+  phases: ReadonlyArray<{ id: string; poles: ReadonlyArray<{ key: string; name: string; colour?: string }> }>,
+): Map<string, string> {
+  const exploit = poleColours(poles);
+  const byName = new Map<string, string>();
+  for (const pole of poles) {
+    const name = sameName(pole.name);
+    if (name !== '' && !byName.has(name)) byName.set(name, exploit.get(pole.key)!);
+  }
+
+  const used = new Set(byName.values());
+  const free = POLE_PALETTE.filter((colour) => !used.has(colour));
+  let next = 0;
+  const colours = new Map<string, string>();
+  for (const phase of phases) {
+    for (const pole of phase.poles) {
+      const name = sameName(pole.name);
+      let colour = pole.colour ?? byName.get(name);
+      if (!colour) {
+        colour = (free.length > 0 ? free : POLE_PALETTE)[next++ % (free.length > 0 ? free.length : POLE_PALETTE.length)]!;
+        if (name !== '') byName.set(name, colour);
+      }
+      colours.set(`${phase.id}|${pole.key}`, colour);
+    }
+  }
+  return colours;
+}

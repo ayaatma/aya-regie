@@ -81,6 +81,86 @@ export interface PhaseEvent {
   end: number;
   /** How many people it needs. Zero means "as many as turn up", and is never reported short. */
   headcount: number;
+  /**
+   * On a démontage événement: the montage événement it was created from, since 2026-10-22. Only
+   * a name follows through it, and only while the régisseur has not renamed this one by hand
+   * (see `renameMirrored`); hours, places and people are this événement's own from the start.
+   */
+  mirrorOf?: string;
+}
+
+/** One word of a montage événement's name and the word the démontage copy takes instead. */
+export interface MirrorWord {
+  from: string;
+  to: string;
+}
+
+/**
+ * What the two phases share, since 2026-10-22: the length of a new événement, apart from the
+ * exploit's créneaux, and whether an événement added to the montage gets its démontage copy.
+ */
+export interface PhaseOptions {
+  /** How long a new événement lasts, in hours, on the montage and the démontage alike. */
+  eventHours: number;
+  /** An événement added to the montage adds one to the démontage, at the same time of day. */
+  mirrorEvents: boolean;
+  /** The words swapped in the copy's name. The longest match wins; a name with none is kept. */
+  mirrorWords: readonly MirrorWord[];
+}
+
+/** The régisseur's own list of 2026-10-22, what every event starts from. */
+export const DEFAULT_MIRROR_WORDS: readonly MirrorWord[] = [
+  { from: 'Montage', to: 'Démontage' },
+  { from: 'Installation', to: 'Désinstallation' },
+  { from: 'Chargement', to: 'Déchargement' },
+  { from: 'Install', to: 'Désinstal' },
+  { from: 'Installat°', to: 'Désinstallat°' },
+];
+
+export const DEFAULT_PHASE_OPTIONS: PhaseOptions = {
+  eventHours: 2,
+  mirrorEvents: true,
+  mirrorWords: DEFAULT_MIRROR_WORDS,
+};
+
+const LETTER = /[\p{L}\p{N}]/u;
+
+/** `to` written in the case `found` was written in: all capitals, a capital first, or as typed. */
+function matchCase(found: string, to: string): string {
+  if (found === found.toUpperCase() && found !== found.toLowerCase()) return to.toUpperCase();
+  const first = found.charAt(0);
+  if (first === first.toLowerCase() && first !== first.toUpperCase()) return to.charAt(0).toLowerCase() + to.slice(1);
+  return to.charAt(0).toUpperCase() + to.slice(1);
+}
+
+/**
+ * The démontage name of a montage événement: every listed word swapped, whole words only and
+ * whatever their case, the longest first so « Installation » is never read as « Install ». A name
+ * holding none of them is returned as it is.
+ */
+export function mirrorLabel(label: string, words: readonly MirrorWord[]): string {
+  const sorted = words.filter((w) => w.from.trim() !== '').sort((a, b) => b.from.length - a.from.length);
+  const lower = label.toLowerCase();
+  let out = '';
+  let i = 0;
+  while (i < label.length) {
+    const word = sorted.find((w) => {
+      const from = w.from.trim();
+      if (!lower.startsWith(from.toLowerCase(), i)) return false;
+      const before = i > 0 ? label.charAt(i - 1) : '';
+      const after = label.charAt(i + from.length);
+      return !LETTER.test(before) && !(LETTER.test(from.charAt(from.length - 1)) && LETTER.test(after));
+    });
+    if (word) {
+      const from = word.from.trim();
+      out += matchCase(label.slice(i, i + from.length), word.to.trim());
+      i += from.length;
+    } else {
+      out += label.charAt(i);
+      i += 1;
+    }
+  }
+  return out;
 }
 
 /**

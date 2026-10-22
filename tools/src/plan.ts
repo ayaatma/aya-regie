@@ -35,7 +35,14 @@ import {
   type MailTemplate,
 } from './model.js';
 import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
-import { type Phase, alignPhase, defaultPhase, defaultPhaseStart } from './phase.js';
+import {
+  DEFAULT_PHASE_OPTIONS,
+  type Phase,
+  type PhaseOptions,
+  alignPhase,
+  defaultPhase,
+  defaultPhaseStart,
+} from './phase.js';
 import { refusedWindows, usableWindows } from './availability.js';
 import { shortNames } from './display.js';
 import { EMPTY_FORM_MAPPING, type FormMapping } from './form-mapping.js';
@@ -341,6 +348,8 @@ export interface Plan {
    */
   montage: Phase;
   demontage: Phase;
+  /** What the two phases share: a new événement's length, and its démontage copy. 2026-10-22. */
+  phaseOptions: PhaseOptions;
   /**
    * The meals and the drink tickets: what the rules are, and which boxes were ticked by hand.
    *
@@ -923,6 +932,7 @@ export function emptyPlan(
     | 'equipment'
     | 'defaultShiftHours'
     | 'mailTemplates'
+    | 'phaseOptions'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -962,5 +972,6 @@ export function emptyPlan(
     equipment: [],
     defaultShiftHours: 2,
     mailTemplates: {},
+    phaseOptions: DEFAULT_PHASE_OPTIONS,
   };
 }

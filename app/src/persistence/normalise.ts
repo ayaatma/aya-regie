@@ -23,6 +23,8 @@ import {
   type MailAudience,
   type MailTemplate,
   DEFAULT_APPLICATION_STEPS,
+  DEFAULT_PHASE_OPTIONS,
+  type PhaseOptions,
   STEP_REPLIES,
   type StepMail,
   type StepReply,
@@ -206,6 +208,27 @@ const phaseEvent = (value: unknown): PhaseEvent => {
     start: hours(loose.start) ?? 0,
     end: hours(loose.end) ?? 0,
     headcount: Math.max(0, Math.round(hours(loose.headcount) ?? 0)),
+    // Absent from anything written before 2026-10-22, and from every événement not copied.
+    ...(text(loose.mirrorOf) === '' ? {} : { mirrorOf: text(loose.mirrorOf) }),
+  };
+};
+
+/**
+ * What the two phases share. Absent from anything written before 2026-10-22: two hours, the
+ * copy on, and the régisseur's list of words, the defaults a new event gets.
+ */
+const phaseOptions = (value: unknown): PhaseOptions => {
+  if (value === null || typeof value !== 'object') return DEFAULT_PHASE_OPTIONS;
+  const loose = value as Record<string, unknown>;
+  const eventHours = hours(loose.eventHours);
+  return {
+    eventHours: eventHours !== null && eventHours > 0 ? eventHours : DEFAULT_PHASE_OPTIONS.eventHours,
+    mirrorEvents: loose.mirrorEvents !== false,
+    mirrorWords: Array.isArray(loose.mirrorWords)
+      ? loose.mirrorWords
+          .filter((w): w is Record<string, unknown> => w !== null && typeof w === 'object')
+          .map((w) => ({ from: text(w.from), to: text(w.to) }))
+      : DEFAULT_PHASE_OPTIONS.mirrorWords,
   };
 };
 
@@ -1062,6 +1085,7 @@ export function normalisePlan(raw: unknown): Plan {
       .filter((a) => a.key !== ''),
     // Absent from anything written before 2026-10-22: every audience sends the default text.
     mailTemplates: mailTemplates((loose as Record<string, unknown>).mailTemplates),
+    phaseOptions: phaseOptions((loose as Record<string, unknown>).phaseOptions),
     // Absent from anything written before 2026-09-17: two hours, what every pole had before.
     defaultShiftHours: (() => {
       const hours = (loose as Record<string, unknown>).defaultShiftHours;

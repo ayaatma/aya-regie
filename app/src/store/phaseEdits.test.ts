@@ -14,7 +14,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  DEFAULT_MIRROR_WORDS,
   GENERAL_POLE_KEY,
+  mirrorLabel,
   defaultPhase,
   emptyPlan,
   type Organiser,
@@ -39,6 +41,8 @@ import {
   setPhase,
   setVolunteerPhase,
   slidePhaseEvent,
+  addPhaseEventWithMirror,
+  renamePhaseEvent,
 } from './phaseEdits.ts';
 
 const orga = (key: string, over: Partial<Organiser> = {}): Organiser => ({
@@ -420,4 +424,56 @@ test('sliding an événement takes its people along, and leaves everybody else w
     ['scene', 0, 2],
     ['camion', 5, 7],
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// The démontage copy of a montage événement, since 2026-10-22
+// ---------------------------------------------------------------------------
+
+/** The clock hour an hour of a phase falls on, as the régisseur reads it. */
+const clockAt = (phase: Phase, hour: number): number => {
+  const at = new Date(new Date(phase.startISO).getTime() + hour * 3600_000);
+  return at.getHours() + at.getMinutes() / 60;
+};
+
+const withDemontage = (over: Partial<Plan> = {}): Plan => {
+  const plan = base(over);
+  return { ...plan, demontage: { ...plan.demontage, enabled: true } };
+};
+
+test('a montage événement gets its démontage copy: same time of day, same places, the name swapped', () => {
+  const { plan, key } = addPhaseEventWithMirror(withDemontage(), 'montage', 'Installation scène', 2, 4, 3);
+  const original = plan.montage.events.find((e) => e.key === key)!;
+  assert.equal(plan.demontage.events.length, 1);
+  const copy = plan.demontage.events[0]!;
+  assert.equal(copy.label, 'Désinstallation scène');
+  assert.equal(copy.headcount, 3);
+  assert.equal(copy.mirrorOf, original.key);
+  assert.equal(copy.end - copy.start, 2, 'la même durée');
+  assert.equal(clockAt(plan.demontage, copy.start), clockAt(plan.montage, original.start), 'la même heure de la journée');
+});
+
+test('no copy from the démontage, none to a démontage switched off, none with the setting off', () => {
+  assert.equal(addPhaseEventWithMirror(withDemontage(), 'demontage', 'Camion', 4, 6, 1).plan.montage.events.length, 0);
+  assert.equal(addPhaseEventWithMirror(base(), 'montage', 'Camion', 2, 4, 1).plan.demontage.events.length, 0);
+  const off = withDemontage({ phaseOptions: { eventHours: 2, mirrorEvents: false, mirrorWords: [] } });
+  assert.equal(addPhaseEventWithMirror(off, 'montage', 'Camion', 2, 4, 1).plan.demontage.events.length, 0);
+});
+
+test('renaming the montage événement renames its copy until the copy is renamed by hand', () => {
+  let { plan, key } = addPhaseEventWithMirror(withDemontage(), 'montage', 'Nouvel événement', 2, 4, 1);
+  plan = renamePhaseEvent(plan, 'montage', key!, 'Montage du bar');
+  assert.equal(plan.demontage.events[0]!.label, 'Démontage du bar');
+  plan = renamePhaseEvent(plan, 'demontage', plan.demontage.events[0]!.key, 'Rangement du bar');
+  plan = renamePhaseEvent(plan, 'montage', key!, 'Montage des bars');
+  assert.equal(plan.demontage.events[0]!.label, 'Rangement du bar', 'renommée à la main, elle garde son nom');
+});
+
+test('the words are swapped whole, in the case they were written, the longest first, and a name with none is kept', () => {
+  assert.equal(mirrorLabel('Installation lumière', DEFAULT_MIRROR_WORDS), 'Désinstallation lumière');
+  assert.equal(mirrorLabel('Install son', DEFAULT_MIRROR_WORDS), 'Désinstal son');
+  assert.equal(mirrorLabel('installat° bar', DEFAULT_MIRROR_WORDS), 'désinstallat° bar');
+  assert.equal(mirrorLabel('CHARGEMENT camion', DEFAULT_MIRROR_WORDS), 'DÉCHARGEMENT camion');
+  assert.equal(mirrorLabel('Remontage', DEFAULT_MIRROR_WORDS), 'Remontage', 'jamais au milieu d’un mot');
+  assert.equal(mirrorLabel('Camion son', DEFAULT_MIRROR_WORDS), 'Camion son');
 });

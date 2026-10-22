@@ -26,16 +26,17 @@ import { useState } from 'react';
 import { SkillPicker } from '../components/SkillPicker.tsx';
 
 import {
+  DEFAULT_MIRROR_WORDS,
   fmtHours,
   phaseDayParts,
   phaseDays,
   toLabel,
+  type MirrorWord,
   type Phase,
   type PhaseId,
   type PhasePole,
 } from '../engine.ts';
 import {
-  addPhaseEvent,
   addPhasePole,
   copyMontagePoles,
   deletePhaseEvent,
@@ -48,11 +49,15 @@ import {
   setPhaseEvent,
   setPhasePole,
   slidePhaseEvent,
+  addPhaseEventWithMirror,
+  phaseEventHours,
+  renamePhaseEvent,
+  setPhaseOptions,
 } from '../store/phaseEdits.ts';
-import { eventShiftHours } from '../store/setupEdits.ts';
+import { NumberField } from '../components/NumberField.tsx';
 import { useLoadedPlan } from '../store/store.tsx';
 import { ClockField, TimeOfDayField } from '../components/ClockField.tsx';
-import { isColour } from '../components/poleColours.ts';
+import { isColour, phasePoleColours } from '../components/poleColours.ts';
 import type { ClockTime } from '../components/clock.ts';
 import { SetupSection } from './SetupSection.tsx';
 
@@ -454,7 +459,7 @@ export function PhaseCard({ id }: { id: PhaseId }) {
                     aria-label={`Nom de l'événement ${event.label}`}
                     onChange={(change2) =>
                       edit(
-                        (p) => setPhaseEvent(p, id, event.key, { label: change2.target.value }),
+                        (p) => renamePhaseEvent(p, id, event.key, change2.target.value),
                         `événement ${event.label}`,
                       )
                     }
@@ -585,14 +590,14 @@ export function PhaseCard({ id }: { id: PhaseId }) {
                   const part = newEventPart!;
                   edit(
                     (p) =>
-                      addPhaseEvent(
+                      addPhaseEventWithMirror(
                         p,
                         id,
                         newEvent,
                         part.start,
-                        Math.min(part.start + eventShiftHours(p), part.end),
+                        Math.min(part.start + phaseEventHours(p), part.end),
                         2,
-                      ),
+                      ).plan,
                     `événement ${newEvent.trim()}`,
                   );
                   setNewEvent('');
@@ -634,7 +639,7 @@ function PhasePoleRow({
       <label className="setup-colour" title={`Couleur du pôle ${pole.name}`}>
         <input
           type="color"
-          value={pole.colour ?? '#8a8a8a'}
+          value={phasePoleColours(plan.poles, [plan.montage, plan.demontage]).get(`${id}|${pole.key}`) ?? '#8a8a8a'}
           onChange={(event) => {
             const value = event.target.value;
             if (!isColour(value)) return;
@@ -705,5 +710,139 @@ function PhasePoleRow({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * What the montage and the démontage share, at the top of their tab, since 2026-10-22: the
+ * length of a new événement, set apart from the exploit's créneaux, and the démontage copy of
+ * every événement added to the montage, with the words its name swaps.
+ */
+export function PhasesSharedCard() {
+  const { plan, edit } = useLoadedPlan();
+  const options = plan.phaseOptions;
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const words = options.mirrorWords;
+  const setWords = (next: MirrorWord[], what: string) =>
+    edit((p) => setPhaseOptions(p, { mirrorWords: next }), what);
+
+  return (
+    <SetupSection
+      title="Montage et démontage"
+      meta={`événements de ${fmtHours(options.eventHours)} · copie au démontage ${options.mirrorEvents ? 'activée' : 'désactivée'}`}
+    >
+      <div className="rules-grid">
+        <label className="rule">
+          <span className="rule-label">Durée d'un nouvel événement</span>
+          <span className="rule-input">
+            <NumberField
+              value={options.eventHours}
+              step={0.25}
+              ariaLabel="Durée d'un nouvel événement du montage ou du démontage, en heures"
+              name="phase-event-hours"
+              onCommit={(value) =>
+                edit((p) => setPhaseOptions(p, { eventHours: value ?? 2 }), "durée d'un événement")
+              }
+            />
+            <span className="rule-suffix">h</span>
+          </span>
+          <span className="rule-hint">
+            Au montage comme au démontage, indépendamment des créneaux de l'exploit. Un événement
+            déjà créé garde sa durée.
+          </span>
+        </label>
+
+        <label className="rule">
+          <span className="rule-label">Copie au démontage</span>
+          <span className="rule-input">
+            <input
+              type="checkbox"
+              name="phase-mirror-events"
+              checked={options.mirrorEvents}
+              onChange={(event) =>
+                edit((p) => setPhaseOptions(p, { mirrorEvents: event.target.checked }), 'copie des événements')
+              }
+            />
+            <span>Un événement ajouté au montage s'ajoute au démontage</span>
+          </span>
+          <span className="rule-hint">
+            À la même heure de la journée, avec le même nombre de personnes et son nom inversé
+            selon la liste ci-dessous. Tant que la copie garde ce nom, renommer l'événement du
+            montage la renomme aussi. Rien n'est copié si le démontage n'est pas activé.
+          </span>
+        </label>
+      </div>
+
+      <div className="setup-lineup">
+        <span className="panel-section-title">Mots inversés ({words.length})</span>
+        <p className="panel-sub">
+          Mots entiers, majuscules ou non. Un nom qui n'en contient aucun est copié tel quel.
+        </p>
+        {words.map((word, index) => (
+          <div key={index} className="setup-organiser">
+            <input
+              className="setup-name"
+              autoComplete="off"
+              value={word.from}
+              aria-label="Mot du montage"
+              onChange={(event) =>
+                setWords(words.map((w, i) => (i === index ? { ...w, from: event.target.value } : w)), 'mots inversés')
+              }
+            />
+            <span className="rule-suffix">→</span>
+            <input
+              className="setup-name"
+              autoComplete="off"
+              value={word.to}
+              aria-label={`Mot du démontage pour ${word.from}`}
+              onChange={(event) =>
+                setWords(words.map((w, i) => (i === index ? { ...w, to: event.target.value } : w)), 'mots inversés')
+              }
+            />
+            <button
+              className="btn is-icon is-danger"
+              title={`Retirer ${word.from} → ${word.to}`}
+              onClick={() => setWords(words.filter((_, i) => i !== index), `retrait de ${word.from}`)}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <span className="setup-confirm">
+          <input
+            className="select"
+            placeholder="Chargement"
+            aria-label="Nouveau mot du montage"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+          />
+          <span className="rule-suffix">→</span>
+          <input
+            className="select"
+            placeholder="Déchargement"
+            aria-label="Nouveau mot du démontage"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+          />
+          <button
+            className="btn"
+            disabled={from.trim() === '' || to.trim() === ''}
+            onClick={() => {
+              setWords([...words, { from: from.trim(), to: to.trim() }], `mot ${from.trim()}`);
+              setFrom('');
+              setTo('');
+            }}
+          >
+            Ajouter
+          </button>
+          {words.length === 0 && (
+            <button className="btn" onClick={() => setWords([...DEFAULT_MIRROR_WORDS], 'mots inversés par défaut')}>
+              Reprendre la liste par défaut
+            </button>
+          )}
+        </span>
+      </div>
+    </SetupSection>
   );
 }

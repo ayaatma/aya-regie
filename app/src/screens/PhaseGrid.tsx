@@ -48,7 +48,6 @@ import {
   type PhasePlacement,
 } from '../engine.ts';
 import {
-  addPhaseEvent,
   assignWindow,
   declaredToPlace,
   removePhaseAssignment,
@@ -56,8 +55,9 @@ import {
   setPhaseAssignment,
   setPhaseEvent,
   slidePhaseEvent,
+  addPhaseEventWithMirror,
+  phaseEventHours,
 } from '../store/phaseEdits.ts';
-import { eventShiftHours } from '../store/setupEdits.ts';
 import {
   EditModeButton,
   MIN_WINDOW_HOURS,
@@ -75,6 +75,7 @@ import { DRAG_MIME } from '../components/drag.ts';
 import { stepBox, type NavBox, type NavRows } from '../components/phaseNav.ts';
 import { LABEL_W, PHASE_ZOOM, fitZoom } from '../components/layout.ts';
 import { TrashTarget } from '../components/TrashTarget.tsx';
+import { phasePoleColours } from '../components/poleColours.ts';
 import { ZoomSlider } from '../components/ZoomSlider.tsx';
 import { useWheelZoom } from '../components/useWheelZoom.ts';
 import { ARTIST_ROW_H } from '../components/TimeRuler.tsx';
@@ -320,6 +321,10 @@ export function PhaseGrid({
     [plan.startISO, plan.artists, phase, axis],
   );
   const artistRows = useMemo(() => packRows(artistMoments), [artistMoments]);
+  const colours = useMemo(
+    () => phasePoleColours(plan.poles, [plan.montage, plan.demontage]),
+    [plan.poles, plan.montage, plan.demontage],
+  );
 
   const issues = useMemo(
     () => phaseIssues(phase, plan.organisers, plan.volunteers, plan.skills),
@@ -761,7 +766,7 @@ export function PhaseGrid({
       ? ghostWindow(
           phase.events,
           segment.start + (x - segment.x) / axis.pxPerHour,
-          eventShiftHours(plan),
+          phaseEventHours(plan),
           segment.start,
           segment.end,
         )
@@ -777,12 +782,11 @@ export function PhaseGrid({
 
   /** Creates the événement under the pointer and opens it in the pane, where it is named. */
   const createEvent = (window: Edges) => {
-    const before = new Set(phase.events.map((e) => e.key));
     let created: string | undefined;
     edit((p) => {
-      const next = addPhaseEvent(p, id, 'Nouvel événement', window.start, window.end, 1);
-      created = (id === 'montage' ? next.montage : next.demontage).events.find((e) => !before.has(e.key))?.key;
-      return next;
+      const next = addPhaseEventWithMirror(p, id, 'Nouvel événement', window.start, window.end, 1);
+      created = next.key;
+      return next.plan;
     }, `événement ajouté sur ${phase.label || (id === 'montage' ? 'le montage' : 'le démontage')}`);
     setEventGhost(null);
     if (created) setSelection({ kind: 'evenement', phaseId: id, eventKey: created, fill: false });
@@ -1285,7 +1289,7 @@ export function PhaseGrid({
                 <div
                   key={pole.key}
                   className="lane"
-                  style={{ '--pole': pole.colour ?? '#8a8a8a' } as React.CSSProperties}
+                  style={{ '--pole': colours.get(`${id}|${pole.key}`) ?? '#8a8a8a' } as React.CSSProperties}
                 >
                   <div className="lane-label">
                     <span className="lane-label-name">{pole.name}</span>

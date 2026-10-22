@@ -56,7 +56,7 @@ import { organiserName } from '../components/labels.ts';
 import { slideEnd } from '../components/clock.ts';
 import { EventCard } from './EventCard.tsx';
 import { SlotsCard } from './SlotsCard.tsx';
-import { PhaseCard } from './PhaseCard.tsx';
+import { PhaseCard, PhasesSharedCard } from './PhaseCard.tsx';
 import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
@@ -97,7 +97,14 @@ interface PoleGroup {
   leaves: Pole[];
 }
 
-export function SetupScreen() {
+/**
+ * Which of the three Réglages tabs this is, since 2026-10-22. The régisseur asked for the poles
+ * to have a tab of their own, and the montage and démontage another: the general settings were
+ * one long page where the poles of the exploit came after the billetterie.
+ */
+export type SetupPart = 'reglages' | 'poles' | 'phases';
+
+export function SetupScreen({ part = 'reglages' }: { part?: SetupPart }) {
   const { plan, index, report, edit } = useLoadedPlan();
   const [openPole, setOpenPole] = useState<string | null>(null);
   /**
@@ -163,7 +170,9 @@ export function SetupScreen() {
       <div className="screen-main">
         <div className="toolbar">
           <strong>
-            {groups.length} pôles, {plan.shifts.length} créneaux, {plan.organisers.length} responsables de pôle
+            {part === 'phases'
+              ? `${plan.montage.poles.length + plan.demontage.poles.length} pôles, ${plan.montage.events.length + plan.demontage.events.length} événements`
+              : `${groups.length} pôles, ${plan.shifts.length} créneaux, ${plan.organisers.length} responsables de pôle`}
           </strong>
           <span className="toolbar-note">
             Rien n'est recalculé après une modification ici. Un créneau raccourci ou une règle
@@ -172,6 +181,8 @@ export function SetupScreen() {
         </div>
 
         <div className="setup-list">
+          {part === 'reglages' && (
+            <>
           <EventCard />
 
           <SlotsCard />
@@ -185,14 +196,19 @@ export function SetupScreen() {
           <TestMailCard />
 
           <SkillsCard />
+            </>
+          )}
 
-          {/*
-            The two phases, between the people and the poles of the exploit. They are settings of
-            the same kind as the event's own dates, and they are read far less often than the
-            poles below, which is why they sit above them rather than at the top.
-          */}
-          <PhaseCard id="montage" />
-          <PhaseCard id="demontage" />
+          {part === 'phases' && (
+            <>
+              <PhasesSharedCard />
+              <PhaseCard id="montage" />
+              <PhaseCard id="demontage" />
+            </>
+          )}
+
+          {part === 'reglages' && (
+            <>
 
           {/*
             The catering, after the three moments it feeds: its services are hours of the clock
@@ -202,7 +218,11 @@ export function SetupScreen() {
           <CateringCard />
           <TicketingCard />
           <TravelCard />
+            </>
+          )}
 
+          {part === 'poles' && (
+            <>
           {groups.map((group) => (
             <section
               key={group.root.key}
@@ -341,13 +361,15 @@ export function SetupScreen() {
               Ajouter un pôle
             </button>
           </div>
+            </>
+          )}
 
           {/*
             Last, as the régisseur asked: the rules and weights every other screen is judged by,
             read rarely and changed more rarely still. The four thresholds of the former « Règles
             de planning » card live on their criterion's row here.
           */}
-          <AdvancedSettingsCard />
+          {part === 'reglages' && <AdvancedSettingsCard />}
         </div>
       </div>
     </div>
