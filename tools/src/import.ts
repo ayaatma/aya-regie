@@ -395,6 +395,35 @@ export interface ImportIssue {
   person: string;
   message: string;
   suggestions?: string[];
+  /**
+   * The fiche the line is about, since 2026-10-22: filled after the read for every issue raised
+   * on a row that became a volunteer, so the review screen lists it with that fiche rather than
+   * as a loose line, and `foldIssuesIntoFiches` keeps it on the fiche once the import is applied.
+   */
+  key?: string;
+  /** The same doubt is already one of the fiche's `reviewReasons`, worded for the fiche. */
+  onFiche?: boolean;
+}
+
+/**
+ * One answer of a closed question read with a doubt, since 2026-10-22.
+ *
+ * WHAT MAKES A DOUBT SETTLEABLE ONCE FOR EVERYBODY: the same answer, typed or ticked the same way,
+ * is read the same way on every row, so deciding what « 🛠️ VOLANTE (Bénévole polyvalent) » means
+ * is one decision for every fiche that carries it. The decision is an entry of the form's
+ * correspondence (`FormMapping.answers[kind]`), the one the mapping card writes, and a decided
+ * answer is read without doubt on this export and on every later one.
+ */
+export interface AnswerDoubt {
+  /** The volunteer whose fiche carries it. */
+  key: string;
+  kind: AnswerKind;
+  /** As typed, trimmed. Grouped by its normalised form. */
+  answer: string;
+  /** What the tool made of it, in the shape of the answer map, or null when it read nothing. */
+  read: unknown;
+  /** The fiche's review lines this doubt accounts for, word for word. */
+  messages: string[];
 }
 
 export interface ResolvedBuddy {
@@ -409,6 +438,8 @@ export interface ImportResult {
   volunteers: Volunteer[];
   buddies: ResolvedBuddy[];
   issues: ImportIssue[];
+  /** The closed answers read with a doubt, one per fiche and answer. See `AnswerDoubt`. */
+  doubts?: AnswerDoubt[];
   /**
    * The photo each person uploaded with the form, as a Drive file id, since 2026-10-10. Absent
    * when the form asks for none. Kept out of `Volunteer` on purpose: a photo is a file in the
@@ -1126,6 +1157,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   const rowOf = new Map<string, number>();
   const photoOf = new Map<string, string>();
   const identities = new Set<string>();
+  const doubts: AnswerDoubt[] = [];
 
   const activityColumns = sideActivityColumns(rows[0]!, binding, options.sideActivities ?? []);
 
@@ -1171,6 +1203,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     // The two prose answers. Each reading carries its own doubt, and every doubt collected here
     // ends up on the fiche as a line the régisseur has to clear by hand. See `answers.ts`.
     const reviewReasons: string[] = [];
+    // The closed answers among those doubts, given their fiche once its key is known.
+    const rowDoubts: Array<Omit<AnswerDoubt, 'key'>> = [];
 
     /*
      * The closed question first, because an answer picked from a list needs no interpreting
@@ -1225,9 +1259,9 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const comfort = decidedComfort ?? parseSlotComfort(map.slotComfort === undefined ? '' : rows[0]![map.slotComfort]!, comfortCell, slots);
     readable.saw('slotComfort', comfort !== 'inconnu');
     if (comfort === 'inconnu') {
-      reviewReasons.push(
-        `Réponse « ${comfortCell} »: ni la tranche ni le refus ne sont reconnus. À relier dans la correspondance du formulaire.`,
-      );
+      const reason = `Réponse « ${comfortCell} »: ni la tranche ni le refus ne sont reconnus. À relier dans la correspondance du formulaire.`;
+      reviewReasons.push(reason);
+      rowDoubts.push({ kind: 'slotComfort', answer: comfortCell.trim(), read: null, messages: [reason] });
     }
     const readComfort: SlotComfort = comfort === null || comfort === 'inconnu' ? { refused: [], avoided: [] } : comfort;
 
@@ -1242,10 +1276,14 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     readable.saw('volume', map.volume === undefined || volume !== null);
 
     if (preferred === 'inconnu') {
-      issues.push({ severity: 'error', code: 'reponse-illisible', row: rowNumber, person, message: `Préférence horaire illisible, aucune tranche de Réglages ne s'appelle ainsi: "${cell(row, 'halfPreference')}".` });
+      const message = `Préférence horaire illisible, aucune tranche de Réglages ne s'appelle ainsi: "${cell(row, 'halfPreference')}".`;
+      issues.push({ severity: 'error', code: 'reponse-illisible', row: rowNumber, person, message });
+      rowDoubts.push({ kind: 'preferredSlot', answer: preferenceCell.trim(), read: null, messages: [message] });
     }
     if (map.volume !== undefined && volume === null) {
-      issues.push({ severity: 'error', code: 'reponse-illisible', row: rowNumber, person, message: `Volume horaire illisible: "${volumeCell}". La relier à un volume dans la correspondance des réponses.` });
+      const message = `Volume horaire illisible: "${volumeCell}". La relier à un volume dans la correspondance des réponses.`;
+      issues.push({ severity: 'error', code: 'reponse-illisible', row: rowNumber, person, message });
+      rowDoubts.push({ kind: 'volume', answer: volumeCell.trim(), read: null, messages: [message] });
     }
     // The fourth volume answer carries no volume. The person exists and has to be called back,
     // so they are imported at the floor rather than dropped, and the signalement says why.
@@ -1329,7 +1367,10 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       const several = parts.length > 1 && whole.value === '' && partReadings.every((r) => r.value !== '' && r.confident);
       const readings = several ? parts.map((part, i) => ({ raw: part, reading: partReadings[i]! })) : [{ raw, reading: whole }];
       for (const { raw: text, reading } of readings) {
-        if (reading.reason) reviewReasons.push(reading.reason);
+        if (reading.reason) {
+          reviewReasons.push(reading.reason);
+          rowDoubts.push({ kind: 'pole', answer: text.trim(), read: reading.value === '' ? null : reading.value, messages: [reading.reason] });
+        }
         // An answer naming no pole on purpose (« peu importe », « tout me va ») is every pole.
         const anyPole = reading.value === '' && reading.confident && text.trim() !== '';
         choiceEntries.push({ raw: text, pole: poles.find((p) => p.key === reading.value) ?? null, level, anyPole });
@@ -1355,15 +1396,11 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       const found = poles.find((p) => p.key === key) ?? null;
       if (found) refusedPoles.push(found);
       else {
-        issues.push({
-          severity: 'warning',
-          code: 'pole-inconnu',
-          row: rowNumber,
-          person,
-          message:
-            `Pôle refusé introuvable: "${raw}". Ce refus ne sera pas appliqué. ` +
-            "Vérifier l'intitulé du pôle dans Réglages.",
-        });
+        const message =
+          `Pôle refusé introuvable: "${raw}". Ce refus ne sera pas appliqué. ` +
+          "Vérifier l'intitulé du pôle dans Réglages.";
+        issues.push({ severity: 'warning', code: 'pole-inconnu', row: rowNumber, person, message });
+        rowDoubts.push({ kind: 'pole', answer: raw.trim(), read: null, messages: [message] });
       }
     }
     readable.saw('refusedPoles', refusedRaw.length === 0 || refusedPoles.length > 0);
@@ -1382,6 +1419,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
           row: rowNumber,
           person,
           message: `Pôle du ${label} non reconnu: "${raw}". À trancher sur la fiche.`,
+          // Said on the fiche already, by the reading's own doubt, whenever there was one.
+          onFiche: rowDoubts.some((d) => d.kind === 'pole' && d.answer === raw.trim()),
         });
       }
     }
@@ -1454,6 +1493,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
           row: rowNumber,
           person,
           message: `${label} "${choice!.path}" appartient au pôle refusé "${clash.path}". ${consequence}`,
+          onFiche: true,
         });
         reviewReasons.push(`${label} "${choice!.path}" et refus de "${clash.path}" se contredisent. ${consequence}`);
       }
@@ -1495,6 +1535,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     }
     identities.add(key);
     rowOf.set(key, rowNumber);
+    for (const doubt of rowDoubts) doubts.push({ key, ...doubt });
     // The first file of the answer: the question takes one photo, and a second is a mistake.
     const photo = driveFileIds(cell(row, 'photo'))[0];
     if (photo) photoOf.set(key, photo);
@@ -1599,7 +1640,38 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   }
 
   const buddies = resolveBuddies(rawBuddies, volunteers, rowOf, issues);
-  return { volunteers, buddies, issues, photos: [...photoOf].map(([volunteerKey, driveFileId]) => ({ volunteerKey, driveFileId })) };
+  // Every line raised on a row that became somebody is that somebody's. See `ImportIssue.key`.
+  const keyOfRow = new Map([...rowOf].map(([key, row]) => [row, key]));
+  for (const issue of issues) {
+    const key = issue.row === null ? undefined : keyOfRow.get(issue.row);
+    if (key !== undefined) issue.key = key;
+  }
+  return { volunteers, buddies, issues, doubts, photos:[...photoOf].map(([volunteerKey, driveFileId]) => ({ volunteerKey, driveFileId })) };
+}
+
+/**
+ * Every signalement about somebody, kept on their fiche, since 2026-10-22.
+ *
+ * A signalement lives on the import screen and dies with it, while a review reason travels with
+ * the fiche into the plan. The screen tells the régisseur that whatever is not settled before
+ * applying stays « à relire » on the fiche in Personnes, so a line like « Volume horaire
+ * illisible » has to become one of its reasons: otherwise applying would forget it in silence.
+ * Lines the fiche already says in its own words (`onFiche`) are not added twice.
+ */
+export function foldIssuesIntoFiches(result: ImportResult): ImportResult {
+  const extra = new Map<string, string[]>();
+  for (const issue of result.issues) {
+    if (issue.key === undefined || issue.onFiche) continue;
+    extra.set(issue.key, [...(extra.get(issue.key) ?? []), issue.message]);
+  }
+  if (extra.size === 0) return result;
+  return {
+    ...result,
+    volunteers: result.volunteers.map((v) => {
+      const lines = (extra.get(v.key) ?? []).filter((line) => !v.reviewReasons.includes(line));
+      return lines.length === 0 ? v : { ...v, needsReview: true, reviewReasons: [...v.reviewReasons, ...lines] };
+    }),
+  };
 }
 
 /**

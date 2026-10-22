@@ -355,6 +355,55 @@ async function main() {
         await sleep(800);
         await shot('106-import-reglages-appliques');
       }
+      if (want('aregler')) {
+        // « À régler », 2026-10-22: two fiches sharing an unread answer, one interpreted, one sentence.
+        await tab('Import/Export');
+        const q = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+        const rows = [
+          ['Horodateur', 'Adresse e-mail', 'Nom', 'Prénom', 'Ton premier choix.', 'Ton deuxième choix.'],
+          ['01/06/2026 10:00:00', 'a@exemple.org', 'Alpha', 'Ana', "Je m'en fous", 'Bar'],
+          ['02/06/2026 10:00:00', 'b@exemple.org', 'Beta', 'Ben', "Je m'en fous", '🛠️ VOLANTES (polyvalent)'],
+          ['03/06/2026 10:00:00', 'c@exemple.org', 'Gamma', 'Cléo', '🛠️ VOLANTES (polyvalent)', 'Bar et Plonge'],
+        ];
+        const file = path.join(require('node:os').tmpdir(), 'aya-regie-a-regler.csv');
+        require('node:fs').writeFileSync(file, rows.map((r) => r.map(q).join(',')).join('\n'));
+        const input = await page.$('input[type="file"][accept=".csv,text/csv"]');
+        await input.uploadFile(file);
+        await sleep(800);
+        await page.evaluate(() => document.querySelector('.import-todo')?.scrollIntoView());
+        await sleep(300);
+        await shot('53-import-a-regler');
+        const scrollOf = () => page.evaluate(() => {
+          let at = document.querySelector('.import-todo');
+          while (at && !(['auto', 'scroll'].includes(getComputedStyle(at).overflowY) && at.scrollHeight > at.clientHeight)) at = at.parentElement;
+          return (at ?? document.scrollingElement).scrollTop;
+        });
+        const before = await scrollOf();
+        await page.evaluate(() => [...document.querySelectorAll('.import-todo-people button')].at(-1)?.click());
+        await sleep(900);
+        const down = await scrollOf();
+        await shot('54-import-sur-la-fiche');
+        await page.evaluate(() => [...document.querySelectorAll('.import-review button')].find((b) => /Enregistrer/.test(b.textContent || ''))?.click());
+        await sleep(1800);
+        const back = await scrollOf();
+        problems.push(`${scheme} a-regler: défilement ${before} → fiche ${down} → retour ${back}`);
+        await shot('55-import-retour-liste');
+        await page.evaluate(() => {
+          const select = document.querySelector('.import-todo-decide select');
+          select.value = '0';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await sleep(300);
+        await clickButton(/^Retenir pour /).catch(() => problems.push(`${scheme} a-regler: pas de bouton Retenir`));
+        await sleep(600);
+        await shot('56-import-reponse-retenue');
+        await tab('Personnes');
+        await tab('Import/Export');
+        await sleep(600);
+        problems.push(`${scheme} a-regler: après Personnes, import ${await page.evaluate(() => (document.querySelector('.import-todo') ? 'toujours là' : 'perdu'))}`);
+        await page.evaluate(() => document.querySelector('.import-todo')?.scrollIntoView());
+        await shot('57-import-apres-personnes');
+      }
       if (want('historique')) {
         await tab('Historique');
         await page.evaluate(() => [...document.querySelectorAll('.stack-head button')].forEach((b) => b.click()));

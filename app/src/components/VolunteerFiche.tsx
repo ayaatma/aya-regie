@@ -32,8 +32,12 @@ import {
   windowHours,
   isNoAllergy,
   isStandardDiet,
+  normalise,
+  parsePoleAnswer,
   type EditableField,
+  type Plan,
   type PlanIndex,
+  type PoleChoice,
   type ValidationResult,
   type Volunteer,
   type VolunteerReport,
@@ -427,6 +431,11 @@ function VolunteerDetail({
                 {index.plan.poleChoicesRanked !== false ? `${i + 1}. ` : '• '}
                 {choicePoleLabel(choice, (key) => index.polePath(key))}{' '}
                 <span className="pool-item-meta">({levelLabel(choice.level)})</span>
+                {answerDiffers(choice, index.plan) && (
+                  <span className="pool-item-meta" title="Ce qui a été répondu au formulaire, avant la correction">
+                    {' '}· réponse au formulaire: « {choice.raw.trim()} »
+                  </span>
+                )}
               </Fragment>
             ))}
           </p>
@@ -691,6 +700,27 @@ function BuddiesSection({
  * A pole answer is only worth showing when it is not simply the pole’s own name, which is what
  * the closed list produces and what most answers are.
  */
+/**
+ * Whether a pole choice says something else than its answer to the form, since 2026-10-22.
+ *
+ * « Je m'en fous », read as nothing and corrected to « Tous les pôles acceptés », used to vanish
+ * from the fiche: the sentence was only shown while the choice was unread. So the answer is read
+ * again the way the import reads it (the event's correspondence first, then the automatic rules)
+ * and shown beside the choice whenever the choice now differs from that reading. An answer the
+ * choice still matches says nothing new and is not repeated; an answer read as nothing and still
+ * unread is shown in « Ce qui a été écrit » instead.
+ */
+function answerDiffers(choice: PoleChoice, plan: Plan): boolean {
+  const raw = choice.raw.trim();
+  if (raw === '') return false;
+  const decided = plan.formMapping.answers.pole?.[normalise(raw)];
+  const reading = decided !== undefined ? { value: decided, confident: true } : parsePoleAnswer(raw, plan.poles);
+  const readAny = reading.value === '' && reading.confident;
+  if (choice.anyPole) return !readAny;
+  if (choice.poleKey === '') return false;
+  return readAny || reading.value !== choice.poleKey;
+}
+
 function RawAnswers({ volunteer }: { volunteer: Volunteer }) {
   const note = volunteer.availabilityNote.trim();
   const choices = volunteer.choices

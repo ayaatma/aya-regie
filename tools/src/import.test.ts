@@ -16,7 +16,8 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { EVENT_START_ISO, buildArtists, buildPoles } from './event-config.js';
-import { bindColumns, bindForm, importVolunteers, parseCsv, surveyForm } from './import.js';
+import { bindColumns, bindForm, foldIssuesIntoFiches, importVolunteers, parseCsv, surveyForm } from './import.js';
+import { normalise } from './text.js';
 import { FORM_COLUMNS, brevoContactsCsv } from './csv.js';
 import { emptyPlan } from './plan.js';
 import type { Plan } from './plan.js';
@@ -787,4 +788,37 @@ test('in plages libres the time constraint becomes exact windows, and no tranche
   const plages = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO, availabilityMode: 'plages' }).volunteers[0]!;
   deepStrictEqual(plages.refusedSlotIds, []);
   deepStrictEqual(plages.unavailable, [{ start: 1, end: 3 }]);
+});
+
+test('a doubtful closed answer is a doubt of its fiche, settled for everybody by one decided answer', () => {
+  const result = importOne({ 20: "Je m'en fous", 24: '🌳 BRIGADE VERTE', 32: 'Beaucoup' });
+  const v = result.volunteers[0]!;
+  const doubts = result.doubts ?? [];
+  const choice = doubts.find((d) => d.kind === 'pole' && d.answer === "Je m'en fous");
+  ok(choice, JSON.stringify(doubts));
+  strictEqual(choice.key, v.key);
+  strictEqual(choice.read, null);
+  ok(choice.messages.every((m) => v.reviewReasons.includes(m)), 'la ligne de la fiche est celle du doute');
+  ok(doubts.some((d) => d.kind === 'pole' && /BRIGADE VERTE/.test(d.answer)), 'un refus inconnu aussi');
+  // Every signalement of the row names the fiche it is about.
+  ok(result.issues.filter((i) => i.row !== null).every((i) => i.key === v.key), JSON.stringify(result.issues));
+
+  const decided = importVolunteers(rowCsv({ 20: "Je m'en fous" }), {
+    poles,
+    artists,
+    startISO: EVENT_START_ISO,
+    mapping: { columns: {}, answers: { pole: { [normalise("Je m'en fous")]: '' } } },
+  });
+  strictEqual(decided.volunteers[0]!.choices[0]!.anyPole, true);
+  ok(!(decided.doubts ?? []).some((d) => d.answer === "Je m'en fous"));
+});
+
+test('folding keeps every signalement about somebody on their fiche, once', () => {
+  const result = importOne({ 20: "Je m'en fous", 24: '🌳 BRIGADE VERTE' });
+  const folded = foldIssuesIntoFiches(result).volunteers[0]!;
+  ok(folded.needsReview);
+  ok(folded.reviewReasons.some((r) => /Pôle refusé introuvable/.test(r)), 'le refus inconnu reste sur la fiche');
+  // The unread choice is said by the reading's own doubt, not a second time by its signalement.
+  ok(!folded.reviewReasons.some((r) => /Pôle du choix 1 non reconnu/.test(r)), JSON.stringify(folded.reviewReasons));
+  deepStrictEqual(foldIssuesIntoFiches({ ...result, volunteers: [folded] }).volunteers[0]!.reviewReasons, folded.reviewReasons);
 });

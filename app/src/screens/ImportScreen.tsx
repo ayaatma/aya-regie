@@ -12,18 +12,20 @@
  * turning up to a shift that no longer exists.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   existingCodes,
   fmtHours,
   keptByDefault,
   importVolunteers,
+  foldIssuesIntoFiches,
   surveyForm,
   reconcileVolunteers,
   applyReconciliation,
   summariseReconciliation,
   EDITABLE_FIELDS,
+  type AnswerKind,
   type EditableField,
   type FormMapping,
   type ImportOptions,
@@ -40,9 +42,38 @@ import { rememberSheet, setFormMapping } from '../store/edits.ts';
 import { FormMappingCard } from './FormMappingCard.tsx';
 import { SetupFromFormCard } from './SetupFromFormCard.tsx';
 import { OrganiserImportCard } from './OrganiserImportCard.tsx';
+import { ImportReview } from './ImportReview.tsx';
 import { photosAvailable, syncFormPhotos, type PhotoSyncReport } from '../photos/photoStore.ts';
+import {
+  loadImportSession,
+  saveImportSession,
+  type FicheFix,
+  type ImportSession,
+  type ImportSource as Source,
+} from '../import/importSession.ts';
 
-type Source = { kind: 'sheet'; url: string } | { kind: 'file'; name: string };
+/** The nearest ancestor that scrolls, which is where « back to the list » has to go back in. */
+function scrollParent(el: HTMLElement): HTMLElement {
+  for (let at = el.parentElement; at; at = at.parentElement) {
+    const { overflowY } = getComputedStyle(at);
+    if ((overflowY === 'auto' || overflowY === 'scroll') && at.scrollHeight > at.clientHeight) return at;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
+
+/** A fiche's corrections replayed on a fresh reading of it, exactly as `correct` first made them. */
+function withFix(v: Volunteer, fix: FicheFix | undefined): Volunteer {
+  if (!fix) return v;
+  const fields = Object.keys(fix.changes).filter((field): field is EditableField =>
+    (EDITABLE_FIELDS as readonly string[]).includes(field),
+  );
+  return {
+    ...v,
+    ...fix.changes,
+    manualFields: [...new Set([...v.manualFields, ...fields])],
+    ...(fix.validated ? { needsReview: false } : {}),
+  };
+}
 
 export function ImportScreen() {
   const { plan, index, apply, id: eventId } = useLoadedPlan();
@@ -58,24 +89,40 @@ export function ImportScreen() {
   const [sheetUrl, setSheetUrl] = useState(plan.sheetUrl);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imported, setImported] = useState<{ result: ImportResult; source: Source; csv: string } | null>(null);
   /**
-   * The correspondence being worked on, started from the one this event remembers. Saved with
-   * the import it was made for (`onApply`), so abandoning an import abandons it too.
+   * The import under review: the file, the correspondence being worked on, the removals flipped
+   * and the fiches corrected. Kept outside the component since 2026-10-22, so a look at
+   * Personnes in the middle of a review no longer throws it away; see `importSession.ts`.
+   *
+   * The correspondence starts from the one this event remembers and is saved with the import it
+   * was made for (`onApply`), so abandoning an import abandons it too. A removal box flipped from
+   * its default: the default is removal, except for somebody entered by hand (`keptByDefault`),
+   * who never had a row in the export to lose.
    */
-  const [mapping, setMapping] = useState<FormMapping>(plan.formMapping);
-  /**
-   * The absent people whose box the régisseur flipped from its default. The default is removal,
-   * except for somebody entered by hand (`keptByDefault`), who never had a row in the export to lose.
-   */
-  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
+  const [session, setSessionState] = useState<ImportSession | null>(() => loadImportSession(eventId));
+  const setSession = (next: ImportSession | null): void => {
+    setSessionState(next);
+    saveImportSession(eventId, next);
+  };
+  const updateSession = (change: (current: ImportSession) => ImportSession): void => {
+    setSessionState((current) => {
+      if (!current) return current;
+      const next = change(current);
+      saveImportSession(eventId, next);
+      return next;
+    });
+  };
+  const mapping: FormMapping = session?.mapping ?? plan.formMapping;
+  const flipped = useMemo<ReadonlySet<string>>(() => new Set(session?.flipped ?? []), [session?.flipped]);
   /** Whose reading is being corrected, before any of it is applied. */
   const [correcting, setCorrecting] = useState<string | null>(null);
   /**
-   * Set when settings proposed by the form were applied: the file is read again on the next render,
-   * once the plan the reading needs has arrived through the context.
+   * Where « Régler directement sur la fiche » was clicked, to come back to once the fiche is
+   * saved: the scrolling box and how far down it was. `go` asks for the jump down to the fiche.
    */
-  const [rereadPending, setRereadPending] = useState(false);
+  const [jump, setJump] = useState<{ key: string; scroller: HTMLElement; top: number; go: boolean } | null>(null);
+  const [comeBack, setComeBack] = useState<{ scroller: HTMLElement; top: number } | null>(null);
+  const ficheRefs = useRef(new Map<string, HTMLDivElement>());
   /**
    * What the last action did, said on the screen, since 2026-09-16: « Appliquer ces réglages » used
    * to change the plan without a word and leave the card as it was, which reads as nothing having
@@ -123,60 +170,47 @@ export function ImportScreen() {
    * export does not quietly put the tool's own guess back.
    */
   const correct = (key: string, changes: Partial<Volunteer>): void => {
-    setImported((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        result: {
-          ...current.result,
-          volunteers: current.result.volunteers.map((v) => {
-            if (v.key !== key) return v;
-            const fields = Object.keys(changes).filter((field): field is EditableField =>
-              (EDITABLE_FIELDS as readonly string[]).includes(field),
-            );
-            return {
-              ...v,
-              ...changes,
-              manualFields: [...new Set([...v.manualFields, ...fields])],
-            };
-          }),
-        },
-      };
+    updateSession((current) => {
+      const fix = current.fixes[key] ?? { changes: {}, validated: false };
+      return { ...current, fixes: { ...current.fixes, [key]: { ...fix, changes: { ...fix.changes, ...changes } } } };
     });
   };
 
   /** "J'ai lu, c'est bon": the doubt is cleared, the reasons stay as the record of it. */
   const validate = (key: string): void => {
-    setImported((current) =>
-      current
-        ? {
-            ...current,
-            result: {
-              ...current.result,
-              volunteers: current.result.volunteers.map((v) =>
-                v.key === key ? { ...v, needsReview: false } : v,
-              ),
-            },
-          }
-        : current,
-    );
-    setCorrecting(null);
+    updateSession((current) => {
+      const fix = current.fixes[key] ?? { changes: {}, validated: false };
+      return { ...current, fixes: { ...current.fixes, [key]: { ...fix, validated: true } } };
+    });
+    closeFiche(key);
   };
 
-  const reconciliation = useMemo<Reconciliation | null>(
-    () => (imported ? reconcileVolunteers(plan, imported.result) : null),
-    [plan, imported],
-  );
-
-  /** Removals the régisseur has refused. Their answers and placements stay untouched. */
-  const kept = useMemo<ReadonlySet<string>>(() => {
-    const keep = reconciliation ? keptByDefault(reconciliation) : new Set<string>();
-    for (const key of flipped) {
-      if (keep.has(key)) keep.delete(key);
-      else keep.add(key);
+  /** The fiche's editor closes; when the list sent the régisseur here, the list is where they go back. */
+  const closeFiche = (key: string): void => {
+    setCorrecting(null);
+    if (jump?.key === key) {
+      setComeBack({ scroller: jump.scroller, top: jump.top });
+      setJump(null);
     }
-    return keep;
-  }, [reconciliation, flipped]);
+  };
+
+  const jumpTo = (key: string, from: HTMLElement): void => {
+    const scroller = scrollParent(from);
+    setCorrecting(key);
+    setJump({ key, scroller, top: scroller.scrollTop, go: true });
+  };
+
+  useEffect(() => {
+    if (!jump?.go) return;
+    ficheRefs.current.get(jump.key)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setJump({ ...jump, go: false });
+  }, [jump]);
+
+  useEffect(() => {
+    if (!comeBack) return;
+    comeBack.scroller.scrollTo({ top: comeBack.top, behavior: 'smooth' });
+    setComeBack(null);
+  }, [comeBack]);
 
   const importOptions = (withMapping: FormMapping): ImportOptions => ({
     poles: plan.poles,
@@ -201,23 +235,60 @@ export function ImportScreen() {
     sideActivities: plan.sideActivities,
   });
 
+  /*
+   * THE FILE IS READ FROM THE SESSION, against the plan as it is now, and the corrections are
+   * replayed on top. So a correspondence changed, settings applied from the form or a pole added
+   * meanwhile re-read the file without losing a single fiche already corrected. Every signalement
+   * about somebody is folded into their fiche, which is what the « À régler » list promises: what
+   * is left unsettled stays « à relire » in Personnes.
+   */
+  const reading = useMemo<{ result: ImportResult; error: null } | { result: null; error: string } | null>(() => {
+    if (!session) return null;
+    try {
+      const raw = foldIssuesIntoFiches(importVolunteers(session.csv, importOptions(session.mapping)));
+      return { result: { ...raw, volunteers: raw.volunteers.map((v) => withFix(v, session.fixes[v.key])) }, error: null };
+    } catch (cause: unknown) {
+      return { result: null, error: cause instanceof Error ? cause.message : String(cause) };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, plan]);
+  const imported = useMemo(
+    () => (session && reading?.result ? { result: reading.result, source: session.source, csv: session.csv } : null),
+    [session, reading],
+  );
+
+  const reconciliation = useMemo<Reconciliation | null>(
+    () => (imported ? reconcileVolunteers(plan, imported.result) : null),
+    [plan, imported],
+  );
+
+  /** Removals the régisseur has refused. Their answers and placements stay untouched. */
+  const kept = useMemo<ReadonlySet<string>>(() => {
+    const keep = reconciliation ? keptByDefault(reconciliation) : new Set<string>();
+    for (const key of flipped) {
+      if (keep.has(key)) keep.delete(key);
+      else keep.add(key);
+    }
+    return keep;
+  }, [reconciliation, flipped]);
+
   const survey = useMemo(
     () => (imported ? surveyForm(imported.csv, importOptions(mapping)) : null),
     [imported, mapping, plan],
   );
 
-  /** A changed correspondence re-reads the file, dropping corrections made on the old reading. */
+  /** A changed correspondence re-reads the file; the corrections already made are replayed on it. */
   const changeMapping = (next: FormMapping): void => {
-    setMapping(next);
-    if (imported) read(imported.csv, imported.source, next);
+    updateSession((current) => ({ ...current, mapping: next }));
   };
 
-  useEffect(() => {
-    if (!rereadPending || !imported) return;
-    setRereadPending(false);
-    read(imported.csv, imported.source, mapping);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan, rereadPending]);
+  /** One answer settled from « À régler »: an entry of the correspondence, for every fiche at once. */
+  const decideAnswer = (kind: AnswerKind, answerKey: string, value: unknown): void => {
+    changeMapping({
+      ...mapping,
+      answers: { ...mapping.answers, [kind]: { ...((mapping.answers[kind] as Record<string, unknown> | undefined) ?? {}), [answerKey]: value } },
+    });
+  };
 
   /** The form's proposed settings, applied as one edit; the answers they cover join the mapping. */
   const applyFormSetup = (next: Plan, summary: string): void => {
@@ -233,8 +304,8 @@ export function ImportScreen() {
     ].filter(Boolean);
     try {
       apply(next, summary);
-      setMapping({ ...mapping, answers: { ...mapping.answers, pole: next.formMapping.answers.pole } });
-      setRereadPending(true);
+      // The plan arriving through the context re-reads the file on its own; see `reading`.
+      changeMapping({ ...mapping, answers: { ...mapping.answers, pole: next.formMapping.answers.pole } });
       setSetupRound((n) => n + 1);
       setNotice({
         tone: 'ok',
@@ -248,11 +319,15 @@ export function ImportScreen() {
     }
   };
 
-  const read = (csv: string, source: Source, withMapping: FormMapping = mapping): void => {
+  /**
+   * A new file starts a new review. The correspondence being worked on carries over, as it always
+   * did; the corrections do not, since they were made against answers this file may have changed.
+   */
+  const read = (csv: string, source: Source): void => {
     try {
-      const result = importVolunteers(csv, importOptions(withMapping));
-      setImported({ result, source, csv });
-      setFlipped(new Set());
+      importVolunteers(csv, importOptions(mapping));
+      setSession({ csv, source, mapping, flipped: [], fixes: {} });
+      setCorrecting(null);
       setError(null);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -276,7 +351,7 @@ export function ImportScreen() {
       if (remembered !== plan) apply(remembered, 'lien du Google Sheet mémorisé');
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
-      setImported(null);
+      setSession(null);
     } finally {
       setBusy(false);
     }
@@ -290,8 +365,7 @@ export function ImportScreen() {
         setFormMapping(applyReconciliation(plan, imported.result, reconciliation, { keep: kept }), mapping),
         `import: ${summary}`,
       );
-      setImported(null);
-      setFlipped(new Set());
+      setSession(null);
       startPhotoSync(imported.result);
       const review = imported.result.volunteers.filter((v) => v.needsReview).length;
       setNotice({
@@ -329,7 +403,9 @@ export function ImportScreen() {
   const toRead = imported?.result.volunteers.filter((v) => v.needsReview) ?? [];
 
   const blocking = imported?.result.issues.filter((i) => i.severity === 'error') ?? [];
-  const warnings = imported?.result.issues.filter((i) => i.severity === 'warning') ?? [];
+  /** The signalements about nobody in particular; the others are on their fiche, see `ImportReview`. */
+  const fileIssues = imported?.result.issues.filter((i) => i.key === undefined) ?? [];
+  const shownError = error ?? reading?.error ?? null;
 
   return (
     <div className="screen is-wide">
@@ -445,7 +521,7 @@ export function ImportScreen() {
               </label>
             </div>
 
-            {error && <p className="alert is-bad import-error">{error}</p>}
+            {shownError && <p className="alert is-bad import-error">{shownError}</p>}
           </section>
 
           {imported && (
@@ -491,7 +567,7 @@ export function ImportScreen() {
                     <p className="alert is-bad">
                       {/* Every row is imported, errors included: `importVolunteers` drops nobody. */}
                       {blocking.length} erreur(s) à corriger. Toutes les lignes sont importées
-                      quand même: le détail plus bas dit ce que chaque erreur change.
+                      quand même: « À régler » dit ce que chaque erreur change.
                     </p>
                   )}
 
@@ -502,8 +578,8 @@ export function ImportScreen() {
                     <button
                       className="btn"
                       onClick={() => {
-                        setImported(null);
-                        setFlipped(new Set());
+                        setSession(null);
+                        setCorrecting(null);
                       }}
                     >
                       Abandonner
@@ -515,6 +591,16 @@ export function ImportScreen() {
                   </div>
                 </div>
               </section>
+
+              <ImportReview
+                plan={plan}
+                survey={survey}
+                volunteers={imported.result.volunteers}
+                doubts={imported.result.doubts ?? []}
+                fileIssues={fileIssues}
+                onDecide={decideAnswer}
+                onJump={jumpTo}
+              />
 
               {reconciliation.removed.length > 0 && (
                 <section className="setup-group">
@@ -544,7 +630,7 @@ export function ImportScreen() {
                             const next = new Set(flipped);
                             if (next.has(entry.volunteer.key)) next.delete(entry.volunteer.key);
                             else next.add(entry.volunteer.key);
-                            setFlipped(next);
+                            updateSession((current) => ({ ...current, flipped: [...next] }));
                           }}
                         />
                         <span className="import-removal-name">{entry.name}</span>
@@ -641,20 +727,27 @@ export function ImportScreen() {
                 <section className="setup-group">
                   <div className="setup-group-head">
                     <span className="setup-group-title">
-                      Réponses à interpréter ({toRead.length})
+                      Fiches à relire ({toRead.length})
                     </span>
                     <span className="people-meta">
                       Ce que l'outil a lu, et la phrase à côté
                     </span>
                   </div>
                   <p className="panel-sub">
-                    L'outil a dû interpréter ces réponses-là et n'en est pas sûr. Corrigez la
-                    lecture ici, avant d'appliquer: une correction faite maintenant part avec
-                    l'import, et le prochain export ne la défera pas.
+                    L'outil n'est pas sûr de ces fiches-là. Corrigez la lecture ici, avant
+                    d'appliquer: une correction faite maintenant part avec l'import, et le
+                    prochain export ne la défera pas. Une fiche validée ou corrigée quitte la liste.
                   </p>
 
                   {toRead.map((v) => (
-                    <div key={v.key} className="import-review">
+                    <div
+                      key={v.key}
+                      className="import-review"
+                      ref={(el) => {
+                        if (el) ficheRefs.current.set(v.key, el);
+                        else ficheRefs.current.delete(v.key);
+                      }}
+                    >
                       <div className="setup-organiser-who">
                         <strong>
                           {v.firstName} {v.lastName}
@@ -678,7 +771,7 @@ export function ImportScreen() {
                         <VolunteerEdit
                           index={index}
                           volunteer={v}
-                          onCancel={() => setCorrecting(null)}
+                          onCancel={() => closeFiche(v.key)}
                           onSave={(changes) => {
                             correct(v.key, changes);
                             validate(v.key);
@@ -696,31 +789,6 @@ export function ImportScreen() {
                       )}
                     </div>
                   ))}
-                </section>
-              )}
-
-              {(blocking.length > 0 || warnings.length > 0) && (
-                <section className="setup-group">
-                  <div className="setup-group-head">
-                    <span className="setup-group-title">
-                      Anomalies ({blocking.length} erreurs, {warnings.length} avertissements)
-                    </span>
-                  </div>
-                  <div className="import-issues">
-                    {[...blocking, ...warnings].map((issue, i) => (
-                      <div key={i} className={`issue ${issue.severity === 'error' ? '' : 'is-tier2'}`}>
-                        <span className="issue-code">
-                          {issue.code}
-                          {issue.row !== null && ` · ligne ${issue.row}`}
-                          {issue.person && ` · ${issue.person}`}
-                        </span>
-                        {issue.message}
-                        {issue.suggestions && issue.suggestions.length > 0 && (
-                          <span className="people-meta"> Suggestions: {issue.suggestions.join(', ')}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
                 </section>
               )}
             </>

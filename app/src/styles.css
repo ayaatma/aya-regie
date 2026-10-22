@@ -4140,6 +4140,30 @@ button {
   display: block;
 }
 
+/* « À régler »: one line per doubt, with who carries it and how to settle it. */
+.import-todo-item {
+  display: grid;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.import-todo-item .issue {
+  display: block;
+}
+
+.import-todo-decide,
+.import-todo-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.import-todo-decide .select {
+  max-width: 100%;
+}
+
 
 /* ---------------------------------------------------------------------------
    Le catering: les réglages des repas, et l'écran qui compte les couverts.

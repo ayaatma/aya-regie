@@ -140,6 +140,7 @@ export {
 
 export {
   importVolunteers,
+  foldIssuesIntoFiches,
   parseCsv,
   bindColumns,
   bindForm,
@@ -185,6 +186,7 @@ export type {
   FormSurvey,
   SurveyAnswer,
   ImportIssue,
+  AnswerDoubt,
   ImportOptions,
   ImportResult,
   IssueSeverity,
@@ -414,3 +416,6 @@ export type {
   Tone,
 } from '@engine/followup.ts';
 export type { Registrant, RegistrantKind, RenderedMail } from '@engine/registration.ts';
+
+/** The one normal form every answer is compared in: accents, case, punctuation and emoji gone. */
+export { normalise } from '@engine/text.ts';

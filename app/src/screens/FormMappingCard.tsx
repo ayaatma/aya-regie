@@ -11,8 +11,8 @@
  * was written for it, and this card is what another event's form needs instead of a developer.
  *
  * A CHANGE RE-READS THE FILE, so the import below always shows the file read the way this card
- * says. Corrections made to individual fiches before the change are dropped with the old reading,
- * which the card says in so many words.
+ * says. Corrections made to individual fiches are replayed on the new reading since 2026-10-22
+ * (`importSession.ts`), so settling an answer here no longer costs the fiches already corrected.
  */
 
 import { useMemo } from 'react';
@@ -98,8 +98,8 @@ export function FormMappingCard({
         Chaque champ de l'outil lit une colonne du fichier, et chaque réponse d'une question
         fermée est reliée à une valeur. « Automatique » garde la détection de l'outil. Ce qui est
         choisi ici est retenu avec l'import, pour les prochains exports du même formulaire.
-        Changer une correspondance relit le fichier: les corrections faites sur les fiches
-        ci-dessous sont alors perdues.
+        Changer une correspondance relit le fichier, et les corrections déjà faites sur les
+        fiches ci-dessous sont gardées.
       </p>
 
       <div className="mapping-group">
@@ -205,76 +205,71 @@ export function FormMappingCard({
         )}
       </div>
 
-      <AnswerTable
-        title="Réponses: volume horaire"
-        kind="volume"
-        entries={survey.answers.volume}
-        mapping={mapping}
-        options={[
-          ...[...new Set([...plan.volume.options, ...survey.answers.volume.flatMap((a) => (typeof a.auto?.value === 'number' ? [a.auto.value] : []))])]
-            .sort((a, b) => a - b)
-            .map((h) => ({ value: h as number | 'a-confirmer', label: volumeText(h, plan.volume.scope === 'day') })),
-          { value: 'a-confirmer', label: 'À confirmer (aucun volume dans la réponse)' },
-        ]}
-        onSet={setAnswer}
-      />
-      <AnswerTable
-        title="Réponses: niveau"
-        kind="level"
-        entries={survey.answers.level}
-        mapping={mapping}
-        options={(['debutant', 'intermediaire', 'expert'] as SkillLevel[]).map((l) => ({ value: l, label: levelLabel(l) }))}
-        onSet={setAnswer}
-      />
-      <AnswerTable
-        title="Réponses: tranche préférée"
-        kind="preferredSlot"
-        entries={survey.answers.preferredSlot}
-        mapping={mapping}
-        options={[
-          { value: null as string | null, label: 'Sans préférence' },
-          ...plan.preferenceSlots.map((s) => ({ value: s.id as string | null, label: `Plutôt « ${s.label} »` })),
-        ]}
-        onSet={setAnswer}
-      />
-      <AnswerTable
-        title="Réponses: tranches refusées"
-        kind="refusedSlots"
-        entries={survey.answers.refusedSlots}
-        mapping={mapping}
-        options={[
-          { value: [] as string[], label: 'Aucune tranche refusée' },
-          ...plan.slots.map((s) => ({ value: [s.id], label: `Refuse « ${s.label} »` })),
-        ]}
-        onSet={setAnswer}
-      />
-      <AnswerTable
-        title="Réponses: tranche refusée ou à éviter"
-        kind="slotComfort"
-        entries={survey.answers.slotComfort}
-        mapping={mapping}
-        options={[
-          { value: { refused: [], avoided: [] } as { refused: string[]; avoided: string[] }, label: 'Aucune contrainte' },
-          ...plan.slots.flatMap((s) => [
-            { value: { refused: [s.id], avoided: [] as string[] }, label: `Refuse « ${s.label} »` },
-            { value: { refused: [] as string[], avoided: [s.id] }, label: `Préfère éviter « ${s.label} »` },
-          ]),
-        ]}
-        onSet={setAnswer}
-      />
-      <AnswerTable
-        title="Réponses: pôles"
-        kind="pole"
-        entries={survey.answers.pole}
-        mapping={mapping}
-        options={[
-          { value: '', label: 'Aucun pôle' },
-          ...plan.poles.map((p) => ({ value: p.key, label: p.path })),
-        ]}
-        onSet={setAnswer}
-      />
+      {ANSWER_TABLES.map(([kind, title]) => (
+        <AnswerTable
+          key={kind}
+          title={title}
+          kind={kind}
+          entries={survey.answers[kind] as SurveyAnswer<unknown>[]}
+          mapping={mapping}
+          options={answerOptions(plan, kind, survey)}
+          onSet={setAnswer}
+        />
+      ))}
     </SetupSection>
   );
+}
+
+/** The answer tables, in the order the card lists them. */
+const ANSWER_TABLES: ReadonlyArray<[AnswerKind, string]> = [
+  ['volume', 'Réponses: volume horaire'],
+  ['level', 'Réponses: niveau'],
+  ['preferredSlot', 'Réponses: tranche préférée'],
+  ['refusedSlots', 'Réponses: tranches refusées'],
+  ['slotComfort', 'Réponses: tranche refusée ou à éviter'],
+  ['pole', 'Réponses: pôles'],
+];
+
+/**
+ * What an answer of each closed question may be decided to mean. Shared with the review list of
+ * the import screen, which settles one answer for every fiche carrying it with the same values.
+ */
+export function answerOptions(plan: Plan, kind: AnswerKind, survey: FormSurvey): Array<{ value: unknown; label: string }> {
+  switch (kind) {
+    case 'volume':
+      return [
+        ...[...new Set([...plan.volume.options, ...survey.answers.volume.flatMap((a) => (typeof a.auto?.value === 'number' ? [a.auto.value] : []))])]
+          .sort((a, b) => a - b)
+          .map((h) => ({ value: h, label: volumeText(h, plan.volume.scope === 'day') })),
+        { value: 'a-confirmer', label: 'À confirmer (aucun volume dans la réponse)' },
+      ];
+    case 'level':
+      return (['debutant', 'intermediaire', 'expert'] as SkillLevel[]).map((l) => ({ value: l, label: levelLabel(l) }));
+    case 'preferredSlot':
+      return [
+        { value: null, label: 'Sans préférence' },
+        ...plan.preferenceSlots.map((s) => ({ value: s.id, label: `Plutôt « ${s.label} »` })),
+      ];
+    case 'refusedSlots':
+      return [
+        { value: [], label: 'Aucune tranche refusée' },
+        ...plan.slots.map((s) => ({ value: [s.id], label: `Refuse « ${s.label} »` })),
+      ];
+    case 'slotComfort':
+      return [
+        { value: { refused: [], avoided: [] }, label: 'Aucune contrainte' },
+        ...plan.slots.flatMap((s) => [
+          { value: { refused: [s.id], avoided: [] }, label: `Refuse « ${s.label} »` },
+          { value: { refused: [], avoided: [s.id] }, label: `Préfère éviter « ${s.label} »` },
+        ]),
+      ];
+    case 'pole':
+      return [
+        // An answer naming no pole: every pole as a choice, nothing as a refusal.
+        { value: '', label: 'Aucun pôle précis (tous acceptés)' },
+        ...plan.poles.map((p) => ({ value: p.key, label: p.path })),
+      ];
+  }
 }
 
 function AnswerTable<V>({

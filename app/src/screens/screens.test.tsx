@@ -2786,3 +2786,73 @@ test('the correction form offers « Tous les pôles acceptés », and stretches 
   assert.ok(shows(plages, 'Tranches refusées'));
   assert.ok(plages.includes(`name="edit-${volunteer.key}-range-0-from"`), 'la plage existante est éditable');
 });
+
+// ---------------------------------------------------------------------------
+// « À régler » on the import screen, 2026-10-22
+// ---------------------------------------------------------------------------
+
+const doubtCsv = [
+  'Horodateur,Adresse e-mail,Nom,Prénom,Ton premier choix.,Ton deuxième choix.',
+  "01/06/2026 10:00:00,a@exemple.org,Alpha,Ana,Je m'en fous,Bar",
+  "02/06/2026 10:00:00,b@exemple.org,Beta,Ben,Je m'en fous,Bar",
+].join('\n');
+
+test('a doubtful answer shared by two fiches is one line to settle for both, each fiche reachable', async () => {
+  const { ImportReview } = await import('./ImportReview.tsx');
+  const { importVolunteers, foldIssuesIntoFiches, surveyForm } = await import('../engine.ts');
+  const options = { poles: plan.poles, artists: plan.artists, slots: plan.slots, startISO: plan.startISO, lengthHours: plan.lengthHours };
+  const result = foldIssuesIntoFiches(importVolunteers(doubtCsv, options));
+  const html = render(
+    <ImportReview
+      plan={plan}
+      survey={surveyForm(doubtCsv, options)}
+      volunteers={result.volunteers}
+      doubts={result.doubts ?? []}
+      fileIssues={[]}
+      onDecide={noop}
+      onJump={noop}
+    />,
+  );
+  assert.ok(shows(html, "Pôle: « Je m'en fous » non reconnu."), html);
+  assert.ok(shows(html, 'Retenir pour les 2 fiches'));
+  assert.ok(shows(html, 'Régler directement sur la fiche de:'));
+  assert.ok(shows(html, "Rien ici n'empêche d'appliquer l'import."));
+});
+
+test('an import under review survives leaving the screen, its corrections replayed on the file', async () => {
+  const { saveImportSession } = await import('../import/importSession.ts');
+  const { importVolunteers } = await import('../engine.ts');
+  const keys = importVolunteers(doubtCsv, { poles: plan.poles, artists: plan.artists, startISO: plan.startISO }).volunteers.map((v) => v.key);
+  saveImportSession('balanced', {
+    csv: doubtCsv,
+    source: { kind: 'file', name: 'essai.csv' },
+    mapping: plan.formMapping,
+    flipped: [],
+    fixes: { [keys[0]!]: { changes: {}, validated: true } },
+  });
+  try {
+    const html = render(<ImportScreen />);
+    assert.ok(shows(html, 'essai.csv'), "l'import en cours est revenu");
+    // One of the two fiches was validated before leaving: the line now counts one.
+    assert.ok(shows(html, 'Retenir pour cette fiche'), html);
+    assert.ok(shows(html, 'Fiches à relire (1)'));
+  } finally {
+    saveImportSession('balanced', null);
+  }
+});
+
+test('a pole choice corrected by hand shows the answer given to the form beside it', () => {
+  const someone = plan.volunteers[0]!;
+  const corrected: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) =>
+      v.key === someone.key
+        ? { ...v, choices: [{ poleKey: '', raw: "Je m'en fous", level: 'debutant', anyPole: true }], manualFields: ['choices'] }
+        : v,
+    ),
+  };
+  const html = infoOf(corrected, { kind: 'benevole', volunteerKey: someone.key });
+  assert.ok(shows(html, "réponse au formulaire: « Je m'en fous »"), 'la réponse d’origine est à côté du choix corrigé');
+  const untouched = infoOf(plan, { kind: 'benevole', volunteerKey: someone.key });
+  assert.ok(!shows(untouched, 'réponse au formulaire'), 'un choix lu tel quel ne répète rien');
+});
