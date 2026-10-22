@@ -181,7 +181,8 @@ const MATCHERS: Array<{ field: FormField; test: (h: string) => boolean; required
   { field: 'refusedSlotChoice', test: (h) => /ne veux peux absolument pas travailler/.test(h), required: false },
   { field: 'availabilityNote', test: (h) => /imperatif horaire/.test(h), required: false },
   { field: 'halfPreference', test: (h) => /ce que tu preferes|prefereriez vous/.test(h), required: true },
-  { field: 'volume',      test: (h) => /demandons a chaque benevole|heures de benevolat souhaitez/.test(h), required: true },
+  // « Chaque bénévole s'engage pour un minimum de 4 h de bénévolat », the 2026-10 form's wording.
+  { field: 'volume',      test: (h) => /demandons a chaque benevole|heures de benevolat souhaitez|s engage pour un minimum de/.test(h), required: true },
   /*
    * THE REAL FORM ASKS THIS ONCE, FOR BOTH PHASES, at column 43: "Serais-tu prêt à faire du
    * montage / démontage les jours avant / après l'événement ?". So the question naming both is
@@ -1423,14 +1424,23 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     for (const [i, { pole: choice }] of choiceEntries.entries()) {
       const label = `Choix ${i + 1}`;
       const clash = refusedPoles.find((root) => isUnder(choice, root));
+      /*
+       * Imported anyway, since 2026-10-22: the rest of the row is good, and dropping the person
+       * over one contradiction would lose them. The refusal wins, because placing somebody on a
+       * pole they said they refuse is the worse mistake of the two; the fiche says so.
+       */
       if (clash) {
+        const consequence =
+          `Importé·e quand même: le refus l'emporte, aucune place sur "${clash.path}" ne lui sera proposée. ` +
+          'À rappeler, puis corriger le choix ou le refus sur la fiche.';
         issues.push({
-          severity: 'error',
+          severity: 'warning',
           code: 'choix-contradictoire',
           row: rowNumber,
           person,
-          message: `${label} "${choice!.path}" appartient au pôle refusé "${clash.path}".`,
+          message: `${label} "${choice!.path}" appartient au pôle refusé "${clash.path}". ${consequence}`,
         });
+        reviewReasons.push(`${label} "${choice!.path}" et refus de "${clash.path}" se contredisent. ${consequence}`);
       }
     }
 

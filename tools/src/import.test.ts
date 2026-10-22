@@ -726,3 +726,27 @@ test('the 2026-10 form ticks montage / démontage days in one column, and the co
   strictEqual(no.volunteers[0]!.montage.present, false);
   strictEqual(no.volunteers[0]!.demontage.present, false);
 });
+
+test('the 2026-10 volume question, worded « s’engage pour un minimum de 4 h », is bound and read', () => {
+  const header =
+    'Chaque bénévole s’engage pour un minimum de 4 h de bénévolat. 😊\n\nMais si tu as envie de prolonger l’aventure, tu peux choisir d’offrir 2 h ou 4 h de plus à l’équipe ! ❤️';
+  const [headers, values] = parseCsv(rowCsv({ 19: 'Je veux bien donner un coup de main 2 h de plus, ça ne me fait pas peur ! 💪💪' }));
+  headers![19] = header;
+  const quote = (v: string) => (/["\n,]/.test(v) ? `"${v.split('"').join('""')}"` : v);
+  const csv = [headers!.map(quote).join(','), values!.map(quote).join(',')].join('\n');
+  const result = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO });
+  ok(!result.issues.some((i) => i.code === 'colonne-non-reliee' && /volume/.test(i.message)));
+  strictEqual(result.volunteers[0]!.requestedHours, 6);
+});
+
+test('a first choice on a refused pole is imported anyway, the refusal winning, on a fiche to read', () => {
+  const result = importOne({ 24: 'Bar / Service' });
+  const issue = result.issues.find((i) => i.code === 'choix-contradictoire');
+  ok(issue, 'la contradiction est signalée');
+  strictEqual(issue.severity, 'warning');
+  ok(/le refus l'emporte/.test(issue.message));
+  strictEqual(result.volunteers.length, 1, 'la personne est importée');
+  const v = result.volunteers[0]!;
+  ok(v.needsReview);
+  ok(v.refusedPoleKeys.length > 0, 'le refus est gardé');
+});

@@ -488,8 +488,9 @@ export function ImportScreen() {
 
                   {blocking.length > 0 && (
                     <p className="alert is-bad">
-                      {blocking.length} ligne(s) illisible(s). Elles ne seront pas importées, mais
-                      le reste le sera. Voir le détail plus bas.
+                      {/* Every row is imported, errors included: `importVolunteers` drops nobody. */}
+                      {blocking.length} erreur(s) à corriger. Toutes les lignes sont importées
+                      quand même: le détail plus bas dit ce que chaque erreur change.
                     </p>
                   )}
 
