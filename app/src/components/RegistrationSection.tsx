@@ -32,6 +32,7 @@ import {
 } from '../engine.ts';
 import { sendMail, sentAtLabel, useMailLog, type MailEntry } from '../mail/mailStore.ts';
 import { TONE_CHIP } from './FollowUpSteps.tsx';
+import { SendDialog } from './SendDialog.tsx';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
 
 const siteUrl = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
@@ -152,25 +153,21 @@ export function RegistrationSection({
         </div>
       )}
 
+      {/*
+        IN A WINDOW SINCE 2026-10-22, the régisseur's rule for every action that sends a mail: the
+        same window as a grouped sending, for one person, with the exact mail beside the name.
+      */}
       {confirming !== null && (
-        <div className="registration-confirm" role="group" aria-label="Aperçu du mail">
-          <p className="registration-confirm-title">
-            {confirming === 'validation' ? `Valider ${who}` : `Renvoyer le mail à ${who}`}
-          </p>
-          {addressOk ? (
+        <SendDialog
+          title={confirming === 'validation' ? `Valider ${who}` : `Renvoyer le mail à ${who}`}
+          intro={
             <>
-              <p className="registration-mail-head">
-                À <strong>{mail.to}</strong>
-                <br />
-                Objet: <strong>{mail.subject}</strong>
-              </p>
-              <pre className="registration-mail-body">{mail.body}</pre>
-              {mail.empty.length > 0 && (
+              {mail.empty.length > 0 && addressOk && (
                 <p className="people-meta is-bad">
                   Vide dans ce message: {mail.empty.join(', ')}. Le texte se change dans Réglages, Mails de validation.
                 </p>
               )}
-              {confirming === 'validation' && (
+              {confirming === 'validation' && addressOk && (
                 <label className="fiche-step">
                   <input
                     type="checkbox"
@@ -182,34 +179,27 @@ export function RegistrationSection({
                 </label>
               )}
             </>
-          ) : (
-            <p className="people-meta is-bad">
-              {mail.to === ''
-                ? "Pas d'adresse e-mail sur la fiche: la validation se fait sans mail."
-                : `« ${mail.to} » n'est pas une adresse valide: la validation se fait sans mail.`}
-            </p>
-          )}
-          <div className="registration-actions">
-            <button
-              type="button"
-              className="btn is-primary"
-              disabled={sending || (confirming === 'renvoi' && !addressOk)}
-              onClick={() => void confirm()}
-            >
-              {sending
-                ? 'Envoi…'
-                : confirming === 'renvoi'
-                  ? 'Envoyer'
-                  : withMail && addressOk
-                    ? 'Valider et envoyer'
-                    : 'Valider sans mail'}
-            </button>
-            <button type="button" className="btn is-small" disabled={sending} onClick={() => setConfirming(null)}>
-              Annuler
-            </button>
-          </div>
-        </div>
+          }
+          people={[
+            {
+              id: `${kind}|${personKey}`,
+              name: who,
+              mail: confirming === 'validation' && !withMail ? null : mail,
+              kind,
+              key: personKey,
+            },
+          ]}
+          withoutMailNote={confirming === 'validation' ? 'validé·e sans mail' : undefined}
+          confirmLabel={(mailed) =>
+            confirming === 'renvoi' ? 'Envoyer' : mailed > 0 ? 'Valider et envoyer' : 'Valider sans mail'
+          }
+          onConfirm={() => void confirm()}
+          onClose={() => {
+            if (!sending) setConfirming(null);
+          }}
+        />
       )}
+      {sending && <p className="people-meta">Envoi…</p>}
 
       {log.error && <p className="people-meta is-bad">{log.error}</p>}
       {last ? (

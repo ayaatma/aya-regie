@@ -28,6 +28,7 @@ import {
 import { recordReply, sendMail, sentAtLabel, useMailLog } from '../mail/mailStore.ts';
 import { setApplicationStep } from '../store/applicationEdits.ts';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
+import { SendDialog } from './SendDialog.tsx';
 
 const siteUrl = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
 
@@ -162,27 +163,32 @@ function StepRow({ step, volunteer, progress }: { step: ApplicationStep; volunte
         </div>
       )}
       {error && <p className="people-meta is-bad">{error}</p>}
+      {/* In a window since 2026-10-22, like every other send. See `SendDialog`. */}
       {previewing && mail && (
-        <div className="registration-confirm" role="group" aria-label={`Aperçu: ${step.label}`}>
-          <p className="registration-mail-head">
-            À <strong>{mail.to}</strong>
-            <br />
-            Objet: <strong>{mail.subject}</strong>
-          </p>
-          <pre className="registration-mail-body">{mail.body}</pre>
-          {mail.empty.length > 0 && (
-            <p className="people-meta is-bad">Vide dans ce message: {mail.empty.join(', ')}.</p>
-          )}
-          <div className="registration-actions">
-            <button type="button" className="btn is-primary" disabled={busy} onClick={() => void send()}>
-              {busy ? 'Envoi…' : 'Envoyer'}
-            </button>
-            <button type="button" className="btn is-small" disabled={busy} onClick={() => setPreviewing(false)}>
-              Annuler
-            </button>
-          </div>
-        </div>
+        <SendDialog
+          title={`${step.label}: ${progress.lastSent ? 'renvoyer' : 'envoyer'} à ${name}`}
+          intro={
+            mail.empty.length > 0 ? (
+              <p className="people-meta is-bad">Vide dans ce message: {mail.empty.join(', ')}.</p>
+            ) : null
+          }
+          people={[
+            {
+              id: volunteer.key,
+              name,
+              mail,
+              kind: 'benevole',
+              key: volunteer.key,
+              stepKey: step.key,
+              planning: planningText(plan, 'benevole', volunteer.key),
+            },
+          ]}
+          confirmLabel={() => 'Envoyer'}
+          onConfirm={() => void send()}
+          onClose={() => setPreviewing(false)}
+        />
       )}
+      {busy && <p className="people-meta">Envoi…</p>}
     </div>
   );
 }

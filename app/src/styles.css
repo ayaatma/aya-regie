@@ -5823,6 +5823,15 @@ textarea.select,
   background: rgba(10, 16, 24, 0.45);
 }
 
+/* Une petite fenêtre de confirmation, au-dessus d'une grande quand elle en vient. */
+.dialog-backdrop.is-front {
+  z-index: 60;
+}
+
+.dialog.is-small {
+  width: min(480px, 100%);
+}
+
 .dialog {
   display: flex;
   flex-direction: column;

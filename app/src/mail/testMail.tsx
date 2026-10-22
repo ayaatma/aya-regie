@@ -18,6 +18,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { isMailAddress, type RegistrantKind, type RenderedMail } from '../engine.ts';
 import { getSupabase, supabaseConfigured } from '../persistence/supabaseClient.ts';
 import { sendMail, type MailEntry } from './mailStore.ts';
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 
 const LOCAL_KEY = 'ayaregie:test-mail';
 
@@ -124,6 +125,8 @@ export function TestMailButton({
   const to = useTestAddress();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MailEntry | null>(null);
+  // The régisseur's rule since 2026-10-22: nothing leaves without an OK in a window, a test included.
+  const [asking, setAsking] = useState(false);
   // Another person or another text: the last outcome was about something else.
   useEffect(() => setResult(null), [personKey, mail.subject, mail.body]);
 
@@ -136,15 +139,28 @@ export function TestMailButton({
         type="button"
         className="btn"
         disabled={busy || eventId === null}
-        onClick={async () => {
-          if (eventId === null) return;
-          setBusy(true);
-          setResult(await sendMail(eventId, kind, personKey, asTest(mail, to, who), 'test', { stepKey, planning }));
-          setBusy(false);
-        }}
+        onClick={() => setAsking(true)}
       >
         {busy ? 'Envoi du test…' : `Envoyer un test à ${to}`}
       </button>
+      {asking && (
+        <ConfirmDialog
+          title="Envoyer un mail de test"
+          confirmLabel="Envoyer le test"
+          onClose={() => setAsking(false)}
+          onConfirm={async () => {
+            if (eventId === null) return;
+            setBusy(true);
+            setResult(await sendMail(eventId, kind, personKey, asTest(mail, to, who), 'test', { stepKey, planning }));
+            setBusy(false);
+          }}
+        >
+          <p>
+            Le mail de <strong>{who}</strong> part à <strong>{to}</strong>, et à personne d'autre.
+          </p>
+          <p className="people-meta">Objet: [TEST] {mail.subject}</p>
+        </ConfirmDialog>
+      )}
       {result && (
         <span className={`people-meta ${result.outcome === 'envoye' ? 'is-ok' : 'is-bad'}`}>
           {result.outcome === 'envoye' ? '✓ Test envoyé, à vérifier dans la boîte.' : `⚠️ ${result.error}`}
