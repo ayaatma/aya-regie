@@ -20,11 +20,11 @@
 
 import {
   PERSON_STATUS_LABEL,
+  statusLabel,
   statusOf,
   applicationStatusOf,
   type ApplicationStatus,
   type BraceletType,
-  type PersonStatus,
   type TicketPersonKind,
   type TicketType,
   type TicketingChoice,
@@ -37,7 +37,8 @@ import { toClock } from './model.js';
 
 /** One status of a person, with the act it comes from when it does. */
 export interface StatusTag {
-  status: PersonStatus;
+  /** One of `BUILT_IN_STATUSES`, or a guest type's key. */
+  status: string;
   /** "Artiste: Nashkø", "Invité de Nashkø", "Bénévole". */
   label: string;
 }
@@ -73,8 +74,9 @@ export interface TicketingRow {
   /** The ticket this person gets, by key, or null when the event has none. */
   ticketTypeKey: string | null;
   ticketByHand: boolean;
-  braceletKey: string | null;
-  braceletByHand: boolean;
+  /** Every bracelet this person is handed, the entry's own aside: cumulative since 2026-10-22. */
+  braceletKeys: string[];
+  braceletsByHand: boolean;
   /** What does not add up, in French, one line each. Reported, never refused. */
   issues: string[];
 }
@@ -82,7 +84,7 @@ export interface TicketingRow {
 export interface TicketingReport {
   rows: TicketingRow[];
   /** How many rows carry each status, for the filter's counts. */
-  byStatus: Partial<Record<PersonStatus, number>>;
+  byStatus: Partial<Record<string, number>>;
   ticketTypes: readonly TicketType[];
   bracelets: readonly BraceletType[];
 }
@@ -106,32 +108,9 @@ export function defaultTicketType(types: readonly TicketType[]): TicketType | nu
   return best;
 }
 
-/**
- * The statuses in the order that decides a bracelet: the artist first, per the régisseur's
- * "on lui attribue par défaut les effets Artiste". A responsable outranks an orga, an orga a
- * bénévole; the guests and the extras come last because they never hold another status.
- */
-export const STATUS_PRIORITY: readonly PersonStatus[] = [
-  'artiste',
-  'responsable',
-  'orga',
-  'benevole',
-  'invite-artiste',
-  'prestataire',
-  'autre',
-];
-
-/** The bracelet a set of statuses gets by default: the first status, in priority, that any bracelet names. */
-export function defaultBracelet(
-  bracelets: readonly BraceletType[],
-  statuses: readonly PersonStatus[],
-): BraceletType | null {
-  for (const status of STATUS_PRIORITY) {
-    if (!statuses.includes(status)) continue;
-    const bracelet = bracelets.find((b) => b.defaultFor.includes(status));
-    if (bracelet) return bracelet;
-  }
-  return null;
+/** Every bracelet one of these statuses is named on, in the order of the list. */
+export function defaultBracelets(bracelets: readonly BraceletType[], statuses: readonly string[]): BraceletType[] {
+  return bracelets.filter((b) => b.defaultFor.some((s) => statuses.includes(s)));
 }
 
 // ---------------------------------------------------------------------------
@@ -203,9 +182,10 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     const ticket =
       (choice?.ticketTypeKey && settings.ticketTypes.find((t) => t.key === choice.ticketTypeKey)) ||
       fallbackTicket;
-    const bracelet =
-      (choice?.braceletKey && settings.bracelets.find((b) => b.key === choice.braceletKey)) ||
-      defaultBracelet(settings.bracelets, statuses.map((s) => s.status));
+    const known = new Set(settings.bracelets.map((b) => b.key));
+    const braceletKeys = choice?.braceletKeys
+      ? choice.braceletKeys.filter((key) => known.has(key))
+      : defaultBracelets(settings.bracelets, statuses.map((s) => s.status)).map((b) => b.key);
     rows.push({
       kind,
       key,
@@ -226,8 +206,8 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       note: choice?.note ?? '',
       ticketTypeKey: ticket?.key ?? null,
       ticketByHand: Boolean(choice?.ticketTypeKey && ticket && ticket.key === choice.ticketTypeKey),
-      braceletKey: bracelet?.key ?? null,
-      braceletByHand: Boolean(choice?.braceletKey && bracelet && bracelet.key === choice.braceletKey),
+      braceletKeys,
+      braceletsByHand: choice?.braceletKeys != null,
       issues: [
         ...extraIssues,
         ...ticketIssues(ticket, catering.services, given.serviceKeys, plan.startISO),
@@ -309,7 +289,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       'extra',
       extra.key,
       { firstName: extra.firstName, lastName: extra.lastName, phone: extra.phone, email: extra.email ?? '', diet: '', allergies: '' },
-      [{ status: extra.status, label: PERSON_STATUS_LABEL[extra.status] }],
+      [{ status: extra.status, label: statusLabel(extra.status, settings.guestTypes) }],
       { drinks: Math.max(0, extra.drinkTickets), meals: Math.max(0, extra.mealTickets), serviceKeys: [] },
       [],
       applicationStatusOf(extra),
@@ -322,7 +302,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       a.firstName.localeCompare(b.firstName, 'fr', { sensitivity: 'base' }),
   );
 
-  const byStatus: Partial<Record<PersonStatus, number>> = {};
+  const byStatus: Partial<Record<string, number>> = {};
   for (const row of rows) {
     for (const tag of new Set(row.statuses.map((s) => s.status))) {
       byStatus[tag] = (byStatus[tag] ?? 0) + 1;
@@ -346,8 +326,8 @@ export function setTicketingChoice(
   plan: Plan,
   kind: TicketPersonKind,
   personKey: string,
-  over: Partial<Pick<TicketingChoice, 'ticketTypeKey' | 'braceletKey' | 'drinkTickets' | 'note'>>,
-  defaults: { ticketTypeKey: string | null; braceletKey: string | null; drinkTickets?: number },
+  over: Partial<Pick<TicketingChoice, 'ticketTypeKey' | 'braceletKeys' | 'drinkTickets' | 'note'>>,
+  defaults: { ticketTypeKey: string | null; braceletKeys: readonly string[]; drinkTickets?: number },
 ): TicketingChoice[] {
   const rest = plan.ticketing.choices.filter(
     (c) => !(c.personKind === kind && c.personKey === personKey),
@@ -357,15 +337,19 @@ export function setTicketingChoice(
   );
   const ticketTypeKey =
     over.ticketTypeKey !== undefined ? over.ticketTypeKey : (current?.ticketTypeKey ?? null);
-  const braceletKey =
-    over.braceletKey !== undefined ? over.braceletKey : (current?.braceletKey ?? null);
+  const braceletKeys =
+    over.braceletKeys !== undefined ? over.braceletKeys : (current?.braceletKeys ?? null);
+  const sameAsDefault =
+    braceletKeys !== null &&
+    braceletKeys.length === defaults.braceletKeys.length &&
+    braceletKeys.every((key) => defaults.braceletKeys.includes(key));
   const drinkTickets =
     over.drinkTickets !== undefined ? over.drinkTickets : (current?.drinkTickets ?? null);
   const next: TicketingChoice = {
     personKind: kind,
     personKey,
     ticketTypeKey: ticketTypeKey === defaults.ticketTypeKey ? null : ticketTypeKey,
-    braceletKey: braceletKey === defaults.braceletKey ? null : braceletKey,
+    braceletKeys: braceletKeys === null || sameAsDefault ? null : [...braceletKeys],
     // The computed figure typed back is the default again, not a decision.
     drinkTickets:
       drinkTickets !== null && defaults.drinkTickets !== undefined && drinkTickets === defaults.drinkTickets
@@ -374,7 +358,7 @@ export function setTicketingChoice(
     note: (over.note !== undefined ? over.note : (current?.note ?? '')).trim(),
   };
   const empty =
-    next.ticketTypeKey === null && next.braceletKey === null && next.drinkTickets === null && next.note === '';
+    next.ticketTypeKey === null && next.braceletKeys === null && next.drinkTickets === null && next.note === '';
   return empty ? rest : [...rest, next];
 }
 
@@ -396,6 +380,7 @@ export function ticketingCsv(
 ): string {
   const report = ticketingReport(plan, index);
   const ticketLabel = new Map(report.ticketTypes.map((t) => [t.key, t.label]));
+  const ticketBracelet = new Map(report.ticketTypes.map((t) => [t.key, t.bracelet]));
   const braceletLabel = new Map(report.bracelets.map((b) => [b.key, b.label]));
   const headers = [
     'Nom',
@@ -404,7 +389,7 @@ export function ticketingCsv(
     'Tickets boisson',
     'Tickets repas',
     "Billet d'entrée",
-    'Bracelet',
+    'Bracelets',
     ...(withPhones ? ['Téléphone'] : []),
     'Remarques',
   ];
@@ -423,7 +408,13 @@ export function ticketingCsv(
     String(row.drinks),
     String(row.meals),
     row.ticketTypeKey === null ? '' : (ticketLabel.get(row.ticketTypeKey) ?? row.ticketTypeKey),
-    row.braceletKey === null ? '' : (braceletLabel.get(row.braceletKey) ?? row.braceletKey),
+    // ONE COLUMN, the régisseur's choice of 2026-10-22: the entry's wristband, then the accesses.
+    [
+      row.ticketTypeKey === null ? '' : (ticketBracelet.get(row.ticketTypeKey) ?? ''),
+      ...row.braceletKeys.map((key) => braceletLabel.get(key) ?? key),
+    ]
+      .filter((label) => label.trim() !== '')
+      .join(' + '),
     ...(withPhones ? [row.phone] : []),
     [row.note, ...row.issues].filter((part) => part !== '').join(' · '),
   ]);

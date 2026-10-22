@@ -18,7 +18,7 @@ import { useState } from 'react';
 
 import {
   ORGANISER_CODE_LENGTH,
-  PERSON_STATUS_LABEL,
+  statusLabel,
   artistGuests,
   convertPerson,
   type PersonKind,
@@ -509,10 +509,16 @@ function ExtraFiche({ extraKey, onDeleted }: { extraKey: string; onDeleted(): vo
               name={`extra-status-${extra.key}`}
               value={extra.status}
               aria-label={`Statut de ${who}`}
-              onChange={(event) => change({ status: event.target.value as ExtraPerson['status'] }, 'statut')}
+              onChange={(event) => change({ status: event.target.value }, 'statut')}
             >
-              <option value="prestataire">{PERSON_STATUS_LABEL.prestataire}</option>
-              <option value="autre">{PERSON_STATUS_LABEL.autre}</option>
+              {plan.ticketing.guestTypes.map((type) => (
+                <option key={type.key} value={type.key}>
+                  {type.label}
+                </option>
+              ))}
+              {!plan.ticketing.guestTypes.some((type) => type.key === extra.status) && (
+                <option value={extra.status}>{statusLabel(extra.status, plan.ticketing.guestTypes)}</option>
+              )}
             </select>
           </label>
           <TextRule label="Téléphone" name={`extra-phone-${extra.key}`} value={extra.phone} who={who} type="tel" onChange={(v) => change({ phone: v }, 'téléphone')} />

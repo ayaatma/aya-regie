@@ -26,7 +26,7 @@ import { DEFAULT_CONSTRAINTS } from './constraints.js';
 import { PlanIndex, type Plan } from './plan.js';
 import { defaultPhase } from './phase.js';
 import {
-  defaultBracelet,
+  defaultBracelets,
   defaultTicketType,
   setTicketingChoice,
   ticketingCsv,
@@ -36,9 +36,9 @@ import {
 const START = '2027-03-13T12:00:00+01:00';
 
 const TICKETS: TicketType[] = [
-  { key: 'loto', label: 'Loto seulement', start: 0, end: 6 },
-  { key: 'full', label: 'Pass complet', start: 0, end: 18 },
-  { key: 'soiree', label: 'Soirée', start: 8, end: 18 },
+  { key: 'loto', label: 'Loto seulement', start: 0, end: 6, bracelet: 'Papier Loto' },
+  { key: 'full', label: 'Pass complet', start: 0, end: 18, bracelet: 'Tissu Loto + Concerts' },
+  { key: 'soiree', label: 'Soirée', start: 8, end: 18, bracelet: '' },
 ];
 
 const BRACELETS: BraceletType[] = [
@@ -119,13 +119,14 @@ function makePlan(ticketing: Partial<TicketingSettings> = {}): Plan {
   };
 }
 
-test('the default ticket is the one opening the most of the event, the bracelet follows the statuses in priority', () => {
+test('the default ticket is the one opening the most of the event, and the bracelets add up over the statuses', () => {
   assert.equal(defaultTicketType(TICKETS)?.key, 'full');
   assert.equal(defaultTicketType([]), null);
-  assert.equal(defaultBracelet(BRACELETS, ['benevole'])?.key, 'basique');
-  assert.equal(defaultBracelet(BRACELETS, ['orga', 'responsable'])?.key, 'all');
-  assert.equal(defaultBracelet(BRACELETS, ['orga', 'artiste'])?.key, 'backstage', 'the artist first');
-  assert.equal(defaultBracelet(BRACELETS, ['prestataire']), null);
+  const keys = (statuses: string[]) => defaultBracelets(BRACELETS, statuses).map((b) => b.key);
+  assert.deepEqual(keys(['benevole']), ['basique']);
+  assert.deepEqual(keys(['orga', 'responsable']), ['backstage', 'all'], 'cumulés depuis 2026-10-22');
+  assert.deepEqual(keys(['orga', 'artiste']), ['backstage']);
+  assert.deepEqual(keys(['prestataire']), []);
 });
 
 test('everybody the tool knows is one line, sorted by name then first name, with every status', () => {
@@ -148,10 +149,10 @@ test('everybody the tool knows is one line, sorted by name then first name, with
   assert.ok(!report.rows.some((r) => r.key === 'd-2'));
   const sam = report.rows.find((r) => r.key === 'sam')!;
   assert.deepEqual(sam.statuses.map((s) => s.status), ['orga', 'responsable']);
-  assert.equal(sam.braceletKey, 'all');
+  assert.deepEqual(sam.braceletKeys, ['backstage', 'all']);
   const noa = report.rows.find((r) => r.key === 'd-1-g1')!;
   assert.deepEqual(noa.statuses.map((s) => s.label), ['Invité de Doline']);
-  assert.equal(noa.braceletKey, 'backstage');
+  assert.deepEqual(noa.braceletKeys, ['backstage']);
   assert.equal(noa.ticketTypeKey, 'full');
   assert.equal(noa.drinks, 0);
   assert.deepEqual(report.byStatus, { orga: 2, responsable: 1, artiste: 2, benevole: 2, 'invite-artiste': 3 });
@@ -169,7 +170,7 @@ test("the tickets are the catering's figures, and a member with more guests than
 test('a meal outside the ticket is an incohérence, reported and never refused', () => {
   const plan = makePlan({
     guestsPerArtist: 2,
-    choices: [{ personKind: 'artiste', personKey: 'd-1', ticketTypeKey: 'loto', braceletKey: null, drinkTickets: null, note: '' }],
+    choices: [{ personKind: 'artiste', personKey: 'd-1', ticketTypeKey: 'loto', braceletKeys: null, drinkTickets: null, note: '' }],
   });
   const report = ticketingReport(plan, new PlanIndex(plan));
   const lou = report.rows.find((r) => r.key === 'd-1')!;
@@ -181,21 +182,23 @@ test('a meal outside the ticket is an incohérence, reported and never refused',
 
 test('a choice equal to the default is not stored, and a row with nothing chosen disappears', () => {
   const plan = makePlan();
-  const defaults = { ticketTypeKey: 'full', braceletKey: 'basique' };
-  let choices = setTicketingChoice(plan, 'benevole', 'v1', { braceletKey: 'backstage' }, defaults);
-  assert.deepEqual(choices, [{ personKind: 'benevole', personKey: 'v1', ticketTypeKey: null, braceletKey: 'backstage', drinkTickets: null, note: '' }]);
+  const defaults = { ticketTypeKey: 'full', braceletKeys: ['basique'] };
+  let choices = setTicketingChoice(plan, 'benevole', 'v1', { braceletKeys: ['basique', 'backstage'] }, defaults);
+  assert.deepEqual(choices, [{ personKind: 'benevole', personKey: 'v1', ticketTypeKey: null, braceletKeys: ['basique', 'backstage'], drinkTickets: null, note: '' }]);
   const next = { ...plan, ticketing: { ...plan.ticketing, choices } };
-  choices = setTicketingChoice(next, 'benevole', 'v1', { braceletKey: 'basique' }, defaults);
-  assert.deepEqual(choices, []);
+  choices = setTicketingChoice(next, 'benevole', 'v1', { braceletKeys: ['basique'] }, defaults);
+  assert.deepEqual(choices, [], 'la liste par défaut retapée n’est pas un choix');
   choices = setTicketingChoice(next, 'benevole', 'v1', { ticketTypeKey: 'soiree' }, defaults);
-  assert.deepEqual(choices, [{ personKind: 'benevole', personKey: 'v1', ticketTypeKey: 'soiree', braceletKey: 'backstage', drinkTickets: null, note: '' }]);
+  assert.deepEqual(choices, [{ personKind: 'benevole', personKey: 'v1', ticketTypeKey: 'soiree', braceletKeys: ['basique', 'backstage'], drinkTickets: null, note: '' }]);
+  choices = setTicketingChoice(next, 'benevole', 'v1', { braceletKeys: [] }, defaults);
+  assert.deepEqual(choices[0]?.braceletKeys, [], 'aucun bracelet est un choix, pas le défaut');
 });
 
 test('a drink figure and a note are decisions too: kept while they differ from the default, gone otherwise', () => {
   const plan = makePlan();
-  const defaults = { ticketTypeKey: 'full', braceletKey: 'basique', drinkTickets: 2 };
+  const defaults = { ticketTypeKey: 'full', braceletKeys: ['basique'], drinkTickets: 2 };
   let choices = setTicketingChoice(plan, 'benevole', 'v1', { drinkTickets: 5, note: '  passe par la scène ' }, defaults);
-  assert.deepEqual(choices, [{ personKind: 'benevole', personKey: 'v1', ticketTypeKey: null, braceletKey: null, drinkTickets: 5, note: 'passe par la scène' }]);
+  assert.deepEqual(choices, [{ personKind: 'benevole', personKey: 'v1', ticketTypeKey: null, braceletKeys: null, drinkTickets: 5, note: 'passe par la scène' }]);
   const next = { ...plan, ticketing: { ...plan.ticketing, choices } };
   const row = ticketingReport(next, new PlanIndex(next)).rows.find((r) => r.key === 'v1')!;
   assert.equal(row.drinks, 5);
@@ -225,7 +228,7 @@ test('an extra person is a line with what was typed for them, and the CSV carrie
   assert.deepEqual(pat.statuses.map((s) => s.label), ['Prestataire']);
   assert.equal(pat.drinks, 4);
   assert.equal(pat.meals, 2);
-  assert.equal(pat.braceletKey, null, 'no bracelet names a prestataire');
+  assert.deepEqual(pat.braceletKeys, [], 'no bracelet names a prestataire');
 
   const without = ticketingCsv(plan, new PlanIndex(plan), false);
   assert.ok(!without.includes('06 99'));

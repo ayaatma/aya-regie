@@ -462,20 +462,26 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
     montage,
     demontage,
     catering: { ...plan.catering, rules: { ...plan.catering.rules, enabled: true } },
-    // The door: the Loto Tekno's two kinds of entry, three bracelets, a sound engineer hired
-    // for the night, and one ticket chosen by hand so the incohérence has something to say.
+    // The door: the Loto Tekno's kinds of entry, each with its wristband, three accesses that
+    // add up (2026-10-22), a sound engineer hired for the night, and one ticket chosen by hand so
+    // the incohérence has something to say.
     ticketing: {
       guestsPerArtist: 1,
       reserveOnDoorList: false,
       ticketTypes: [
-        { key: 'loto', label: 'Loto seulement', start: 0, end: 8 },
-        { key: 'soiree', label: 'Soirée seulement', start: 8, end: plan.lengthHours },
-        { key: 'full', label: 'Pass complet', start: 0, end: plan.lengthHours },
+        { key: 'loto', label: 'Loto seulement', start: 0, end: 8, bracelet: 'Bracelet papier Loto' },
+        { key: 'soiree', label: 'Soirée seulement', start: 8, end: plan.lengthHours, bracelet: 'Bracelet papier Concert' },
+        { key: 'full', label: 'Pass complet', start: 0, end: plan.lengthHours, bracelet: 'Bracelet Loto + Concerts' },
       ],
       bracelets: [
-        { key: 'basique', label: 'Bracelet basique', defaultFor: ['benevole'] },
-        { key: 'backstage', label: 'Bracelet backstage', defaultFor: ['artiste', 'invite-artiste', 'orga'] },
-        { key: 'all', label: 'Bracelet all inclusive', defaultFor: ['responsable'] },
+        { key: 'bar', label: 'Prix spécial au bar', defaultFor: ['benevole', 'orga', 'artiste'] },
+        { key: 'backstage', label: 'Backstage', defaultFor: ['orga', 'artiste', 'invite-artiste'] },
+        { key: 'full-access', label: 'Full Access', defaultFor: [] },
+      ],
+      guestTypes: [
+        { key: 'partenaire', label: 'Partenaire', drinkTickets: 2, mealTickets: 1 },
+        { key: 'prestataire', label: 'Prestataire', drinkTickets: 4, mealTickets: 2 },
+        { key: 'autre', label: 'Autre invitation', drinkTickets: 2, mealTickets: 0 },
       ],
       extras: [
         { key: 'extra-1', firstName: 'Pat', lastName: 'Lumière', status: 'prestataire', phone: '06 12 34 56 78', drinkTickets: 4, mealTickets: 2 },
@@ -483,8 +489,8 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
       ],
       choices: first
         ? [
-            { personKind: 'artiste', personKey: `${first.key}-m1`, ticketTypeKey: 'soiree', braceletKey: null, drinkTickets: null, note: '' },
-            { personKind: 'extra', personKey: 'extra-1', ticketTypeKey: null, braceletKey: null, drinkTickets: null, note: 'Régie lumière, arrive à 14h' },
+            { personKind: 'artiste', personKey: `${first.key}-m1`, ticketTypeKey: 'soiree', braceletKeys: null, drinkTickets: null, note: '' },
+            { personKind: 'extra', personKey: 'extra-1', ticketTypeKey: null, braceletKeys: null, drinkTickets: null, note: 'Régie lumière, arrive à 14h' },
           ]
         : [],
     },

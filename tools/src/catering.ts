@@ -576,7 +576,9 @@ const personRow = (
     fixedDrinks !== null
       ? fixedDrinks
       : kind === 'orga'
-        ? Math.max(earnedDrinks, Math.max(0, Math.round(rules.organiserDrinks)))
+        ? rules.organiserDrinksFixed
+          ? Math.max(0, Math.round(rules.organiserDrinks))
+          : Math.max(earnedDrinks, Math.max(0, Math.round(rules.organiserDrinks)))
         : earnedDrinks;
 
   /*

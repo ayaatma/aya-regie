@@ -4623,6 +4623,44 @@ textarea.select,
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+/* Les bracelets d'une personne, plusieurs depuis le 22/10/2026: une liste repliée à cocher. */
+.bracelet-pick {
+  position: relative;
+  min-width: 8em;
+}
+
+.bracelet-pick > summary {
+  cursor: pointer;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16em;
+}
+
+.bracelet-pick.is-manual > summary {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.bracelet-pick[open] .bracelet-pick-list {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+  white-space: nowrap;
+}
+
 /* Un statut sur une ligne. Plusieurs se suivent: une personne peut en avoir deux. */
 .chip.is-status {
   margin-right: 4px;
@@ -4657,6 +4695,11 @@ textarea.select,
 .setup-ticket-row .select,
 .setup-bracelet-row .select {
   width: 220px;
+}
+
+/* Les tickets d'un type d'invité: deux petits nombres, pas deux champs de la largeur d'un nom. */
+.setup-ticket-row .rule-input input {
+  width: 4.5em;
 }
 
 .setup-bracelet-statuses {

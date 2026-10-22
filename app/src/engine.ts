@@ -311,6 +311,9 @@ export {
   DEFAULT_TICKETING,
   DEFAULT_TRAVEL_RATES,
   PERSON_STATUS_LABEL,
+  BUILT_IN_STATUSES,
+  DEFAULT_GUEST_TYPES,
+  statusLabel,
 } from '@engine/model.ts';
 export type {
   ArtistMember,
@@ -321,6 +324,7 @@ export type {
   Guest,
   MealPersonKind,
   PersonStatus,
+  GuestType,
   TicketType,
   BraceletType,
   ExtraPerson,
@@ -335,8 +339,7 @@ export type {
  * CSV with or without phones. See `@engine/ticketing.ts`.
  */
 export {
-  STATUS_PRIORITY,
-  defaultBracelet,
+  defaultBracelets,
   defaultTicketType,
   setTicketingChoice,
   ticketingCsv,

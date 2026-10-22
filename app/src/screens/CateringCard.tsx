@@ -243,18 +243,51 @@ export function CateringCard() {
             </label>
 
             <label className="rule">
-              <span className="rule-label">Tickets boisson garantis à un·e orga</span>
+              <span className="rule-label">
+                {rules.organiserDrinksFixed ? 'Tickets boisson remis à un·e orga' : 'Tickets boisson garantis à un·e orga'}
+              </span>
               <span className="rule-input">
                 <NumberField
                   value={rules.organiserDrinks}
-                  ariaLabel="Tickets boisson garantis à une personne de l'organisation"
+                  ariaLabel={
+                    rules.organiserDrinksFixed
+                      ? "Tickets boisson remis à une personne de l'organisation"
+                      : "Tickets boisson garantis à une personne de l'organisation"
+                  }
                   name="organiser-drinks"
                   onCommit={(value) =>
                     edit((p) => setCateringRules(p, { organiserDrinks: value ?? 0 }), 'boissons des orgas')
                   }
                 />
               </span>
-              <span className="rule-hint">Même principe: un plancher.</span>
+              <span className="rule-hint">
+                {rules.organiserDrinksFixed
+                  ? 'Ce nombre exactement, responsables compris, quelles que soient les heures.'
+                  : 'Même principe: un plancher.'}
+              </span>
+            </label>
+
+            <label className="rule">
+              <span className="rule-label">Règle des orgas</span>
+              <span className="rule-input">
+                <input
+                  type="checkbox"
+                  name="organiser-drinks-fixed"
+                  checked={rules.organiserDrinksFixed}
+                  onChange={(event) =>
+                    edit(
+                      (p) => setCateringRules(p, { organiserDrinksFixed: event.target.checked }),
+                      'règle des tickets boisson des orgas',
+                    )
+                  }
+                />
+                <span>Un nombre fixe de tickets boisson, sans compter les heures</span>
+              </span>
+              <span className="rule-hint">
+                Décoché, un·e orga suit la règle des bénévoles, avec le nombre ci-dessus comme
+                minimum. Coché, chaque orga et chaque responsable reçoit ce nombre, et un nombre
+                différent se règle personne par personne dans l'onglet Personnes.
+              </span>
             </label>
 
             <label className="rule">

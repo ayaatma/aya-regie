@@ -257,6 +257,12 @@ export interface CateringRules {
   organiserMeals: number;
   organiserDrinks: number;
   /**
+   * Since 2026-10-22, off by default: an orga (a responsable included) is handed exactly
+   * `organiserDrinks` tickets, whatever the hours, rather than that figure as a floor under
+   * the hourly rule. The régisseur then sets a different figure person by person in Personnes.
+   */
+  organiserDrinksFixed: boolean;
+  /**
    * What a member of an act is handed, whatever the hours: an act works no créneau and earns
    * nothing by the hour. A member's own `drinkTickets` overrides this for that one person.
    */
@@ -324,6 +330,7 @@ export const DEFAULT_CATERING: CateringSettings = {
     drinkCountsPhases: false,
     organiserMeals: 2,
     organiserDrinks: 2,
+    organiserDrinksFixed: false,
     artistDrinks: 2,
     artistDrinksCumulative: false,
   },
@@ -1397,17 +1404,61 @@ export interface TicketType {
   label: string;
   start: number;
   end: number;
+  /**
+   * The wristband this entry is worth at the door, « Bracelet Loto + Concerts », since
+   * 2026-10-22. Empty when the entry is not a wristband. Every other bracelet is an access that
+   * adds to it (`BraceletType`).
+   */
+  bracelet: string;
 }
 
 /**
- * A wristband, and who gets it by default: "backstage" for the artistes and their guests,
- * "basique" for the bénévoles. A status named by no bracelet gets none; the régisseur can put
- * any bracelet on anybody, one person at a time.
+ * A kind of guest the door knows, since 2026-10-22: « Partenaire », « Prestataire », and
+ * whatever the event invites. An extra person is one of them. The figures are what a new person
+ * of that kind starts with; each is changed on their own fiche. A guest of an act is not one of
+ * these: they belong to the act.
+ */
+export interface GuestType {
+  key: string;
+  label: string;
+  drinkTickets: number;
+  mealTickets: number;
+}
+
+/** What every event starts with. The keys of the two old fixed kinds are kept. */
+export const DEFAULT_GUEST_TYPES: readonly GuestType[] = [
+  { key: 'partenaire', label: 'Partenaire', drinkTickets: 0, mealTickets: 0 },
+  { key: 'prestataire', label: 'Prestataire', drinkTickets: 0, mealTickets: 0 },
+  { key: 'autre', label: 'Autre invitation', drinkTickets: 0, mealTickets: 0 },
+];
+
+/**
+ * The statuses known whatever the event: those the tool computes. A guest type's key is a
+ * status too, on its own people, and a bracelet may name either.
+ */
+export const BUILT_IN_STATUSES: readonly PersonStatus[] = ['benevole', 'orga', 'responsable', 'artiste', 'invite-artiste'];
+
+/** The label of a status, a guest type's included. */
+export function statusLabel(status: string, guestTypes: readonly GuestType[]): string {
+  return (
+    guestTypes.find((g) => g.key === status)?.label ??
+    (PERSON_STATUS_LABEL as Record<string, string>)[status] ??
+    status
+  );
+}
+
+/**
+ * A wristband that gives an access, and who gets it by default: « Backstage » for the orgas and
+ * the artistes, « Prix spécial au bar » for whoever works. CUMULATIVE SINCE 2026-10-22: somebody
+ * holds every bracelet one of their statuses is named on, and the régisseur sets another list
+ * person by person. The entry's own wristband is `TicketType.bracelet`.
+ *
+ * `defaultFor` holds statuses: one of `BUILT_IN_STATUSES` or a guest type's key.
  */
 export interface BraceletType {
   key: string;
   label: string;
-  defaultFor: PersonStatus[];
+  defaultFor: string[];
 }
 
 /**
@@ -1419,7 +1470,8 @@ export interface ExtraPerson {
   key: string;
   firstName: string;
   lastName: string;
-  status: 'prestataire' | 'autre';
+  /** The key of their `GuestType`. Since 2026-10-22; « prestataire » or « autre » before. */
+  status: string;
   phone: string;
   drinkTickets: number;
   mealTickets: number;
@@ -1447,7 +1499,11 @@ export interface TicketingChoice {
   personKind: TicketPersonKind;
   personKey: string;
   ticketTypeKey: string | null;
-  braceletKey: string | null;
+  /**
+   * The bracelets chosen by hand, the whole list, or null for the defaults. Since 2026-10-22; a
+   * single `braceletKey` before, read as a list of one.
+   */
+  braceletKeys: string[] | null;
   /** The drink tickets to hand, when not the computed figure. */
   drinkTickets: number | null;
   note: string;
@@ -1483,6 +1539,8 @@ export interface TicketingSettings {
   reserveOnDoorList: boolean;
   ticketTypes: readonly TicketType[];
   bracelets: readonly BraceletType[];
+  /** Since 2026-10-22. See `GuestType`. */
+  guestTypes: readonly GuestType[];
   extras: readonly ExtraPerson[];
   choices: readonly TicketingChoice[];
 }
@@ -1493,6 +1551,7 @@ export const DEFAULT_TICKETING: TicketingSettings = {
   reserveOnDoorList: false,
   ticketTypes: [],
   bracelets: [],
+  guestTypes: DEFAULT_GUEST_TYPES,
   extras: [],
   choices: [],
 };

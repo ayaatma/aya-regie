@@ -21,12 +21,12 @@ import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_LABEL,
   ENERGY_LABEL,
-  PERSON_STATUS_LABEL,
+  BUILT_IN_STATUSES,
+  statusLabel,
   type ApplicationStatus,
   ticketingCsv,
   ticketingReport,
   type ExtraPerson,
-  type PersonStatus,
   type TicketingReport,
   type TicketingRow,
   followUpOf,
@@ -147,7 +147,7 @@ export function PeopleScreen({
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<PersonStatus | typeof ALL>(ALL);
+  const [status, setStatus] = useState<string>(ALL);
   const [view, setView] = useState<PeopleView>('accueil');
   const [withPhones, setWithPhones] = useState(false);
   const [followUp, setFollowUp] = useState<FollowUp>(ALL);
@@ -209,7 +209,8 @@ export function PeopleScreen({
   /** What the arrow keys walk: the main list, then the reserve, as drawn. */
   const walk = [...rows, ...reserveRows];
   const issues = report.rows.filter((r) => r.issues.length > 0).length;
-  const statuses = Object.keys(PERSON_STATUS_LABEL) as PersonStatus[];
+  // The statuses the tool knows, then the event's guest types (2026-10-22).
+  const statuses: string[] = [...BUILT_IN_STATUSES, ...plan.ticketing.guestTypes.map((g) => g.key)];
 
   /*
    * THE ARROW KEYS WALK THE LIST, Escape closes the fiche, and neither does anything while a field
@@ -243,9 +244,9 @@ export function PeopleScreen({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const addExtra = (kind: ExtraPerson['status']): void => {
+  const addExtra = (kind: string): void => {
     const key = nextExtraKey(plan);
-    edit((p) => addExtraPerson(p, kind), kind === 'prestataire' ? 'prestataire ajouté' : 'invitation ajoutée');
+    edit((p) => addExtraPerson(p, kind), `${statusLabel(kind, plan.ticketing.guestTypes).toLowerCase()} ajouté·e`);
     onFocus({ kind: 'extra', key });
   };
 
@@ -295,12 +296,12 @@ export function PeopleScreen({
               className="select"
               value={status}
               aria-label="Filtrer par statut"
-              onChange={(event) => setStatus(event.target.value as PersonStatus | typeof ALL)}
+              onChange={(event) => setStatus(event.target.value)}
             >
               <option value={ALL}>Tous ({report.rows.length})</option>
               {statuses.map((s) => (
                 <option key={s} value={s}>
-                  {PERSON_STATUS_LABEL[s]} ({report.byStatus[s] ?? 0})
+                  {statusLabel(s, plan.ticketing.guestTypes)} ({report.byStatus[s] ?? 0})
                 </option>
               ))}
             </select>
@@ -346,12 +347,22 @@ export function PeopleScreen({
             </select>
           </label>
           <span className="toolbar-sep" />
-          <button className="btn is-small" onClick={() => addExtra('prestataire')}>
-            Ajouter un prestataire
-          </button>
-          <button className="btn is-small" onClick={() => addExtra('autre')}>
-            Ajouter une invitation
-          </button>
+          {/* One entry per guest type of the event, since 2026-10-22: they are settings now. */}
+          <select
+            className="select"
+            value=""
+            aria-label="Ajouter un invité"
+            onChange={(event) => {
+              if (event.target.value !== '') addExtra(event.target.value);
+            }}
+          >
+            <option value="">Ajouter un invité…</option>
+            {plan.ticketing.guestTypes.map((type) => (
+              <option key={type.key} value={type.key}>
+                {type.label}
+              </option>
+            ))}
+          </select>
           <span className="toolbar-sep" />
           <label
             className="checkline"

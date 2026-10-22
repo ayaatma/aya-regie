@@ -10,7 +10,7 @@
  */
 
 import type { TicketingReport, TicketingRow } from '../engine.ts';
-import { defaultBracelet, defaultTicketType } from '../engine.ts';
+import { defaultBracelets, defaultTicketType } from '../engine.ts';
 import { chooseForPerson } from '../store/ticketingEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { NumberField } from './NumberField.tsx';
@@ -33,13 +33,13 @@ export const personLabel = (row: Pick<TicketingRow, 'firstName' | 'lastName'>): 
 export function doorDefaults(row: TicketingRow, report: TicketingReport) {
   return {
     ticketTypeKey: defaultTicketType(report.ticketTypes)?.key ?? null,
-    braceletKey: defaultBracelet(report.bracelets, row.statuses.map((s) => s.status))?.key ?? null,
+    braceletKeys: defaultBracelets(report.bracelets, row.statuses.map((s) => s.status)).map((b) => b.key),
     drinkTickets: row.computedDrinks,
   };
 }
 
 export const hasDoorChoice = (row: TicketingRow): boolean =>
-  row.ticketByHand || row.braceletByHand || row.drinksByHand || row.note !== '';
+  row.ticketByHand || row.braceletsByHand || row.drinksByHand || row.note !== '';
 
 export function TicketSelect({ row, report, who, prefix = '' }: DoorFieldProps) {
   const { edit } = useLoadedPlan();
@@ -69,31 +69,53 @@ export function TicketSelect({ row, report, who, prefix = '' }: DoorFieldProps) 
   );
 }
 
+/**
+ * The bracelets of one person, SEVERAL SINCE 2026-10-22: a folded list of boxes to tick, whose
+ * summary is what the door reads. Green when the list was chosen by hand; « Revenir au défaut »
+ * gives it back to the statuses.
+ */
 export function BraceletSelect({ row, report, who, prefix = '' }: DoorFieldProps) {
   const { edit } = useLoadedPlan();
+  const label = new Map(report.bracelets.map((b) => [b.key, b.label]));
+  const summary = row.braceletKeys.map((key) => label.get(key) ?? key).join(' + ') || 'aucun';
+  const choose = (keys: string[] | null) =>
+    edit((p) => chooseForPerson(p, row.kind, row.key, { braceletKeys: keys }, doorDefaults(row, report)), `bracelets de ${who}`);
+  if (report.bracelets.length === 0) {
+    return <span className="people-meta">aucun bracelet défini</span>;
+  }
   return (
-    <select
-      className={`select${row.braceletByHand ? ' is-manual' : ''}`}
-      name={`${prefix}bracelet-${row.kind}-${row.key}`}
-      value={row.braceletKey ?? ''}
-      disabled={report.bracelets.length === 0}
-      aria-label={`Bracelet de ${who}`}
-      title={row.braceletByHand ? 'Choisi à la main; suit Réglages sinon.' : 'Le bracelet par défaut de son statut.'}
-      onChange={(event) =>
-        edit(
-          (p) =>
-            chooseForPerson(p, row.kind, row.key, { braceletKey: event.target.value || null }, doorDefaults(row, report)),
-          `bracelet de ${who}`,
-        )
-      }
-    >
-      <option value="">{report.bracelets.length === 0 ? 'aucun bracelet défini' : 'aucun'}</option>
-      {report.bracelets.map((bracelet) => (
-        <option key={bracelet.key} value={bracelet.key}>
-          {bracelet.label}
-        </option>
-      ))}
-    </select>
+    <details className={`bracelet-pick${row.braceletsByHand ? ' is-manual' : ''}`}>
+      <summary
+        aria-label={`Bracelets de ${who}: ${summary}`}
+        title={row.braceletsByHand ? 'Choisis à la main; suivent Réglages sinon.' : 'Les bracelets par défaut de ses statuts.'}
+      >
+        {summary}
+      </summary>
+      <div className="bracelet-pick-list">
+        {report.bracelets.map((bracelet) => (
+          <label key={bracelet.key} className="checkline">
+            <input
+              type="checkbox"
+              name={`${prefix}bracelet-${row.kind}-${row.key}-${bracelet.key}`}
+              checked={row.braceletKeys.includes(bracelet.key)}
+              onChange={(event) =>
+                choose(
+                  event.target.checked
+                    ? report.bracelets.map((b) => b.key).filter((key) => key === bracelet.key || row.braceletKeys.includes(key))
+                    : row.braceletKeys.filter((key) => key !== bracelet.key),
+                )
+              }
+            />
+            {bracelet.label}
+          </label>
+        ))}
+        {row.braceletsByHand && (
+          <button type="button" className="btn is-small" onClick={() => choose(null)}>
+            Revenir au défaut
+          </button>
+        )}
+      </div>
+    </details>
   );
 }
 

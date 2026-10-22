@@ -16,9 +16,13 @@
 
 import { useState } from 'react';
 
-import { PERSON_STATUS_LABEL, fmtHours, type FuelKind, type PersonStatus } from '../engine.ts';
+import { BUILT_IN_STATUSES, fmtHours, statusLabel, type FuelKind } from '../engine.ts';
 import {
   addBracelet,
+  addGuestType,
+  deleteGuestType,
+  guestTypeHolders,
+  setGuestType,
   addTicketType,
   braceletHolders,
   deleteBracelet,
@@ -37,20 +41,21 @@ import { NumberField } from '../components/NumberField.tsx';
 import { slideEnd } from '../components/clock.ts';
 import { SetupSection } from './SetupSection.tsx';
 
-const STATUSES = Object.keys(PERSON_STATUS_LABEL) as PersonStatus[];
-
 export function TicketingCard() {
   const { plan, edit } = useLoadedPlan();
   const { ticketing } = plan;
   const [newTicket, setNewTicket] = useState('');
   const [newBracelet, setNewBracelet] = useState('');
+  const [newGuestType, setNewGuestType] = useState('');
+  // The statuses a bracelet can be given to: those the tool computes, then the guest types.
+  const statuses: string[] = [...BUILT_IN_STATUSES, ...ticketing.guestTypes.map((g) => g.key)];
   const [armed, setArmed] = useState<{ what: 'ticket' | 'bracelet'; key: string } | null>(null);
 
   return (
     <SetupSection
       className="setup-ticketing"
       title="Billetterie"
-      meta={`${ticketing.ticketTypes.length} type(s) de billet · ${ticketing.bracelets.length} bracelet(s) · ${ticketing.guestsPerArtist} invitation(s) par artiste`}
+      meta={`${ticketing.ticketTypes.length} billet(s) · ${ticketing.bracelets.length} bracelet(s) d'accès · ${ticketing.guestTypes.length} type(s) d'invité · ${ticketing.guestsPerArtist} invitation(s) par artiste`}
     >
       <p className="people-meta setup-orgas-note">
         Ce que la billetterie remet à chaque personne se lit dans l'onglet Personnes: les
@@ -149,6 +154,18 @@ export function TicketingCard() {
                 {type.end > type.start ? fmtHours(type.end - type.start) : 'la fin doit être après le début'}
               </span>
             </span>
+            <input
+              className="select"
+              name={`ticket-bracelet-${type.key}`}
+              autoComplete="off"
+              value={type.bracelet}
+              placeholder="Bracelet de ce billet"
+              aria-label={`Bracelet du billet ${type.label}`}
+              title="Le bracelet que ce billet donne à l'entrée. Les autres bracelets s'y ajoutent."
+              onChange={(event) =>
+                edit((p) => setTicketType(p, type.key, { bracelet: event.target.value }), `bracelet du billet ${type.label}`)
+              }
+            />
             {armed?.what === 'ticket' && armed.key === type.key ? (
               <span className="setup-confirm">
                 <span className="people-meta">
@@ -208,11 +225,11 @@ export function TicketingCard() {
       </div>
 
       <div className="setup-lineup">
-        <span className="panel-section-title">Bracelets ({ticketing.bracelets.length})</span>
+        <span className="panel-section-title">Bracelets d'accès ({ticketing.bracelets.length})</span>
         <p className="panel-sub">
-          Un nom, et les statuts qui le reçoivent par défaut. Un statut ne va qu'à un bracelet:
-          le cocher ici le décoche ailleurs. Une personne à plusieurs statuts reçoit celui de
-          l'artiste, puis du responsable, puis de l'orga, puis du bénévole.
+          Ils s'ajoutent au bracelet du billet d'entrée: prix spécial au bar, backstage, accès
+          complet. Une personne reçoit tous ceux dont l'un de ses statuts est coché, et l'onglet
+          Personnes en ajoute ou en retire personne par personne.
         </p>
         {ticketing.bracelets.map((bracelet) => (
           <div key={bracelet.key} className="setup-bracelet-row">
@@ -227,7 +244,7 @@ export function TicketingCard() {
               }
             />
             <span className="setup-bracelet-statuses">
-              {STATUSES.map((status) => (
+              {statuses.map((status) => (
                 <label key={status} className="checkline">
                   <input
                     type="checkbox"
@@ -240,7 +257,7 @@ export function TicketingCard() {
                       )
                     }
                   />
-                  {PERSON_STATUS_LABEL[status]}
+                  {statusLabel(status, ticketing.guestTypes)}
                 </label>
               ))}
             </span>
@@ -248,7 +265,7 @@ export function TicketingCard() {
               <span className="setup-confirm">
                 <span className="people-meta">
                   {braceletHolders(plan, bracelet.key) > 0
-                    ? `${braceletHolders(plan, bracelet.key)} personne(s) l'avaient à la main et reviennent au défaut.`
+                    ? `${braceletHolders(plan, bracelet.key)} personne(s) l'avaient dans une liste choisie à la main: il en sort.`
                     : 'Retire ce bracelet.'}
                 </span>
                 <button
@@ -298,6 +315,91 @@ export function TicketingCard() {
             }}
           >
             Ajouter un bracelet
+          </button>
+        </span>
+      </div>
+
+      <div className="setup-lineup">
+        <span className="panel-section-title">Types d'invité ({ticketing.guestTypes.length})</span>
+        <p className="panel-sub">
+          Les personnes que seule la billetterie connaît. Les tickets indiqués sont ceux d'un
+          nouvel invité de ce type, à changer ensuite sur sa fiche. Les invités d'un artiste sont
+          dans l'onglet Artistes.
+        </p>
+        {ticketing.guestTypes.map((type) => {
+          const holders = guestTypeHolders(plan, type.key);
+          return (
+            <div key={type.key} className="setup-ticket-row">
+              <input
+                className="select"
+                name={`guest-type-label-${type.key}`}
+                autoComplete="off"
+                value={type.label}
+                aria-label="Nom du type d'invité"
+                onChange={(event) =>
+                  edit((p) => setGuestType(p, type.key, { label: event.target.value }), `type d'invité ${type.label}`)
+                }
+              />
+              <span className="rule-input">
+                <NumberField
+                  value={type.drinkTickets}
+                  ariaLabel={`Tickets boisson d'un ${type.label}`}
+                  name={`guest-type-drinks-${type.key}`}
+                  onCommit={(value) =>
+                    edit((p) => setGuestType(p, type.key, { drinkTickets: value ?? 0 }), `tickets de ${type.label}`)
+                  }
+                />
+                <span className="rule-suffix">boissons</span>
+              </span>
+              <span className="rule-input">
+                <NumberField
+                  value={type.mealTickets}
+                  ariaLabel={`Tickets repas d'un ${type.label}`}
+                  name={`guest-type-meals-${type.key}`}
+                  onCommit={(value) =>
+                    edit((p) => setGuestType(p, type.key, { mealTickets: value ?? 0 }), `repas de ${type.label}`)
+                  }
+                />
+                <span className="rule-suffix">repas</span>
+              </span>
+              <button
+                className="btn is-icon is-danger"
+                disabled={holders > 0}
+                title={
+                  holders > 0
+                    ? `${holders} personne(s) sont de ce type: changez leur type avant de le retirer`
+                    : `Retirer ${type.label}`
+                }
+                onClick={() => edit((p) => deleteGuestType(p, type.key), `retrait du type ${type.label}`)}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
+        <span className="setup-confirm">
+          <input
+            className="select"
+            placeholder="Nom d'un type d'invité"
+            name="new-guest-type"
+            autoComplete="off"
+            value={newGuestType}
+            onChange={(event) => setNewGuestType(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || newGuestType.trim() === '') return;
+              edit((p) => addGuestType(p, newGuestType), `type d'invité ${newGuestType.trim()}`);
+              setNewGuestType('');
+            }}
+          />
+          <button
+            className="btn"
+            disabled={newGuestType.trim() === ''}
+            onClick={() => {
+              edit((p) => addGuestType(p, newGuestType), `type d'invité ${newGuestType.trim()}`);
+              setNewGuestType('');
+            }}
+          >
+            Ajouter un type d'invité
           </button>
         </span>
       </div>

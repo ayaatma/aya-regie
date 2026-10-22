@@ -514,6 +514,24 @@ async function main() {
         await page.evaluate(() => document.querySelector('.setup-advanced')?.scrollIntoView());
         await tall('72-reglages-avances-tall');
       }
+      if (want('bracelets')) {
+        // 2026-10-22: bracelets that add up, a wristband per billet, guest types in Réglages.
+        await tab('Personnes');
+        await page.evaluate(() => {
+          const row = document.querySelector('tr[data-person^="orga|"]');
+          row?.scrollIntoView({ block: 'center' });
+          row?.querySelector('details.bracelet-pick > summary')?.click();
+        });
+        await sleep(400);
+        await shot('95-personnes-bracelets');
+        await page.select('select[aria-label="Ajouter un invité"]', 'partenaire');
+        await sleep(500);
+        await shot('96-personnes-invite-partenaire');
+        await tab('Réglages');
+        await clickButton(/^▸Billetterie/);
+        await sleep(300);
+        await tall('78-reglages-billetterie');
+      }
       if (want('personnes') || want('billetterie')) {
         await tab('Personnes');
         await shot('85-personnes');

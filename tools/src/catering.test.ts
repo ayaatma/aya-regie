@@ -285,6 +285,23 @@ test('the orga floor lifts and never caps', () => {
   assert.equal(person.drinks, 4, 'eight hours beat the floor of two');
 });
 
+test('with the fixed rule, an orga gets exactly the figure, whatever the hours', () => {
+  const base = makePlan({
+    shifts: [shift('s1', 0, 8)],
+    organisers: [organiser('o1')],
+    organiserShifts: [{ key: 'os1', organiserKey: 'o1', shiftKey: 's1' }],
+  });
+  const plan = {
+    ...base,
+    catering: {
+      ...base.catering,
+      rules: { ...base.catering.rules, organiserDrinks: 3, organiserDrinksFixed: true },
+    },
+  };
+  const person = report(plan).people.find((p) => p.key === 'o1')!;
+  assert.equal(person.drinks, 3, 'huit heures ne donnent plus quatre tickets: trois, le nombre fixé');
+});
+
 // ---------------------------------------------------------------------------
 // The phases: a presence, not a quota
 // ---------------------------------------------------------------------------

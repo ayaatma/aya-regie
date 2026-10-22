@@ -24,6 +24,7 @@ import {
   type MailTemplate,
   DEFAULT_APPLICATION_STEPS,
   DEFAULT_PHASE_OPTIONS,
+  DEFAULT_GUEST_TYPES,
   type PhaseOptions,
   STEP_REPLIES,
   type StepMail,
@@ -45,7 +46,6 @@ import {
   DEFAULT_CATERING,
   DEFAULT_TICKETING,
   DEFAULT_TRAVEL_RATES,
-  PERSON_STATUS_LABEL,
   makeArtist,
   makeArtistMember,
   makeCarTrip,
@@ -54,7 +54,6 @@ import {
   type CarTrip,
   type Guest,
   type MealPersonKind,
-  type PersonStatus,
   type TicketPersonKind,
   type TicketingSettings,
   type TravelRates,
@@ -359,6 +358,8 @@ const catering = (value: unknown): CateringSettings => {
         Math.round(hours(rules.artistDrinks) ?? DEFAULT_CATERING.rules.artistDrinks),
       ),
       artistDrinksCumulative: rules.artistDrinksCumulative === true,
+      // Absent from anything written before 2026-10-22: the floor, as before.
+      organiserDrinksFixed: rules.organiserDrinksFixed === true,
     },
     choices: (Array.isArray(loose.choices) ? loose.choices : [])
       .map(mealChoice)
@@ -844,7 +845,6 @@ const preferenceSlots = (
   ];
 };
 
-const STATUSES = Object.keys(PERSON_STATUS_LABEL) as PersonStatus[];
 const TICKET_KINDS: TicketPersonKind[] = ['benevole', 'orga', 'artiste', 'invite', 'extra'];
 
 /**
@@ -860,7 +860,8 @@ const ticketing = (value: unknown): TicketingSettings => {
     ticketTypes: array<unknown>(loose.ticketTypes)
       .map((v) => {
         const t = (v ?? {}) as Record<string, unknown>;
-        return { key: text(t.key), label: text(t.label), start: hours(t.start) ?? 0, end: hours(t.end) ?? 0 };
+        // The wristband absent from anything written before 2026-10-22: none.
+        return { key: text(t.key), label: text(t.label), start: hours(t.start) ?? 0, end: hours(t.end) ?? 0, bracelet: text(t.bracelet) };
       })
       .filter((t) => t.key !== ''),
     bracelets: array<unknown>(loose.bracelets)
@@ -869,10 +870,21 @@ const ticketing = (value: unknown): TicketingSettings => {
         return {
           key: text(b.key),
           label: text(b.label),
-          defaultFor: keys(b.defaultFor).filter((s): s is PersonStatus => STATUSES.includes(s as PersonStatus)),
+          // Any status since 2026-10-22: a guest type's key is one.
+          defaultFor: keys(b.defaultFor),
         };
       })
       .filter((b) => b.key !== ''),
+    // Absent from anything written before 2026-10-22: Partenaire, Prestataire, Autre invitation,
+    // the last two being the kinds an extra person could be before.
+    guestTypes: Array.isArray(loose.guestTypes)
+      ? array<unknown>(loose.guestTypes)
+          .map((v) => {
+            const g = (v ?? {}) as Record<string, unknown>;
+            return { key: text(g.key), label: text(g.label), drinkTickets: count(g.drinkTickets), mealTickets: count(g.mealTickets) };
+          })
+          .filter((g) => g.key !== '')
+      : DEFAULT_GUEST_TYPES,
     extras: array<unknown>(loose.extras)
       .map((v) => {
         const x = (v ?? {}) as Record<string, unknown>;
@@ -880,7 +892,7 @@ const ticketing = (value: unknown): TicketingSettings => {
           key: text(x.key),
           firstName: text(x.firstName),
           lastName: text(x.lastName),
-          status: x.status === 'prestataire' ? ('prestataire' as const) : ('autre' as const),
+          status: text(x.status) || 'autre',
           phone: text(x.phone),
           drinkTickets: count(x.drinkTickets),
           mealTickets: count(x.mealTickets),
@@ -899,7 +911,12 @@ const ticketing = (value: unknown): TicketingSettings => {
             : ('benevole' as TicketPersonKind),
           personKey: text(c.personKey),
           ticketTypeKey: text(c.ticketTypeKey) || null,
-          braceletKey: text(c.braceletKey) || null,
+          // A list since 2026-10-22; the single bracelet of before is a list of one.
+          braceletKeys: Array.isArray(c.braceletKeys)
+            ? keys(c.braceletKeys)
+            : text(c.braceletKey) !== ''
+              ? [text(c.braceletKey)]
+              : null,
           drinkTickets: hours(c.drinkTickets) === null ? null : count(c.drinkTickets),
           note: text(c.note).trim(),
         };
@@ -908,7 +925,7 @@ const ticketing = (value: unknown): TicketingSettings => {
       .filter(
         (c) =>
           c.personKey !== '' &&
-          (c.ticketTypeKey !== null || c.braceletKey !== null || c.drinkTickets !== null || c.note !== ''),
+          (c.ticketTypeKey !== null || c.braceletKeys !== null || c.drinkTickets !== null || c.note !== ''),
       ),
   };
 };

@@ -31,6 +31,7 @@ import {
   validate,
   type Plan,
   type TicketPersonKind,
+  DEFAULT_GUEST_TYPES,
 } from '../engine.ts';
 import { setCateringRules } from '../store/cateringEdits.ts';
 import { normalisePlan } from '../persistence/normalise.ts';
@@ -2287,18 +2288,19 @@ function planWithTicketing(): Plan {
       guestsPerArtist: 1,
       reserveOnDoorList: false,
       ticketTypes: [
-        { key: 'loto', label: 'Loto seulement', start: 0, end: 6 },
-        { key: 'full', label: 'Pass complet', start: 0, end: 18 },
+        { key: 'loto', label: 'Loto seulement', start: 0, end: 6, bracelet: 'Papier Loto' },
+        { key: 'full', label: 'Pass complet', start: 0, end: 18, bracelet: 'Tissu' },
       ],
       bracelets: [
         { key: 'basique', label: 'Bracelet basique', defaultFor: ['benevole'] },
         { key: 'backstage', label: 'Bracelet backstage', defaultFor: ['artiste', 'invite-artiste', 'orga'] },
       ],
+      guestTypes: DEFAULT_GUEST_TYPES,
       extras: [{ key: 'x1', firstName: 'Pat', lastName: 'Lumière', status: 'prestataire', phone: '06 99', drinkTickets: 4, mealTickets: 2 }],
       choices: [
-        { personKind: 'artiste', personKey: 'nk-m1', ticketTypeKey: 'loto', braceletKey: null, drinkTickets: null, note: '' },
-        { personKind: 'extra', personKey: 'x1', ticketTypeKey: null, braceletKey: null, drinkTickets: null, note: 'régie' },
-        { personKind: 'benevole', personKey: plan.volunteers[0]!.key, ticketTypeKey: null, braceletKey: null, drinkTickets: 7, note: '' },
+        { personKind: 'artiste', personKey: 'nk-m1', ticketTypeKey: 'loto', braceletKeys: null, drinkTickets: null, note: '' },
+        { personKind: 'extra', personKey: 'x1', ticketTypeKey: null, braceletKeys: null, drinkTickets: null, note: 'régie' },
+        { personKind: 'benevole', personKey: plan.volunteers[0]!.key, ticketTypeKey: null, braceletKeys: null, drinkTickets: 7, note: '' },
       ],
     },
   };

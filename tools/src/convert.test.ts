@@ -106,7 +106,7 @@ function makePlan(): Plan {
     ticketing: {
       ...DEFAULT_TICKETING,
       choices: [
-        { personKind: 'benevole', personKey: 'mail:anne@example.org', ticketTypeKey: null, braceletKey: null, drinkTickets: 5, note: 'VIP' },
+        { personKind: 'benevole', personKey: 'mail:anne@example.org', ticketTypeKey: null, braceletKeys: null, drinkTickets: 5, note: 'VIP' },
       ],
     },
     travel: DEFAULT_TRAVEL_RATES,

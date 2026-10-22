@@ -82,7 +82,7 @@ export function registrants(plan: Plan): Registrant[] {
   for (const x of plan.ticketing.extras) {
     out.push({
       kind: 'extra', key: x.key, firstName: x.firstName, lastName: x.lastName, email: x.email ?? '',
-      status: applicationStatusOf(x), audience: x.status, accessCode: '', actName: '',
+      status: applicationStatusOf(x), audience: x.status === 'prestataire' ? 'prestataire' : 'autre', accessCode: '', actName: '',
       requestedHours: 0,
     });
   }
