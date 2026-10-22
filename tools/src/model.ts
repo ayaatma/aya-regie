@@ -28,6 +28,19 @@ export interface PoleChoice {
   poleKey: string;
   raw: string;
   level: SkillLevel;
+  /**
+   * « Tous les pôles acceptés », since 2026-10-22: this choice honours every pole, at its rank.
+   * `poleKey` is then ''. Bar first and « peu importe » second is the Bar wanted, and anything
+   * else at the price of a second choice rather than of a placement outside every choice.
+   */
+  anyPole?: boolean;
+}
+
+/** How a choice is named on a screen: its pole, « Tous les pôles acceptés », or the sentence. */
+export const ANY_POLE_LABEL = 'Tous les pôles acceptés';
+export function choicePoleLabel(choice: PoleChoice, polePath: (key: string) => string): string {
+  if (choice.anyPole) return ANY_POLE_LABEL;
+  return choice.poleKey !== '' ? polePath(choice.poleKey) : `« ${choice.raw.trim()} »`;
 }
 
 /**

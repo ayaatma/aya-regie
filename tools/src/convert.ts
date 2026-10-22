@@ -30,7 +30,7 @@
 
 import { newAccessCode, volunteerIdentity, VOLUNTEER_CODE_LENGTH } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
-import { absentFromPhase, applicationStatusOf, statusOf, type Organiser, type PersonKind, type Volunteer } from './model.js';
+import { absentFromPhase, applicationStatusOf, choicePoleLabel, statusOf, type Organiser, type PersonKind, type Volunteer } from './model.js';
 import { PlanIndex, type Assignment, type Plan } from './plan.js';
 import { cateringReport } from './catering.js';
 import type { PhaseAssignment } from './phase.js';
@@ -182,7 +182,7 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
     v.nickname.trim() !== '' ? `Surnom: ${v.nickname.trim()}` : '',
     v.availabilityNote.trim() !== '' ? `Contrainte horaire: ${v.availabilityNote.trim()}` : '',
     v.choices.length > 0
-      ? `Pôles demandés: ${v.choices.map((c) => (c.poleKey !== '' ? polePath(c.poleKey) : c.raw.trim())).join(', ')}`
+      ? `Pôles demandés: ${v.choices.map((c) => choicePoleLabel(c, polePath)).join(', ')}`
       : '',
     v.montage.note.trim() !== '' ? `Montage: ${v.montage.note.trim()}` : '',
     v.demontage.note.trim() !== '' ? `Démontage: ${v.demontage.note.trim()}` : '',

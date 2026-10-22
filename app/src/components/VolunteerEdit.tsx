@@ -19,6 +19,7 @@
 import { useState } from 'react';
 
 import {
+  ANY_POLE_LABEL,
   type EditableField,
   type PlanIndex,
   type PoleChoice,
@@ -27,6 +28,7 @@ import {
 } from '../engine.ts';
 import { levelLabel, volumeText } from './layout.ts';
 import { PhaseDaysEdit, volunteerPhases } from './PhaseDaysEdit.tsx';
+import { UnavailableRanges } from './UnavailableRanges.tsx';
 
 export interface VolunteerEditProps {
   index: PlanIndex;
@@ -38,6 +40,8 @@ export interface VolunteerEditProps {
 const LEVELS: SkillLevel[] = ['debutant', 'intermediaire', 'expert'];
 /** The select's value for "peu importe": a select cannot hold null. */
 const NO_PREFERENCE = '';
+/** The pole select's value for « Tous les pôles acceptés », which no pole key can be. */
+const ANY_POLE = '*';
 
 /** A value the draft holds, compared with the stored one to decide what is actually changing. */
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -46,6 +50,7 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
   const [draft, setDraft] = useState<Volunteer>(volunteer);
 
   const ranked = index.plan.poleChoicesRanked !== false;
+  const ranges = index.plan.availabilityMode === 'plages';
   const setChoice = (at: number, patch: Partial<PoleChoice>): void =>
     set('choices', draft.choices.map((c, i) => (i === at ? { ...c, ...patch } : c)));
   const moveChoice = (at: number, by: -1 | 1): void => {
@@ -76,6 +81,7 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
       if (!same(draft[field], volunteer[field])) patch[field] = draft[field];
     };
     compare('refusedSlotIds');
+    compare('unavailable');
     compare('avoidedSlotIds');
     compare('refusedPoleKeys');
     compare('choices');
@@ -99,11 +105,29 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
 
   return (
     <div className="fiche-edit">
+      {/* « Plages libres », 2026-10-22: the exact stretches first, the form's tranches still under them. */}
+      {ranges && (
+        <div className="panel-section">
+          <p className="panel-section-title">Ne peut pas travailler</p>
+          <p className="panel-sub">
+            Les plages où la personne n'est pas disponible, autant qu'il en faut. Règle dure: elle
+            ne sera jamais placée dessus.
+          </p>
+          <UnavailableRanges
+            index={index}
+            windows={draft.unavailable ?? []}
+            namePrefix={`edit-${volunteer.key}`}
+            onChange={(windows) => set('unavailable', windows)}
+          />
+        </div>
+      )}
+
       <div className="panel-section">
-        <p className="panel-section-title">Ne peut pas travailler</p>
+        <p className="panel-section-title">{ranges ? 'Tranches refusées' : 'Ne peut pas travailler'}</p>
         <p className="panel-sub">
-          Cochez les tranches où la personne n'est pas disponible. C'est une règle dure: elle ne
-          sera jamais placée dessus.
+          {ranges
+            ? "Les tranches entières refusées, quand le formulaire pose la question fermée. Elles s'ajoutent aux plages."
+            : "Cochez les tranches où la personne n'est pas disponible. C'est une règle dure: elle ne sera jamais placée dessus."}
         </p>
         {index.slots.map((slot) => (
           <label className="checkline" key={slot.id}>
@@ -150,10 +174,15 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
             <select
               className="select"
               aria-label={`Pôle du choix ${at + 1}`}
-              value={choice.poleKey}
-              onChange={(event) => setChoice(at, { poleKey: event.target.value })}
+              value={choice.anyPole ? ANY_POLE : choice.poleKey}
+              onChange={(event) =>
+                setChoice(at, event.target.value === ANY_POLE
+                  ? { poleKey: '', anyPole: true }
+                  : { poleKey: event.target.value, anyPole: false })
+              }
             >
               <option value="">{choice.raw.trim() !== '' ? `Non reconnu: « ${choice.raw.trim()} »` : 'Aucun'}</option>
+              <option value={ANY_POLE}>{ANY_POLE_LABEL}</option>
               {index.plan.poles.map((pole) => (
                 <option key={pole.key} value={pole.key}>
                   {pole.path}

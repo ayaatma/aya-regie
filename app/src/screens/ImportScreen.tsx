@@ -194,6 +194,7 @@ export function ImportScreen() {
     constraints: plan.constraints,
     // The days a form ticks for the montage and the démontage become windows of them.
     phases: { montage: plan.montage, demontage: plan.demontage },
+    availabilityMode: plan.availabilityMode,
     // The competences the free-text answer is read for.
     skills: plan.skills,
     // The side activities, each read from a column whose header names it.

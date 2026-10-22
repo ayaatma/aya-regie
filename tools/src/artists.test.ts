@@ -71,6 +71,7 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     ticketing: DEFAULT_TICKETING,
     travel: DEFAULT_TRAVEL_RATES,
     poleChoicesRanked: true,
+    availabilityMode: 'tranches',
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8] },
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],

@@ -19,7 +19,7 @@
  */
 
 import { ORGANISER_CODE_LENGTH, alignPhases, makeArtist, newAccessCode } from '../engine.ts';
-import type { Artist, Organiser, LeaderRole, Plan, Pole, SchedulingRules, Shift, VolumeSettings } from '../engine.ts';
+import type { Artist, AvailabilityMode, Organiser, LeaderRole, Plan, Pole, SchedulingRules, Shift, VolumeSettings } from '../engine.ts';
 
 // ---------------------------------------------------------------------------
 // Keys
@@ -819,6 +819,11 @@ export function shiftsCutByBoundary(plan: Plan, dayStartHour: number): number {
     for (let b = first; b < s.end; b += 24) if (b > s.start + 1e-9 && b < s.end - 1e-9) return true;
     return false;
   }).length;
+}
+
+/** Tranches or plages libres. Nothing already read is rewritten: the mode is how the next answers are held. */
+export function setAvailabilityMode(plan: Plan, mode: AvailabilityMode): Plan {
+  return plan.availabilityMode === mode ? plan : { ...plan, availabilityMode: mode };
 }
 
 export function setPoleChoicesRanked(plan: Plan, ranked: boolean): Plan {

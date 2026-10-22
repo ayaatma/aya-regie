@@ -91,6 +91,7 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     travel: DEFAULT_TRAVEL_RATES,
     constraints: DEFAULT_CONSTRAINTS,
     poleChoicesRanked: true,
+    availabilityMode: 'tranches',
     volume: DEFAULT_VOLUME,
     formMapping: { columns: {}, answers: {} },
     applicationSteps: DEFAULT_APPLICATION_STEPS,

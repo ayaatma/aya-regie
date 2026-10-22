@@ -244,9 +244,10 @@ export function volunteerToFormRow(v: Volunteer, ctx: FormRowContext): string[] 
   // The Loto Tekno form asks for exactly two choices; a volunteer with more is written with its
   // first two, and one with fewer leaves the column empty, the way a skipped question exports.
   const choice = (i: number) => v.choices[i];
-  set(20, choice(0) ? (choice(0)!.raw !== '' ? choice(0)!.raw : pole(choice(0)!.poleKey)) : '');
+  const answer = (c: (typeof v.choices)[number]) => (c.raw !== '' ? c.raw : c.anyPole ? 'Peu importe' : pole(c.poleKey));
+  set(20, choice(0) ? answer(choice(0)!) : '');
   set(21, choice(0) ? LEVEL_LABEL[choice(0)!.level] : '');
-  set(22, choice(1) ? (choice(1)!.raw !== '' ? choice(1)!.raw : pole(choice(1)!.poleKey)) : '');
+  set(22, choice(1) ? answer(choice(1)!) : '');
   set(23, choice(1) ? LEVEL_LABEL[choice(1)!.level] : '');
   // A checkbox question, so several answers come back separated by commas. Not one of the
   // nine pole labels contains a comma, which is what makes that separator safe to split on.

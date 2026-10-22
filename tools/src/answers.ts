@@ -134,9 +134,113 @@ const AFTER =
 const INTERVAL =
   /\b(de|entre)\b[^0-9]{0,12}(\d{1,2})\s*[h:]\s*(\d{2})?[^0-9]{0,10}\b(a|et|jusqu a)\b[^0-9]{0,12}(\d{1,2})\s*[h:]\s*(\d{2})?/g;
 
+/**
+ * « 11h-14h », « 2h/6h »: two hours with nothing but a dash or a slash between them, which
+ * `normalise` leaves as a space. The very example the 2026-10 form gives (« Travail, 11h-14h,
+ * 2h-6h »), and it was read as nothing until 2026-10-22.
+ */
+const RANGE = /(?<![0-9])(\d{1,2})\s*h\s*(\d{2})?\s+(\d{1,2})\s*h\s*(\d{2})?(?![0-9])/g;
+
+/** A sentence saying when somebody CAN come, which turns a bare range around. */
+const AVAILABLE = /\b(dispo|disponible|libre|peux venir|present|la de)\b/;
+
 /** Any wording that puts the problem before the hour. */
 const BEFORE =
   /\b(avant|des|a partir de|j arrive|arrive|arriverai|dispo a|disponible a|commence|libre a)\b[^0-9]{0,20}$/;
+
+/**
+ * The stretches of the event a time constraint rules out, in event hours, before anything turns
+ * them into tranches. Null when the sentence says nothing readable.
+ */
+function availabilityCuts(text: string, startISO: string, lengthHours: number): Unavailable[] | null {
+  const mentions = hoursIn(text);
+  if (mentions.length === 0) return null;
+
+  const negative = NEGATIVE.test(text);
+  const cuts: Unavailable[] = [];
+
+  // "de X a Y", "entre X et Y", as many times as the sentence says it: "pas de 12h a 18h et
+  // pas de 0h a 6h" is two refusals, and reading only the first would drop one of them.
+  //
+  // An interval is a refusal only when the sentence is negative; the same interval in a
+  // positive sentence is when they CAN come, so it cuts both ends instead.
+  const interval = (rawFrom: number | null, rawTo: number | null, refused: boolean): void => {
+    // One edge outside the event is the event's own edge: « 11h-14h » on an event opening at 12h
+    // is the first two hours, not nothing.
+    if (rawFrom === null && rawTo === null) return;
+    const from = rawFrom ?? 0;
+    const to = rawTo ?? lengthHours;
+    // « 22h-2h » crosses midnight, which the offsets already do: only an empty range is skipped.
+    if (to <= from) return;
+    if (refused) cuts.push({ start: from, end: to });
+    else cuts.push({ start: 0, end: from }, { start: to, end: lengthHours });
+  };
+  for (const m of text.matchAll(INTERVAL)) {
+    interval(
+      clockOffset(startISO, lengthHours, Number(m[2]), Number(m[3] ?? 0)),
+      clockOffset(startISO, lengthHours, Number(m[5]), Number(m[6] ?? 0)),
+      negative,
+    );
+  }
+  // The bare ranges, outside what INTERVAL already read. The question asks when somebody can NOT
+  // be there, so a bare range is a refusal unless the sentence says it is when they can come.
+  const rest = text.replace(INTERVAL, ' ');
+  for (const m of rest.matchAll(RANGE)) {
+    interval(
+      clockOffset(startISO, lengthHours, Number(m[1]), Number(m[2] ?? 0)),
+      clockOffset(startISO, lengthHours, Number(m[3]), Number(m[4] ?? 0)),
+      negative || !AVAILABLE.test(text),
+    );
+  }
+
+  if (cuts.length === 0) {
+    for (const mention of mentions) {
+      const at = clockOffset(startISO, lengthHours, mention.hour, mention.minute);
+      if (at === null) continue;
+      const before = text.slice(Math.max(0, mention.at - 40), mention.at);
+
+      if (AFTER.test(before)) {
+        // "je pars a 2h" is a constraint even in a sentence with no negative word in it.
+        if (LEAVES.test(before) || negative) cuts.push({ start: at, end: lengthHours });
+        continue;
+      }
+      if (BEFORE.test(before)) {
+        cuts.push({ start: 0, end: at });
+        continue;
+      }
+      // An hour with nothing around it to say which side of it is the problem.
+      if (negative) cuts.push({ start: at, end: lengthHours });
+    }
+  }
+
+  const usable = cuts.filter((cut) => cut.end > cut.start + 1e-9);
+  return usable.length === 0 ? null : usable;
+}
+
+/**
+ * The same sentence read into exact windows, for an event whose unavailability is « plages
+ * libres » (`Plan.availabilityMode`, 2026-10-22): « Travail, 11h-14h » is 11h to 14h and nothing
+ * more, where the tranches would have refused the whole 12h-18h.
+ */
+export function parseAvailabilityWindows(
+  note: string,
+  startISO: string,
+  lengthHours: number,
+): AnswerReading<Unavailable[]> {
+  const text = inWords(normalise(note));
+  if (text === '' || NOTHING.test(text)) return sure([]);
+  const cuts = availabilityCuts(text, startISO, lengthHours);
+  if (cuts === null) return unsure([], `Contrainte horaire non comprise: "${note.trim()}"`);
+  // Merged and in order: two overlapping refusals are one stretch on the fiche.
+  const sorted = [...cuts].sort((a, b) => a.start - b.start);
+  const merged: Unavailable[] = [];
+  for (const cut of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && cut.start <= last.end + 1e-9) last.end = Math.max(last.end, cut.end);
+    else merged.push({ ...cut });
+  }
+  return sure(merged);
+}
 
 /**
  * Reading a free-text time constraint into the slots it rules out.
@@ -163,49 +267,8 @@ export function parseAvailabilityNote(
   if (text === '') return sure([]);
   if (NOTHING.test(text)) return sure([]);
 
-  const mentions = hoursIn(text);
-  if (mentions.length === 0) {
-    return unsure([], `Contrainte horaire non comprise: "${note.trim()}"`);
-  }
-
-  const negative = NEGATIVE.test(text);
-  const cuts: Unavailable[] = [];
-
-  // "de X a Y", "entre X et Y", as many times as the sentence says it: "pas de 12h a 18h et
-  // pas de 0h a 6h" is two refusals, and reading only the first would drop one of them.
-  //
-  // An interval is a refusal only when the sentence is negative; the same interval in a
-  // positive sentence is when they CAN come, so it cuts both ends instead.
-  for (const interval of text.matchAll(INTERVAL)) {
-    const from = clockOffset(startISO, lengthHours, Number(interval[2]), Number(interval[3] ?? 0));
-    const to = clockOffset(startISO, lengthHours, Number(interval[5]), Number(interval[6] ?? 0));
-    if (from === null || to === null || to <= from) continue;
-    if (negative) cuts.push({ start: from, end: to });
-    else cuts.push({ start: 0, end: from }, { start: to, end: lengthHours });
-  }
-
-  if (cuts.length === 0) {
-    for (const mention of mentions) {
-      const at = clockOffset(startISO, lengthHours, mention.hour, mention.minute);
-      if (at === null) continue;
-      const before = text.slice(Math.max(0, mention.at - 40), mention.at);
-
-      if (AFTER.test(before)) {
-        // "je pars a 2h" is a constraint even in a sentence with no negative word in it.
-        if (LEAVES.test(before) || negative) cuts.push({ start: at, end: lengthHours });
-        continue;
-      }
-      if (BEFORE.test(before)) {
-        cuts.push({ start: 0, end: at });
-        continue;
-      }
-      // An hour with nothing around it to say which side of it is the problem.
-      if (negative) cuts.push({ start: at, end: lengthHours });
-    }
-  }
-
-  const usable = cuts.filter((cut) => cut.end > cut.start + 1e-9);
-  if (usable.length === 0) {
+  const usable = availabilityCuts(text, startISO, lengthHours);
+  if (usable === null) {
     return unsure([], `Contrainte horaire non comprise: "${note.trim()}"`);
   }
 

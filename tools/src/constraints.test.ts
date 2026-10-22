@@ -72,6 +72,7 @@ function makePlan(parts: {
     rules: DEFAULT_RULES, catering: DEFAULT_CATERING, ticketing: DEFAULT_TICKETING,
     travel: DEFAULT_TRAVEL_RATES,
     poleChoicesRanked: true,
+    availabilityMode: 'tranches',
     volume: { scope: 'event', dayStartHour: 12, options: [4, 6, 8], ...parts.volume },
     formMapping: { columns: {}, answers: {} },
     applicationSteps: [],
@@ -353,4 +354,18 @@ test('a placement a weighed rule allows still says what it costs; a blocking one
   const outside = volunteer('b', { choices: [] });
   const onBar = shift('bar1', 'bar', 4, 6);
   deepStrictEqual(costsFor(new PlanIndex(makePlan({ shifts: [onBar], volunteers: [outside] })), outside, onBar).map((c) => c.code), [TIER1.horsChoix]);
+});
+
+test('« Tous les pôles acceptés » honours every pole at its own rank, never outside the choices', () => {
+  const plan = makePlan({ shifts: [], volunteers: [] });
+  const open = volunteer('a', {
+    choices: [
+      { poleKey: 'bar', raw: '', level: 'expert' },
+      { poleKey: '', raw: 'Peu importe', level: 'debutant', anyPole: true },
+    ],
+  });
+  const index = new PlanIndex({ ...plan, volunteers: [open] });
+  strictEqual(index.rankOf(open, 'bar'), 0, 'le premier choix reste le premier');
+  strictEqual(index.rankOf(open, 'propre'), 1, 'tout autre pôle au rang du « tous acceptés »');
+  strictEqual(index.rankOf(open, 'secu'), 1);
 });

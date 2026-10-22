@@ -76,6 +76,7 @@ export type {
   Block,
   BuddyPair,
   LeaderOnPole,
+  AvailabilityMode,
   Plan,
 } from '@engine/plan.ts';
 
@@ -246,7 +247,7 @@ export type {
   PhasePlacement,
   PhasePole,
 } from '@engine/phase.ts';
-export { absentFromPhase } from '@engine/model.ts';
+export { absentFromPhase, ANY_POLE_LABEL, choicePoleLabel } from '@engine/model.ts';
 export type { PhasePresence } from '@engine/model.ts';
 
 /**

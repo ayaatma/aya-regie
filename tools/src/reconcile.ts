@@ -22,7 +22,7 @@
  */
 
 import { fmtHours, type Plan } from './plan.js';
-import { ENERGY_LABEL, type EditableField, type Volunteer } from './model.js';
+import { ENERGY_LABEL, choicePoleLabel, type EditableField, type Volunteer } from './model.js';
 import { parseSubmittedAt, type ImportIssue, type ImportResult } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
 
@@ -162,7 +162,7 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
         v.length === 0
           ? 'aucun'
           : v
-              .map((c, i) => `${i + 1}. ${c.poleKey !== '' ? poleName(c.poleKey) : `« ${c.raw.trim()} »`} (${c.level})`)
+              .map((c, i) => `${i + 1}. ${choicePoleLabel(c, poleName)} (${c.level})`)
               .join(', '),
     },
     artistKeys: { label: 'Artistes à ne pas manquer', show: (v) => v.join(', ') },

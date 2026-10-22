@@ -27,7 +27,9 @@ import {
   setReserve,
 } from '../store/edits.ts';
 import {
+  choicePoleLabel,
   fmtHours,
+  windowHours,
   isNoAllergy,
   isStandardDiet,
   type EditableField,
@@ -44,6 +46,7 @@ import { VolunteerEdit } from './VolunteerEdit.tsx';
 import { ApplicationSection } from './ApplicationSection.tsx';
 import { AvailabilityDays } from './AvailabilityDays.tsx';
 import { PhaseDaysEdit, volunteerPhases } from './PhaseDaysEdit.tsx';
+import { UnavailableRanges } from './UnavailableRanges.tsx';
 import { SkillPicker } from './SkillPicker.tsx';
 import { PersonPhoto } from './PersonPhoto.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
@@ -422,7 +425,7 @@ function VolunteerDetail({
               <Fragment key={i}>
                 {i > 0 && <br />}
                 {index.plan.poleChoicesRanked !== false ? `${i + 1}. ` : '• '}
-                {choice.poleKey !== '' ? index.polePath(choice.poleKey) : `« ${choice.raw.trim()} »`}{' '}
+                {choicePoleLabel(choice, (key) => index.polePath(key))}{' '}
                 <span className="pool-item-meta">({levelLabel(choice.level)})</span>
               </Fragment>
             ))}
@@ -481,7 +484,27 @@ function VolunteerDetail({
         </div>
       )}
 
-      <AvailabilityDays volunteer={volunteer} readOnly={readOnly} />
+      {/* « Plages libres » holds any stretch, which a day's two edges cannot show: the list instead. */}
+      {index.plan.availabilityMode === 'plages' ? (
+        <div className="panel-section">
+          <p className="panel-section-title">Ne peut pas travailler</p>
+          <p className="people-meta">
+            {fmtHours(windowHours(index.windowsOf(volunteer.key)))} disponibles sur l'événement, tranches refusées déduites
+            {volunteer.manualFields.includes('unavailable') ? ' · corrigé à la main' : ''}.
+          </p>
+          <UnavailableRanges
+            index={index}
+            windows={volunteer.unavailable ?? []}
+            namePrefix="fiche"
+            readOnly={readOnly}
+            onChange={(unavailable) =>
+              edit((p) => correctVolunteer(p, volunteer.key, { unavailable }), `plages indisponibles de ${index.volunteerName(volunteer.key)}`)
+            }
+          />
+        </div>
+      ) : (
+        <AvailabilityDays volunteer={volunteer} readOnly={readOnly} />
+      )}
 
       <BuddiesSection volunteer={volunteer} buddies={detail.buddies} readOnly={readOnly} />
 
@@ -672,7 +695,7 @@ function RawAnswers({ volunteer }: { volunteer: Volunteer }) {
   const note = volunteer.availabilityNote.trim();
   const choices = volunteer.choices
     .map((c, i) => [`Choix ${i + 1}`, c.raw, c.poleKey] as const)
-    .filter(([, rawAnswer, key]) => rawAnswer.trim() !== '' && key === '');
+    .filter(([, rawAnswer, key], i) => rawAnswer.trim() !== '' && key === '' && !volunteer.choices[i]!.anyPole);
 
   if (note === '' && choices.length === 0) return null;
 

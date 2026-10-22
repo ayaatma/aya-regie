@@ -33,9 +33,10 @@ import {
   refusedWindows,
   usableWindows,
 } from './availability.js';
-import { parseAvailabilityNote, parsePhaseAnswer, parsePoleAnswer, type AnswerReading } from './answers.js';
+import { parseAvailabilityNote, parseAvailabilityWindows, parsePhaseAnswer, parsePoleAnswer, type AnswerReading } from './answers.js';
 import { parseArrival, parseDeparture, parsePhaseDays, splitPhaseDays, unavailableFrom } from './presence-days.js';
-import type { Phase } from './phase.js';
+import { mergeWindows, type Phase } from './phase.js';
+import type { AvailabilityMode } from './plan.js';
 import { resolveConstraints, type ConstraintSettings } from './constraints.js';
 import { DEFAULT_VOLUME, eventDays, type VolumeSettings } from './days.js';
 import {
@@ -953,6 +954,8 @@ export interface ImportOptions {
    * a phase answer is read as present or not, as before 2026-09-15.
    */
   phases?: { montage: Phase; demontage: Phase };
+  /** Tranches (the default) or plages libres: how the written time constraint is held. See `Plan.availabilityMode`. */
+  availabilityMode?: AvailabilityMode;
   /** The event's volume settings: per day or not, and the options. Defaults to the Loto Tekno's. */
   volume?: VolumeSettings;
   /** Which rhythm rules block, for the volume ceiling. Defaults to all of them. */
@@ -1186,7 +1189,12 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const availabilityNote = [chosenIsProse ? choiceCell.trim() : '', noteCell.trim()]
       .filter((part) => part !== '')
       .join('\n');
-    const availability = parseAvailabilityNote(availabilityNote, slots, startISO, lengthHours);
+    // « Plages libres »: the sentence's own hours, kept as they are, and no tranche from it.
+    const ranges = options.availabilityMode === 'plages';
+    const noteWindows = ranges ? parseAvailabilityWindows(availabilityNote, startISO, lengthHours) : null;
+    const availability = noteWindows
+      ? { value: [] as SlotId[], confident: noteWindows.confident, reason: noteWindows.reason }
+      : parseAvailabilityNote(availabilityNote, slots, startISO, lengthHours);
     if (availability.reason) reviewReasons.push(availability.reason);
 
     // Arrival and departure: windows of the event before and after, day by day in the tool.
@@ -1202,7 +1210,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const notOnExploit = map.exploitHelp !== undefined && yesNo(cell(row, 'exploitHelp')) === false;
     const unavailable = notOnExploit
       ? [{ start: 0, end: lengthHours }]
-      : unavailableFrom(arrival.value, departure.value, lengthHours);
+      : mergeWindows([...unavailableFrom(arrival.value, departure.value, lengthHours), ...(noteWindows?.value ?? [])]);
     // Kept word for word with the other time answers: this is what a correction is checked against.
     const timeNote = [
       availabilityNote,
@@ -1308,7 +1316,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
      * an "Autre" box usually has commas too, and then the parts do not all resolve and the cell
      * stays one answer to review.
      */
-    const choiceEntries: Array<{ raw: string; pole: Pole | null; level: SkillLevel }> = [];
+    const choiceEntries: Array<{ raw: string; pole: Pole | null; level: SkillLevel; anyPole?: boolean }> = [];
     for (const columns of binding.choices) {
       const raw = at(row, columns.pole);
       if (raw === '') continue;
@@ -1322,7 +1330,9 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       const readings = several ? parts.map((part, i) => ({ raw: part, reading: partReadings[i]! })) : [{ raw, reading: whole }];
       for (const { raw: text, reading } of readings) {
         if (reading.reason) reviewReasons.push(reading.reason);
-        choiceEntries.push({ raw: text, pole: poles.find((p) => p.key === reading.value) ?? null, level });
+        // An answer naming no pole on purpose (« peu importe », « tout me va ») is every pole.
+        const anyPole = reading.value === '' && reading.confident && text.trim() !== '';
+        choiceEntries.push({ raw: text, pole: poles.find((p) => p.key === reading.value) ?? null, level, anyPole });
       }
     }
 
@@ -1365,7 +1375,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     for (const [i, entry] of choiceEntries.entries()) {
       const label = `choix ${i + 1}`;
       const { raw, pole: found } = entry;
-      if (raw.trim() !== '' && !found) {
+      if (raw.trim() !== '' && !found && !entry.anyPole) {
         issues.push({
           severity: 'warning',
           code: 'pole-inconnu',
@@ -1532,7 +1542,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       minor: map.birthDate === undefined ? null : isMinorAt(cell(row, 'birthDate'), startISO),
       nicknameMatters: map.nicknameMatters === undefined ? null : yesNo(cell(row, 'nicknameMatters')),
       refusedPoleKeys: refusedPoles.map((pole) => pole.key),
-      choices: choiceEntries.map((c): PoleChoice => ({ poleKey: c.pole?.key ?? '', raw: c.raw, level: c.level })),
+      choices: choiceEntries.map((c): PoleChoice => ({ poleKey: c.pole?.key ?? '', raw: c.raw, level: c.level, ...(c.anyPole ? { anyPole: true } : {}) })),
       artistKeys,
       // What was asked for, as a person rather than as the fragments of a sentence. The address
       // and the number stay on the mention for the matching and are not repeated here: this is

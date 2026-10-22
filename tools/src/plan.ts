@@ -145,8 +145,14 @@ import {
  *    writes every one of them back as an inscription with no address and the default messages.
  * 27: 2026-10-22, the follow-up by mail: an `ApplicationStep` may carry a `mail` (text, target,
  *    expected reply). A build that predates this writes every step back as a plain box to tick.
+ * 28: 2026-10-22, `PoleChoice.anyPole` (« Tous les pôles acceptés ») and `Plan.availabilityMode`.
+ *    A build that predates this writes « tous acceptés » back as an empty choice and the mode back
+ *    as tranches.
  */
-export const PLAN_FORMAT = 27;
+export const PLAN_FORMAT = 28;
+
+/** See `Plan.availabilityMode`. */
+export type AvailabilityMode = 'tranches' | 'plages';
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -221,6 +227,13 @@ export interface Plan {
    * priced. The list keeps its order either way. See `PoleChoice`.
    */
   poleChoicesRanked: boolean;
+  /**
+   * How « ne peut pas travailler » is held, since 2026-10-22. TRANCHES, the default: the form's
+   * tranches, refused whole, and a sentence is rounded to the tranches it touches. PLAGES: exact
+   * stretches per person (`Volunteer.unavailable`), a sentence read to the hour, any number of
+   * them on the fiche. A closed tranche question the form asks is still read either way, and adds.
+   */
+  availabilityMode: AvailabilityMode;
   /** Whether volumes are for the event or per day, where a day begins, and the options offered. See `days.ts`. */
   volume: VolumeSettings;
   /**
@@ -760,7 +773,7 @@ export class PlanIndex {
    * setting applied.
    */
   choiceIndexOf(volunteer: Volunteer, poleKey: string): number | null {
-    const at = volunteer.choices.findIndex((c) => c.poleKey !== '' && this.isUnder(poleKey, c.poleKey));
+    const at = volunteer.choices.findIndex((c) => c.anyPole || (c.poleKey !== '' && this.isUnder(poleKey, c.poleKey)));
     return at < 0 ? null : at;
   }
 
@@ -898,6 +911,7 @@ export function emptyPlan(
     | 'travel'
     | 'constraints'
     | 'poleChoicesRanked'
+    | 'availabilityMode'
     | 'volume'
     | 'formMapping'
     | 'dismissedBuddies'
@@ -937,6 +951,7 @@ export function emptyPlan(
     travel: DEFAULT_TRAVEL_RATES,
     constraints: DEFAULT_CONSTRAINTS,
     poleChoicesRanked: true,
+    availabilityMode: 'tranches',
     volume: DEFAULT_VOLUME,
     formMapping: EMPTY_FORM_MAPPING,
     applicationSteps: DEFAULT_APPLICATION_STEPS,

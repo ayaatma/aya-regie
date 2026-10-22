@@ -184,3 +184,17 @@ test('a yes naming both phases and refusing neither is a plain yes for both', ()
   }
   strictEqual(parsePhaseAnswer('Peut-être pour le montage et le démontage', 'montage').confident, false);
 });
+
+test('in plages libres, the form\'s own example is read to the hour, edges clamped to the event', async () => {
+  const { parseAvailabilityWindows } = await import('./answers.js');
+  // The event opens at 12h: 11h-14h is its first two hours, 2h-6h is 14h to 18h after the start.
+  deepStrictEqual(parseAvailabilityWindows('Travail, 11h-14h, 2h-6h', EVENT_START_ISO, EVENT_LENGTH_HOURS).value, [
+    { start: 0, end: 2 },
+    { start: 14, end: 18 },
+  ]);
+  deepStrictEqual(parseAvailabilityWindows('Je ne peux pas de 13h à 15h', EVENT_START_ISO, EVENT_LENGTH_HOURS).value, [{ start: 1, end: 3 }]);
+  deepStrictEqual(parseAvailabilityWindows('Rien', EVENT_START_ISO, EVENT_LENGTH_HOURS), { value: [], confident: true, reason: null });
+  strictEqual(parseAvailabilityWindows('ça dépend du boulot', EVENT_START_ISO, EVENT_LENGTH_HOURS).confident, false);
+  // The tranches read the same bare ranges now, still refused whole.
+  deepStrictEqual(parseAvailabilityNote('Bébé à garder, 13h-17h', DEFAULT_SLOTS, EVENT_START_ISO, EVENT_LENGTH_HOURS).value, ['12h-18h']);
+});

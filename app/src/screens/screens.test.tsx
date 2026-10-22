@@ -2762,3 +2762,27 @@ test('the correction form reads and ticks the montage and démontage days, when 
   assert.ok(shows(html, 'Montage et démontage'));
   assert.ok(html.includes(`name="edit-${volunteer.key}-montage-day-`), 'une case par jour du montage');
 });
+
+test('Réglages offers the two ways of holding « ne peut pas travailler »', () => {
+  const html = render(<SetupScreen />);
+  assert.ok(shows(html, 'Indisponibilités des bénévoles'));
+  assert.ok(shows(html, 'Tranches proposées') && shows(html, 'Plages libres'));
+});
+
+test('the correction form offers « Tous les pôles acceptés », and stretches in plages libres', () => {
+  const volunteer = {
+    ...plan.volunteers[0]!,
+    choices: [{ poleKey: '', raw: 'Peu importe', level: 'debutant' as const, anyPole: true }],
+    unavailable: [{ start: 1, end: 3 }],
+  };
+  const tranches = render(<VolunteerEdit index={new PlanIndex(plan)} volunteer={volunteer} onCancel={noop} onSave={noop} />);
+  assert.ok(shows(tranches, 'Tous les pôles acceptés'));
+  assert.ok(tranches.includes('value="*" selected'), 'le choix « tous acceptés » est sélectionné');
+  assert.ok(!shows(tranches, 'Ajouter une plage'));
+  const plages = render(
+    <VolunteerEdit index={new PlanIndex({ ...plan, availabilityMode: 'plages' })} volunteer={volunteer} onCancel={noop} onSave={noop} />,
+  );
+  assert.ok(shows(plages, 'Ajouter une plage'));
+  assert.ok(shows(plages, 'Tranches refusées'));
+  assert.ok(plages.includes(`name="edit-${volunteer.key}-range-0-from"`), 'la plage existante est éditable');
+});

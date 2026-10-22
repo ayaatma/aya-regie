@@ -119,6 +119,9 @@ create table event (
   -- 2026-09-14, the event stops assuming the Loto Tekno's form.
   -- Whether a volunteer's pole choices are an order of preference (true) or a set of equals.
   pole_choices_ranked   boolean not null default true,
+  -- How « ne peut pas travailler » is held, since 2026-10-22: the form's tranches, refused whole,
+  -- or exact stretches per person (volunteer.unavailable). See Plan.availabilityMode.
+  availability_mode     text not null default 'tranches' check (availability_mode in ('tranches', 'plages')),
   -- Whether the volume asked is for the whole event or for each day, the clock hour a day hands
   -- over to the next, and the volumes the form offers. See tools/src/days.ts.
   volume_scope          text not null default 'event' check (volume_scope in ('event', 'day')),
@@ -627,6 +630,8 @@ create table volunteer_choice (
   pole_id      uuid references pole(id) on delete set null,
   raw          text not null default '',
   level        skill_level not null default 'debutant',
+  -- « Tous les pôles acceptés », since 2026-10-22: every pole honours this choice, pole_id null.
+  any_pole     boolean not null default false,
   primary key (volunteer_id, rank)
 );
 
@@ -1098,7 +1103,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 27,
+values ('min_plan_format', 28,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1433,7 +1438,8 @@ as $fn$
                                   select jsonb_agg(jsonb_build_object(
                                            'poleKey', coalesce(cp.key, ''),
                                            'raw',     vc.raw,
-                                           'level',   vc.level) order by vc.rank)
+                                           'level',   vc.level,
+                                           'anyPole', vc.any_pole) order by vc.rank)
                                   from volunteer_choice vc
                                   left join pole cp on cp.id = vc.pole_id
                                   where vc.volunteer_id = v.id), '[]'::jsonb),
@@ -1720,6 +1726,7 @@ as $fn$
       'travel',      travel.j,
       'constraints', e.constraint_settings,
       'poleChoicesRanked', e.pole_choices_ranked,
+      'availabilityMode', e.availability_mode,
       'volume', jsonb_build_object(
         'scope',        e.volume_scope,
         'dayStartHour', e.day_start_hour,
@@ -1809,6 +1816,7 @@ begin
                                  then p_plan->'constraints' else '{}'::jsonb end,
     -- Absent from anything written before PLAN_FORMAT 13: ranked, per event, 4, 6 or 8, noon.
     pole_choices_ranked   = coalesce((p_plan->>'poleChoicesRanked')::boolean, true),
+    availability_mode     = case when p_plan->>'availabilityMode' = 'plages' then 'plages' else 'tranches' end,
     volume_scope          = case when p_plan#>>'{volume,scope}' = 'day' then 'day' else 'event' end,
     day_start_hour        = coalesce((p_plan#>>'{volume,dayStartHour}')::numeric, 12),
     volume_options        = coalesce((select array_agg((o #>> '{}')::numeric order by (o #>> '{}')::numeric)
@@ -2097,9 +2105,10 @@ begin
 
   -- A list, in order: the rank is the position in the JSON. A choice naming a pole the plan does
   -- not hold keeps its answer and loses the pole, which is how the engine reads it.
-  insert into volunteer_choice (volunteer_id, rank, pole_id, raw, level)
+  insert into volunteer_choice (volunteer_id, rank, pole_id, raw, level, any_pole)
   select v.id, (ch.ord - 1)::int, p.id, coalesce(ch.c->>'raw', ''),
-         coalesce((ch.c->>'level')::skill_level, 'debutant')
+         coalesce((ch.c->>'level')::skill_level, 'debutant'),
+         coalesce((ch.c->>'anyPole')::boolean, false)
   from jsonb_array_elements(coalesce(p_plan->'volunteers', '[]'::jsonb)) as t(x)
   join volunteer v on v.event_id = p_event_id and v.key = x->>'key'
   cross join lateral jsonb_array_elements(coalesce(x->'choices', '[]'::jsonb)) with ordinality as ch(c, ord)

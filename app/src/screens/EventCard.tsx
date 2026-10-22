@@ -20,6 +20,7 @@ import { dayLabel, eventDays, toClock } from '../engine.ts';
 import {
   MAX_EVENT_HOURS,
   setEventAddress,
+  setAvailabilityMode,
   setPoleChoicesRanked,
   setVolumeSettings,
   shiftsCutByBoundary,
@@ -333,6 +334,34 @@ export function EventCard() {
           <span className="rule-hint">
             Classés: le premier choix est le plus souhaité, chaque rang plus bas coûte un peu plus
             (Réglages avancés). À égalité: tous les choix se valent, seul le hors choix coûte.
+          </span>
+        </div>
+
+        {/*
+          How « ne peut pas travailler » is held, 2026-10-22. Tranches: the form's tranches,
+          refused whole. Plages libres: the exact hours, as many stretches per person as needed.
+        */}
+        <div className="rule">
+          <span className="rule-label">Indisponibilités des bénévoles</span>
+          <span className="advanced-mode" role="radiogroup" aria-label="Indisponibilités par tranches ou en plages libres">
+            {(['tranches', 'plages'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={plan.availabilityMode === mode}
+                className={`mode-choice is-weight${plan.availabilityMode === mode ? ' is-on' : ''}`}
+                onClick={() => edit((p) => setAvailabilityMode(p, mode), mode === 'tranches' ? 'indisponibilités par tranches' : 'indisponibilités en plages libres')}
+              >
+                {mode === 'tranches' ? 'Tranches proposées' : 'Plages libres'}
+              </button>
+            ))}
+          </span>
+          <span className="rule-hint">
+            Tranches proposées: une contrainte écrite refuse les tranches entières qu'elle touche.
+            Plages libres: elle est gardée à l'heure près (« 11h-14h »), et la fiche accepte
+            autant de plages que nécessaire. Les tranches de la question fermée, si le formulaire
+            la pose, s'y ajoutent. Ne change que les prochains imports et les corrections.
           </span>
         </div>
       </div>

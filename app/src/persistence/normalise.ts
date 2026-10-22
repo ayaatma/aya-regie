@@ -767,8 +767,13 @@ function choices(loose: Record<string, unknown>): PoleChoice[] {
   if (Array.isArray(loose.choices)) {
     return (loose.choices as Array<Record<string, unknown>>)
       .filter((c) => c !== null && typeof c === 'object')
-      .map((c) => ({ poleKey: text(c.poleKey), raw: text(c.raw), level: level(c.level) }))
-      .filter((c) => c.poleKey !== '' || c.raw.trim() !== '');
+      .map((c): PoleChoice => ({
+        poleKey: text(c.poleKey),
+        raw: text(c.raw),
+        level: level(c.level),
+        ...(c.anyPole === true ? { anyPole: true } : {}),
+      }))
+      .filter((c) => c.poleKey !== '' || c.raw.trim() !== '' || c.anyPole === true);
   }
   return [1, 2]
     .map((n) => ({
@@ -1028,6 +1033,8 @@ export function normalisePlan(raw: unknown): Plan {
     // Absent from anything written before 2026-09-14, whose form asked for a first and a second
     // choice: ranked.
     poleChoicesRanked: loose.poleChoicesRanked !== false,
+    // Absent from anything written before 2026-10-22: the tranches, as every event had.
+    availabilityMode: loose.availabilityMode === 'plages' ? 'plages' : 'tranches',
     // Absent from anything written before 2026-09-14: one volume for the event, 4, 6 or 8 hours.
     volume: volume(loose.volume),
     // Absent from anything written before 2026-09-14: nothing decided, everything detected.

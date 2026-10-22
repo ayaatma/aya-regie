@@ -17,6 +17,7 @@
  */
 
 import {
+  choicePoleLabel,
   phaseDays,
   phasePeople,
   subtractWindows,
@@ -209,7 +210,7 @@ export function choicesText(index: PlanIndex, volunteer: Volunteer): string {
   if (volunteer.choices.length === 0) return 'Aucun choix de pôle\n';
   const ranked = index.plan.poleChoicesRanked !== false;
   return volunteer.choices
-    .map((c, i) => `${ranked ? `Choix ${i + 1}` : 'Choix'}: ${c.poleKey !== '' ? index.polePath(c.poleKey) : `« ${c.raw.trim()} »`}\n`)
+    .map((c, i) => `${ranked ? `Choix ${i + 1}` : 'Choix'}: ${choicePoleLabel(c, (key) => index.polePath(key))}\n`)
     .join('');
 }
 
@@ -237,7 +238,8 @@ export function poleMatchOf(
   if (kind === 'benevole') {
     const volunteer = index.volunteerByKey.get(personKey);
     if (!volunteer) return null;
-    const at = volunteer.choices.findIndex((c) => related(c.poleKey));
+    // « Tous les pôles acceptés » is asked for by every pole's filter.
+    const at = volunteer.choices.findIndex((c) => c.anyPole || related(c.poleKey));
     return at < 0 ? null : at;
   }
   return index.polesLedBy(personKey).some((role) => related(role.poleKey)) ? 'responsable' : null;

@@ -15,13 +15,13 @@ import { correctVolunteer } from '../store/edits.ts';
 import { PlainClockField } from './ClockField.tsx';
 
 /** The clock hour of an offset of the event, 0 to 24. */
-function clockAt(startISO: string, hours: number): number {
+export function clockAt(startISO: string, hours: number): number {
   const at = new Date(new Date(startISO).getTime() + hours * 3600_000);
   return at.getHours() + at.getMinutes() / 60;
 }
 
 /** The offset inside `day` a clock hour means; `end` reads 24h as the day's own end. */
-function offsetIn(startISO: string, day: Window, clock: number, end: boolean): number {
+export function offsetIn(startISO: string, day: Window, clock: number, end: boolean): number {
   const first = clockAt(startISO, day.start);
   let delta = (((clock - first) % 24) + 24) % 24;
   if (end && delta < 1e-9) delta = 24;
@@ -108,7 +108,7 @@ export function AvailabilityDays({ volunteer, readOnly }: { volunteer: Volunteer
   );
 }
 
-function fmtClockOf(startISO: string, hours: number): string {
+export function fmtClockOf(startISO: string, hours: number): string {
   const clock = clockAt(startISO, hours);
   const h = Math.floor(clock);
   return `${String(h).padStart(2, '0')}h${String(Math.round((clock - h) * 60)).padStart(2, '0')}`;

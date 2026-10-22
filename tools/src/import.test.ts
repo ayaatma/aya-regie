@@ -771,3 +771,20 @@ test('an unresolved buddy says nobody was found and that the régisseur links it
   ok(raised.length > 0);
   ok(raised.every((i) => /aucune inscription ne correspond/.test(i.message) && /à la main/.test(i.message)));
 });
+
+test('« peu importe » as a choice is « Tous les pôles acceptés », with no signalement', () => {
+  const result = importOne({ 22: 'Peu importe' });
+  const second = result.volunteers[0]!.choices[1]!;
+  strictEqual(second.anyPole, true);
+  strictEqual(second.poleKey, '');
+  ok(!result.issues.some((i) => i.code === 'pole-inconnu'), JSON.stringify(result.issues));
+});
+
+test('in plages libres the time constraint becomes exact windows, and no tranche', () => {
+  const csv = rowCsv({ 42: 'Travail, 13h-15h' });
+  const tranches = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO }).volunteers[0]!;
+  ok(tranches.refusedSlotIds.length > 0);
+  const plages = importVolunteers(csv, { poles, artists, startISO: EVENT_START_ISO, availabilityMode: 'plages' }).volunteers[0]!;
+  deepStrictEqual(plages.refusedSlotIds, []);
+  deepStrictEqual(plages.unavailable, [{ start: 1, end: 3 }]);
+});
