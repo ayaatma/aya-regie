@@ -957,7 +957,9 @@ test('the settings screen lets the form time slots be edited, and prices a remov
   const preferred = plan.preferenceSlots.find((s) => plan.volunteers.some((v) => v.preferredSlotId === s.id))!;
   const preferring = plan.volunteers.filter((v) => v.preferredSlotId === preferred.id).length;
   assert.ok(preferring > 0, 'le scénario doit contenir des préférences');
-  assert.ok(shows(html, `${preferring} la préfèrent`));
+  // Not on the row since 2026-10-22: beside « débordement accepté » it read as part of it.
+  assert.ok(!shows(html, `${preferring} la préfèrent`));
+  assert.ok(!shows(html, 'personne ne la préfère'));
 
   // The removal cost is the point of the card: the régisseur must see how many answers a slot
   // carries before deciding it can go.
@@ -2451,7 +2453,7 @@ test('the Réglages card edits the ticket types, the bracelets and the invitatio
   assert.ok(html.includes('name="ticket-label-loto"'));
   assert.ok(html.includes('name="ticket-start-loto"'));
   assert.ok(html.includes('name="bracelet-backstage-artiste"'));
-  assert.ok(shows(html, 'Ajouter un type de ticket'));
+  assert.ok(shows(html, "Ajouter un billet d'entrée"));
   assert.ok(shows(html, 'Ajouter un bracelet'));
 });
 

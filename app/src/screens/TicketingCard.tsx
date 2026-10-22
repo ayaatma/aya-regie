@@ -50,12 +50,12 @@ export function TicketingCard() {
     <SetupSection
       className="setup-ticketing"
       title="Billetterie"
-      meta={`${ticketing.ticketTypes.length} type(s) de ticket · ${ticketing.bracelets.length} bracelet(s) · ${ticketing.guestsPerArtist} invitation(s) par artiste`}
+      meta={`${ticketing.ticketTypes.length} type(s) de billet · ${ticketing.bracelets.length} bracelet(s) · ${ticketing.guestsPerArtist} invitation(s) par artiste`}
     >
       <p className="people-meta setup-orgas-note">
         Ce que la billetterie remet à chaque personne se lit dans l'onglet Personnes: les
-        tickets boisson et repas viennent du catering, le type de ticket et le bracelet viennent
-        d'ici. Rien n'est refusé: un repas servi hors du ticket est signalé, pas retiré.
+        tickets boisson et repas viennent du catering, le billet d'entrée et le bracelet viennent
+        d'ici. Rien n'est refusé: un repas servi hors du billet d'entrée est signalé, pas retiré.
       </p>
 
       <div className="rules-grid">
@@ -101,10 +101,10 @@ export function TicketingCard() {
       </div>
 
       <div className="setup-lineup">
-        <span className="panel-section-title">Types de ticket ({ticketing.ticketTypes.length})</span>
+        <span className="panel-section-title">Billets d'entrée ({ticketing.ticketTypes.length})</span>
         <p className="panel-sub">
           Un nom et la plage de l'événement qu'il ouvre. Celui qui couvre le plus de l'événement
-          est le ticket de tout le monde, sauf choix contraire dans l'onglet Personnes.
+          est le billet de tout le monde, sauf choix contraire dans l'onglet Personnes.
         </p>
         {ticketing.ticketTypes.map((type) => (
           <div key={type.key} className="setup-ticket-row">
@@ -113,9 +113,9 @@ export function TicketingCard() {
               name={`ticket-label-${type.key}`}
               autoComplete="off"
               value={type.label}
-              aria-label="Nom du type de ticket"
+              aria-label="Nom du billet d'entrée"
               onChange={(event) =>
-                edit((p) => setTicketType(p, type.key, { label: event.target.value }), `ticket ${type.label}`)
+                edit((p) => setTicketType(p, type.key, { label: event.target.value }), `billet ${type.label}`)
               }
             />
             <span className="clock-range">
@@ -159,7 +159,7 @@ export function TicketingCard() {
                 <button
                   className="btn is-danger"
                   onClick={() => {
-                    edit((p) => deleteTicketType(p, type.key), `retrait du ticket ${type.label}`);
+                    edit((p) => deleteTicketType(p, type.key), `retrait du billet ${type.label}`);
                     setArmed(null);
                   }}
                 >
@@ -183,14 +183,14 @@ export function TicketingCard() {
         <span className="setup-confirm">
           <input
             className="select"
-            placeholder="Nom d'un type de ticket"
+            placeholder="Nom d'un billet d'entrée"
             name="new-ticket-type"
             autoComplete="off"
             value={newTicket}
             onChange={(event) => setNewTicket(event.target.value)}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' || newTicket.trim() === '') return;
-              edit((p) => addTicketType(p, newTicket), `ticket ${newTicket.trim()}`);
+              edit((p) => addTicketType(p, newTicket), `billet ${newTicket.trim()}`);
               setNewTicket('');
             }}
           />
@@ -198,11 +198,11 @@ export function TicketingCard() {
             className="btn"
             disabled={newTicket.trim() === ''}
             onClick={() => {
-              edit((p) => addTicketType(p, newTicket), `ticket ${newTicket.trim()}`);
+              edit((p) => addTicketType(p, newTicket), `billet ${newTicket.trim()}`);
               setNewTicket('');
             }}
           >
-            Ajouter un type de ticket
+            Ajouter un billet d'entrée
           </button>
         </span>
       </div>

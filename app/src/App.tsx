@@ -56,6 +56,7 @@ type Screen =
   | 'envois'
   | 'reglages'
   | 'import'
+  | 'export'
   | 'historique';
 
 const TABS: Array<{ id: Screen; label: string }> = [
@@ -75,7 +76,8 @@ const TABS: Array<{ id: Screen; label: string }> = [
   { id: 'equipes', label: 'Équipes' },
   { id: 'annexes', label: 'Activités annexes' },
   { id: 'reglages', label: 'Réglages' },
-  { id: 'import', label: 'Import/Export' },
+  { id: 'import', label: 'Import' },
+  { id: 'export', label: 'Export' },
   { id: 'historique', label: 'Historique' },
 ];
 
@@ -92,7 +94,7 @@ const GROUPS: Array<{ id: Group; label: string; screens: Screen[] }> = [
   { id: 'personnes', label: 'Personnes', screens: ['personnes', 'envois'] },
   { id: 'logistique', label: 'Logistique', screens: ['artistes', 'catering', 'magasin', 'equipes', 'annexes'] },
   { id: 'suivi', label: 'Suivi', screens: ['tableau', 'historique'] },
-  { id: 'reglages', label: 'Réglages', screens: ['reglages', 'import'] },
+  { id: 'reglages', label: 'Réglages', screens: ['reglages', 'import', 'export'] },
 ];
 
 const groupOf = (screen: Screen): Group => GROUPS.find((g) => g.screens.includes(screen))!.id;
@@ -516,12 +518,13 @@ export function App({
         )}
         {screen === 'envois' && <MailsScreen />}
         {screen === 'reglages' && <SetupScreen />}
+        {/* Two tabs since 2026-10-22: bringing answers in and taking documents out are not one task. */}
         {screen === 'import' && (
+          <StackedScreen sections={[{ id: 'import', title: 'Import', children: <ImportScreen /> }]} />
+        )}
+        {screen === 'export' && (
           <StackedScreen
-            sections={[
-              { id: 'import', title: 'Import', children: <ImportScreen /> },
-              { id: 'export', title: 'Export', children: <PrintScreen />, printable: true },
-            ]}
+            sections={[{ id: 'export', title: 'Export', children: <PrintScreen />, printable: true }]}
           />
         )}
         {screen === 'historique' && (

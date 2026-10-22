@@ -307,9 +307,13 @@ function PreferenceRow({ slot }: { slot: PreferenceSlot }) {
         <span className="rule-suffix">h</span>
       </label>
 
+      {/*
+        No head count on the row since 2026-10-22: « débordement accepté · personne ne la préfère »
+        read as one sentence about the overflow, and before any import it said nothing at all. The
+        count is still given where it matters, when removing the tranche.
+      */}
       <span className="people-meta">
-        {named > 0 ? `${named} la préfèrent` : 'personne ne la préfère'} · id{' '}
-        <code>{slot.id}</code>
+        id <code>{slot.id}</code>
       </span>
 
       {armed ? (

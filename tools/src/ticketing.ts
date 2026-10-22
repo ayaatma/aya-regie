@@ -161,7 +161,7 @@ function ticketIssues(
     if (!window) continue;
     if (window.end <= ticket.start || window.start >= ticket.end) {
       issues.push(
-        `repas ${service.label} hors du ticket « ${ticket.label} » ` +
+        `repas ${service.label} hors du billet « ${ticket.label} » ` +
           `(${toClock(startISO, ticket.start)} à ${toClock(startISO, ticket.end)})`,
       );
     }
@@ -403,7 +403,7 @@ export function ticketingCsv(
     'Statut',
     'Tickets boisson',
     'Tickets repas',
-    'Ticket',
+    "Billet d'entrée",
     'Bracelet',
     ...(withPhones ? ['Téléphone'] : []),
     'Remarques',

@@ -311,7 +311,7 @@ function DoorSection({ row, report, who }: { row: TicketingRow; report: Ticketin
       <p className="panel-section-title">À l'entrée</p>
       <div className="rules-grid">
         <label className="rule">
-          <span className="rule-label">Ticket</span>
+          <span className="rule-label">Billet d'entrée</span>
           <TicketSelect row={row} report={report} who={who} prefix="fiche-" />
         </label>
         <label className="rule">
@@ -342,7 +342,7 @@ function DoorSection({ row, report, who }: { row: TicketingRow; report: Ticketin
       {hasDoorChoice(row) && (
         <button
           className="btn is-small"
-          title="Rendre le ticket, le bracelet et les tickets boisson aux réglages, et effacer la remarque"
+          title="Rendre le billet d'entrée, le bracelet et les tickets boisson aux réglages, et effacer la remarque"
           onClick={() => edit((p) => clearChoices(p, row.kind, row.key), `choix de ${who} rendus aux réglages`)}
         >
           Revenir aux réglages

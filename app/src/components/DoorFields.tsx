@@ -49,13 +49,13 @@ export function TicketSelect({ row, report, who, prefix = '' }: DoorFieldProps) 
       name={`${prefix}ticket-${row.kind}-${row.key}`}
       value={row.ticketTypeKey ?? ''}
       disabled={report.ticketTypes.length === 0}
-      aria-label={`Ticket de ${who}`}
+      aria-label={`Billet d'entrée de ${who}`}
       title={row.ticketByHand ? 'Choisi à la main; suit Réglages sinon.' : "Le type par défaut de l'événement."}
       onChange={(event) =>
         edit(
           (p) =>
             chooseForPerson(p, row.kind, row.key, { ticketTypeKey: event.target.value || null }, doorDefaults(row, report)),
-          `ticket de ${who}`,
+          `billet de ${who}`,
         )
       }
     >

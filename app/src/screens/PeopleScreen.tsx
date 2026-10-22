@@ -366,7 +366,7 @@ export function PeopleScreen({
           </label>
           <button
             className="btn"
-            title="La liste de l'accueil: statuts, tickets, bracelets et remarques"
+            title="La liste de l'accueil: statuts, billets, tickets, bracelets et remarques"
             onClick={() =>
               downloadText(
                 `billetterie-${today()}${withPhones ? '-avec-telephones' : ''}.csv`,
@@ -381,7 +381,7 @@ export function PeopleScreen({
         <div className="screen-body">
           {view === 'accueil' && (report.ticketTypes.length === 0 || report.bracelets.length === 0) && (
             <p className="screen-card-note ticketing-note">
-              {report.ticketTypes.length === 0 && 'Aucun type de ticket'}
+              {report.ticketTypes.length === 0 && "Aucun billet d'entrée"}
               {report.ticketTypes.length === 0 && report.bracelets.length === 0 && ' et '}
               {report.bracelets.length === 0 && (report.ticketTypes.length === 0 ? 'aucun bracelet' : 'Aucun bracelet')}
               {" n'est défini pour cet événement: la liste se lit quand même, ces colonnes restent vides. "}
@@ -504,7 +504,7 @@ function PeopleTable({
               <>
                 <th title="Tickets boisson à remettre">Boissons</th>
                 <th title="Tickets repas à remettre">Repas</th>
-                <th>Ticket</th>
+                <th>Billet</th>
                 <th>Bracelet</th>
                 {withPhones && <th>Téléphone</th>}
                 <th>Remarques</th>
@@ -666,7 +666,7 @@ function PersonLine({
               {hasDoorChoice(row) && (
                 <button
                   className="btn is-icon"
-                  title="Rendre le ticket, le bracelet et les tickets boisson aux réglages, et effacer la remarque"
+                  title="Rendre le billet d'entrée, le bracelet et les tickets boisson aux réglages, et effacer la remarque"
                   onClick={() => edit((p) => clearChoices(p, row.kind, row.key), `choix de ${who} rendus aux réglages`)}
                 >
                   ↺

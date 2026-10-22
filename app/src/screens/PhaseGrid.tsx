@@ -99,6 +99,8 @@ const FIT_SLACK = 4;
 const ROW_H = 22;
 const ROW_GAP = 2;
 const LANE_PAD = 6;
+/** Between two lines of événements that run at the same hours. */
+const EVENT_LINE_GAP = 4;
 
 /*
  * The three numbers an événement block is built out of, and they MIRROR THE STYLESHEET.
@@ -800,13 +802,22 @@ export function PhaseGrid({
     );
   }
 
-  /** The événements lane: one row of blocks, as tall as the fullest of them. */
+  /** The événements lane: blocks as tall as the fullest of them. */
   const eventRows =
     Math.max(1, ...fills.map((fill) => Math.max(fill.event.headcount, fill.taken))) +
     // Mode édition draws a « + » place under every événement.
     (editing ? 1 : 0);
   const eventBlockH = eventBlockHeight(eventRows);
-  const eventLaneHeight = eventBlockH + LANE_PAD;
+  /*
+   * ÉVÉNEMENTS AT THE SAME HOURS STACK, since 2026-10-22: they were all drawn on one line and two
+   * at the same time sat exactly on top of each other, the second hiding the first. Packed on the
+   * stored hours, so a block being dragged keeps its line instead of jumping between them.
+   */
+  const eventLineByKey = new Map(
+    [...packRows(phase.events)].map(([event, line]) => [event.key, line] as const),
+  );
+  const eventLines = Math.max(0, ...eventLineByKey.values()) + 1;
+  const eventLaneHeight = eventLines * (eventBlockH + EVENT_LINE_GAP) - EVENT_LINE_GAP + LANE_PAD;
 
   return (
     <div className="screen has-info">
@@ -1001,7 +1012,7 @@ export function PhaseGrid({
                           left: piece.x,
                           width: Math.max(56, piece.width - 2),
                           height: eventBlockH,
-                          top: LANE_PAD / 2,
+                          top: LANE_PAD / 2 + (eventLineByKey.get(stored.key) ?? 0) * (eventBlockH + EVENT_LINE_GAP),
                         }}
                         onDragOver={(e) => {
                           if (drag && !readOnly && !editing) e.preventDefault();

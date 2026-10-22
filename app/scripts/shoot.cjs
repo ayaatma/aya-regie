@@ -119,7 +119,7 @@ async function main() {
       const GROUP_OF = {
         Grille: 'Planning', Propositions: 'Planning', Personnes: 'Personnes',
         Artistes: 'Logistique', Catering: 'Logistique', Magasin: 'Logistique', 'Équipes': 'Logistique', 'Activités annexes': 'Logistique',
-        Mails: 'Personnes', 'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', 'Import/Export': 'Réglages',
+        Mails: 'Personnes', 'Tableau de bord': 'Suivi', Historique: 'Suivi', 'Réglages': 'Réglages', Import: 'Réglages', Export: 'Réglages',
       };
       const tab = async (label) => {
         const group = GROUP_OF[label];
@@ -326,12 +326,12 @@ async function main() {
         await tall('40-tableau');
       }
       if (want('import')) {
-        await tab('Import/Export');
+        await tab('Import');
         await shot('50-import');
       }
       if (want('preparer')) {
         // A festival-shaped export, invented answers, loaded as a file: the setup the form proposes.
-        await tab('Import/Export');
+        await tab('Import');
         const q = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
         const rows = [
           ['Horodateur', 'Adresse e-mail', 'Nom', 'Prénom', 'Peux-tu faire des shifts de nuit ? (entre 3h et 7h)', 'Quels jours es-tu dispo sur le montage ?', 'Est-ce que tu serais dispo pour le pré-montage aussi ?', 'A quelle heure peux-tu arriver vendredi 18 Septembre ?', 'A quelle heure dois-tu repartir dimanche 20 Septembre ?', "Où es-tu le plus à l'aise ? Ton premier choix.", "Où es-tu le plus à l'aise ? Ton deuxième choix."],
@@ -357,7 +357,7 @@ async function main() {
       }
       if (want('aregler')) {
         // « À régler », 2026-10-22: two fiches sharing an unread answer, one interpreted, one sentence.
-        await tab('Import/Export');
+        await tab('Import');
         const q = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
         const rows = [
           ['Horodateur', 'Adresse e-mail', 'Nom', 'Prénom', 'Ton premier choix.', 'Ton deuxième choix.'],
@@ -398,7 +398,7 @@ async function main() {
         await sleep(600);
         await shot('56-import-reponse-retenue');
         await tab('Personnes');
-        await tab('Import/Export');
+        await tab('Import');
         await sleep(600);
         problems.push(`${scheme} a-regler: après Personnes, import ${await page.evaluate(() => (document.querySelector('.import-todo') ? 'toujours là' : 'perdu'))}`);
         await page.evaluate(() => document.querySelector('.import-todo')?.scrollIntoView());
@@ -406,7 +406,7 @@ async function main() {
       }
       if (want('binomes')) {
         // 2026-10-22: a binôme settled on a fiche still being imported; a pole chosen twice.
-        await tab('Import/Export');
+        await tab('Import');
         const q = (v) => (/[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
         const rows = [
           ['Horodateur', 'Adresse e-mail', 'Nom', 'Prénom', 'Ton premier choix.', 'Ton deuxième choix.', 'Avec qui veux-tu être en binôme ?'],
@@ -445,13 +445,41 @@ async function main() {
         await tab('Réglages');
         await shot('70-reglages');
       }
+      if (want('superpose')) {
+        // 2026-10-22: two événements created on the same half-day, picked in Réglages, must stack
+        // on the montage grid instead of hiding each other.
+        await tab('Réglages');
+        await clickButton(/^▸Montage/);
+        await sleep(300);
+        for (const name of ['Camion son', 'Camion lumière']) {
+          await page.evaluate((value) => {
+            const input = document.querySelector('input[placeholder="Déchargement du camion"]');
+            const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            set.call(input, value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            const select = document.querySelector('select[aria-label="Demi-journée du nouvel événement"]');
+            const pick = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+            pick.call(select, select.options[Math.min(1, select.options.length - 1)].value);
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }, name);
+          await sleep(200);
+          await clickButton(/^Ajouter un événement$/);
+          await sleep(300);
+        }
+        await tall('76-reglages-evenements-jour');
+        await tab('Grille');
+        await clickButton(/^Montage$/);
+        await sleep(800);
+        await shot('36-montage-superposes');
+        await clickButton(/^Exploit$/);
+      }
       if (want('evenement')) {
         await tab('Réglages');
         await clickButton(/^▸L'événement/);
         await tall('74-reglages-evenement');
       }
       if (want('correspondance')) {
-        await tab('Import/Export');
+        await tab('Import');
         const input = await page.$('input[type="file"][accept=".csv,text/csv"]');
         await input.uploadFile(path.join(__dirname, '..', '..', 'tools', 'out', 'formulaire-test.csv'));
         await sleep(1500);

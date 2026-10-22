@@ -47,7 +47,9 @@ import {
   setPhaseEnabled,
   setPhaseEvent,
   setPhasePole,
+  slidePhaseEvent,
 } from '../store/phaseEdits.ts';
+import { eventShiftHours } from '../store/setupEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { ClockField, TimeOfDayField } from '../components/ClockField.tsx';
 import { isColour } from '../components/poleColours.ts';
@@ -102,6 +104,13 @@ export function PhaseCard({ id }: { id: PhaseId }) {
 
   const days = phaseDays(phase);
   const parts = phaseDayParts(phase);
+  const [newEventPartKey, setNewEventPartKey] = useState('');
+  // The half-day picked for the next événement, the first one until another is picked or when
+  // the one picked has gone with a change of dates.
+  const newEventPart = parts.find((part) => part.key === newEventPartKey) ?? parts[0];
+  /** The day an hour of the phase falls on, by its midnight. */
+  const dayOfHour = (hour: number) =>
+    days.find((day) => day.midnight <= hour && hour < day.midnight + 24) ?? null;
   const label = phase.label || (id === 'montage' ? 'Montage' : 'Démontage');
   const endISO = new Date(new Date(phase.startISO).getTime() + phase.lengthHours * 3600_000)
     .toISOString();
@@ -450,6 +459,32 @@ export function PhaseCard({ id }: { id: PhaseId }) {
                       )
                     }
                   />
+                  {/*
+                    The day, beside hours that only say a time of day. Moving it keeps the time
+                    and takes the people placed in the événement along, like a slide on the grid.
+                  */}
+                  {days.length > 1 && (
+                    <select
+                      className="select"
+                      aria-label={`Jour de ${event.label}`}
+                      value={dayOfHour(event.start)?.index ?? ''}
+                      onChange={(change2) => {
+                        const from = dayOfHour(event.start);
+                        const to = days.find((day) => day.index === Number(change2.target.value));
+                        if (!from || !to) return;
+                        edit(
+                          (p) => slidePhaseEvent(p, id, event.key, event.start + to.midnight - from.midnight),
+                          `${event.label} déplacé au ${to.label}`,
+                        );
+                      }}
+                    >
+                      {days.map((day) => (
+                        <option key={day.index} value={day.index}>
+                          {day.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <ClockField
                     value={event.start}
                     startISO={phase.startISO}
@@ -524,21 +559,38 @@ export function PhaseCard({ id }: { id: PhaseId }) {
                 value={newEvent}
                 onChange={(event) => setNewEvent(event.target.value)}
               />
+              {/*
+                THE HALF-DAY IS CHOSEN HERE, since 2026-10-22. Every événement used to land at the
+                start of the first half-day, and the hour fields of the row below cannot change
+                the day, so one meant for the third day had no way to get there from Réglages.
+              */}
+              <select
+                className="select"
+                aria-label="Demi-journée du nouvel événement"
+                value={newEventPart?.key ?? ''}
+                onChange={(event) => setNewEventPartKey(event.target.value)}
+              >
+                {parts.map((part) => (
+                  <option key={part.key} value={part.key}>
+                    {part.label}
+                  </option>
+                ))}
+              </select>
               <button
                 className="btn"
-                disabled={newEvent.trim() === '' || parts.length === 0}
+                disabled={newEvent.trim() === '' || !newEventPart}
                 onClick={() => {
-                  // Two hours at the start of the first half-day: a shape to drag, not a guess
-                  // at what the régisseur meant.
-                  const first = parts[0]!;
+                  // The event's default length at the start of the chosen half-day: a shape to
+                  // drag, not a guess at what the régisseur meant.
+                  const part = newEventPart!;
                   edit(
                     (p) =>
                       addPhaseEvent(
                         p,
                         id,
                         newEvent,
-                        first.start,
-                        Math.min(first.start + 2, first.end),
+                        part.start,
+                        Math.min(part.start + eventShiftHours(p), part.end),
                         2,
                       ),
                     `événement ${newEvent.trim()}`,
@@ -548,10 +600,9 @@ export function PhaseCard({ id }: { id: PhaseId }) {
               >
                 Ajouter un événement
               </button>
-              {parts.length > 0 && (
+              {newEventPart && (
                 <span className="rule-hint">
-                  Créé au début de {parts[0]!.label}, à déplacer ensuite.{' '}
-                  {toLabel(phase.startISO, parts[0]!.start)}
+                  Créé à {toLabel(phase.startISO, newEventPart.start)}, à ajuster ensuite.
                 </span>
               )}
             </span>

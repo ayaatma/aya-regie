@@ -114,7 +114,7 @@ function commonCarried(plan: Plan, kind: PersonKind, key: string): string[] {
   const out: string[] = [];
   if (boxes > 0) out.push(`${boxes} ${plural(boxes, 'case', 'cases')} de montage ou de démontage, aux mêmes heures.`);
   if (meals > 0) out.push(`${meals} ${plural(meals, 'repas choisi', 'repas choisis')} à la main au catering.`);
-  if (door) out.push("Le ticket, le bracelet, les tickets boisson et la remarque choisis pour l'entrée.");
+  if (door) out.push("Le billet d'entrée, le bracelet, les tickets boisson et la remarque choisis pour l'accueil.");
   if (acts.length > 0) out.push(`Son lien avec ${acts.map((a) => a.name).join(', ')}.`);
   return out;
 }

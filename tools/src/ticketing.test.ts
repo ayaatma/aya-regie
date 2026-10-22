@@ -175,7 +175,7 @@ test('a meal outside the ticket is an incohérence, reported and never refused',
   assert.equal(lou.ticketTypeKey, 'loto');
   assert.equal(lou.ticketByHand, true);
   assert.equal(lou.meals, 1, 'still counted');
-  assert.deepEqual(lou.issues, ['repas sam. 13/03 soir hors du ticket « Loto seulement » (12h à 18h)']);
+  assert.deepEqual(lou.issues, ['repas sam. 13/03 soir hors du billet « Loto seulement » (12h à 18h)']);
 });
 
 test('a choice equal to the default is not stored, and a row with nothing chosen disappears', () => {
