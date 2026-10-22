@@ -176,3 +176,11 @@ test('the form\'s « Non je ne peux pas » is a plain no for both phases', () =>
     strictEqual(reading.confident, true);
   }
 });
+
+test('a yes naming both phases and refusing neither is a plain yes for both', () => {
+  const said = 'Oui je vous suis à 200% ! Ultra chaud du montage et démontage !';
+  for (const which of ['montage', 'demontage'] as const) {
+    deepStrictEqual(parsePhaseAnswer(said, which), { value: true, confident: true, reason: null });
+  }
+  strictEqual(parsePhaseAnswer('Peut-être pour le montage et le démontage', 'montage').confident, false);
+});

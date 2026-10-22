@@ -2743,3 +2743,22 @@ test('a validated bénévole’s fiche lists the follow-up steps, and the list f
   assert.ok(shows(people, 'Sans réponse (0)'));
   assert.ok(shows(people, "Planning modifié depuis l'envoi (0)"));
 });
+
+test('the correction form reads and ticks the montage and démontage days, when the phases take bénévoles', () => {
+  const volunteer = plan.volunteers[0]!;
+  const closed = render(
+    <VolunteerEdit index={new PlanIndex(plan)} volunteer={volunteer} onCancel={noop} onSave={noop} />,
+  );
+  const open = {
+    ...plan,
+    montage: { ...plan.montage, enabled: true, volunteersAllowed: true },
+    demontage: { ...plan.demontage, enabled: true, volunteersAllowed: true },
+  };
+  const present = { ...volunteer, montage: { ...volunteer.montage, present: true, windows: [] } };
+  const html = render(
+    <VolunteerEdit index={new PlanIndex(open)} volunteer={present} onCancel={noop} onSave={noop} />,
+  );
+  assert.ok(!shows(closed, 'Montage et démontage') || plan.montage.volunteersAllowed);
+  assert.ok(shows(html, 'Montage et démontage'));
+  assert.ok(html.includes(`name="edit-${volunteer.key}-montage-day-`), 'une case par jour du montage');
+});

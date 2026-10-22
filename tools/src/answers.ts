@@ -382,6 +382,11 @@ export function parsePhaseAnswer(
       if (named.test(before) && !named.test(after)) return sure(true);
       if (named.test(after) && !named.test(before)) return sure(false);
     }
+    // BOTH NAMED, NOTHING REFUSED, A YES SAID: « Oui je vous suis à 200% ! Ultra chaud du montage
+    // et démontage ! » (2026-10-22). The whole opening of both phases, which is what a plain yes gets.
+    if (cut < 0 && !/\b(impossible|aucun|ne|non)\b/.test(value) && /\b(oui|chaud\w*|partant\w*|dispo\w*|motive\w*|volontiers|carrement|ok)\b/.test(value)) {
+      return sure(true);
+    }
   }
 
   if (montage !== demontage) {

@@ -26,6 +26,7 @@ import {
   type Volunteer,
 } from '../engine.ts';
 import { levelLabel, volumeText } from './layout.ts';
+import { PhaseDaysEdit, volunteerPhases } from './PhaseDaysEdit.tsx';
 
 export interface VolunteerEditProps {
   index: PlanIndex;
@@ -79,6 +80,8 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
     compare('refusedPoleKeys');
     compare('choices');
     compare('requestedHours');
+    compare('montage');
+    compare('demontage');
     compare('preferredSlotId');
     compare('firstName');
     compare('lastName');
@@ -199,6 +202,24 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
           </label>
         ))}
       </div>
+
+      {/* The montage and démontage reading, since 2026-10-22: a doubt on it had nothing to correct it with here. */}
+      {volunteerPhases(index.plan).length > 0 && (
+        <div className="panel-section">
+          <p className="panel-section-title">Montage et démontage</p>
+          {volunteerPhases(index.plan).map((id) => (
+            <p key={id} className="people-meta">
+              <PhaseDaysEdit
+                id={id}
+                phase={id === 'montage' ? index.plan.montage : index.plan.demontage}
+                answer={draft[id]}
+                namePrefix={`edit-${volunteer.key}`}
+                onChange={(presence) => set(id, { ...draft[id], ...presence })}
+              />
+            </p>
+          ))}
+        </div>
+      )}
 
       <div className="panel-section">
         <p className="panel-section-title">Ce qui a été demandé</p>

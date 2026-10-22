@@ -28,7 +28,6 @@ import {
 } from '../store/edits.ts';
 import {
   fmtHours,
-  phaseDayTicks,
   isNoAllergy,
   isStandardDiet,
   type EditableField,
@@ -44,6 +43,7 @@ import { choiceRankLabel, levelLabel, volumeText } from './layout.ts';
 import { VolunteerEdit } from './VolunteerEdit.tsx';
 import { ApplicationSection } from './ApplicationSection.tsx';
 import { AvailabilityDays } from './AvailabilityDays.tsx';
+import { PhaseDaysEdit, volunteerPhases } from './PhaseDaysEdit.tsx';
 import { SkillPicker } from './SkillPicker.tsx';
 import { PersonPhoto } from './PersonPhoto.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
@@ -708,10 +708,7 @@ function RawAnswers({ volunteer }: { volunteer: Volunteer }) {
  */
 function PhaseAnswers({ volunteer }: { volunteer: Volunteer }) {
   const { plan, edit } = useLoadedPlan();
-  const phases = (['montage', 'demontage'] as const).filter(
-    (id) => (id === 'montage' ? plan.montage : plan.demontage).enabled &&
-            (id === 'montage' ? plan.montage : plan.demontage).volunteersAllowed,
-  );
+  const phases = volunteerPhases(plan);
   if (phases.length === 0) return null;
 
   return (
@@ -719,61 +716,19 @@ function PhaseAnswers({ volunteer }: { volunteer: Volunteer }) {
       <p className="panel-section-title">Montage et démontage</p>
       {phases.map((id) => {
         const phase = id === 'montage' ? plan.montage : plan.demontage;
-        const answer = id === 'montage' ? volunteer.montage : volunteer.demontage;
         const label = phase.label || (id === 'montage' ? 'Montage' : 'Démontage');
-        // The days the bénévoles may come, ticked from the answer's windows (none = all of them).
-        const opening = { start: phase.volunteersFrom, end: phase.volunteersUntil };
-        const ticks = phaseDayTicks(phase, answer.windows).filter((t) =>
-          t.segments.some((s) => s.end > opening.start && s.start < opening.end),
-        );
-        const toggleDay = (index: number) => {
-          const next = ticks.map((t) => (t.index === index ? { ...t, ticked: !t.ticked } : t));
-          const windows = next.every((t) => t.ticked) ? [] : next.filter((t) => t.ticked).flatMap((t) => t.segments);
-          edit(
-            (p) => setVolunteerPhase(p, volunteer.key, id, { present: windows.length > 0 || next.every((t) => t.ticked), windows }),
-            `${label.toLowerCase()} de ${volunteer.firstName}`,
-          );
-        };
-        const corrected = volunteer.manualFields.includes(id);
-
         return (
           <p key={id} className="people-meta">
-            {label}:{' '}
-            <select
-              className="select is-inline"
-              value={answer.present ? 'oui' : 'non'}
-              aria-label={`${label}: présence`}
-              onChange={(event) =>
-                edit(
-                  (p) =>
-                    setVolunteerPhase(p, volunteer.key, id, {
-                      present: event.target.value === 'oui',
-                      windows: event.target.value === 'oui' ? answer.windows : [],
-                    }),
-                  `${label.toLowerCase()} de ${volunteer.firstName}`,
-                )
+            <PhaseDaysEdit
+              id={id}
+              phase={phase}
+              answer={id === 'montage' ? volunteer.montage : volunteer.demontage}
+              namePrefix="fiche"
+              onChange={(presence) =>
+                edit((p) => setVolunteerPhase(p, volunteer.key, id, presence), `${label.toLowerCase()} de ${volunteer.firstName}`)
               }
-            >
-              <option value="non">pas là</option>
-              <option value="oui">présent·e</option>
-            </select>
-
-            {answer.present && ticks.length > 0 && (
-              <span className="phase-day-ticks">
-                {ticks.map((t) => (
-                  <label key={t.index} className="checkline">
-                    <input
-                      type="checkbox"
-                      name={`fiche-${id}-day-${t.index}`}
-                      checked={t.ticked}
-                      onChange={() => toggleDay(t.index)}
-                    />
-                    {t.label}
-                  </label>
-                ))}
-              </span>
-            )}
-            {corrected && ' · corrigé à la main'}
+            />
+            {volunteer.manualFields.includes(id) && ' · corrigé à la main'}
           </p>
         );
       })}
