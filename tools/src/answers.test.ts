@@ -168,3 +168,11 @@ test('a sentence naming neither phase is still read, and flagged', () => {
   strictEqual(reading.value, true);
   strictEqual(reading.confident, false);
 });
+
+test('the form\'s « Non je ne peux pas » is a plain no for both phases', () => {
+  for (const which of ['montage', 'demontage'] as const) {
+    const reading = parsePhaseAnswer('Non je ne peux pas', which);
+    strictEqual(reading.value, false);
+    strictEqual(reading.confident, true);
+  }
+});

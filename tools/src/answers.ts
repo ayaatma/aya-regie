@@ -314,7 +314,7 @@ export function parsePoleAnswer(raw: string, poles: readonly Pole[]): AnswerRead
 // ---------------------------------------------------------------------------
 
 /** Answers that mean "no" outright, in the wordings a form offers and people type. */
-const NOT_COMING = /^(non|non merci|pas dispo\w*|pas disponible|aucun|aucune|rien|je ne peux pas|indisponible|-)$/;
+const NOT_COMING = /^(non|non merci|pas dispo\w*|pas disponible|aucun|aucune|rien|(non )?je ne peux pas|indisponible|-)$/;
 
 /** Answers that mean "yes, and nothing more". Anything else is a sentence somebody wrote. */
 const PLAIN_YES = /^(oui|oui bien sur|ok|d accord|dispo|disponible|je viens|present\w*|yes|x|1)$/;

@@ -599,6 +599,13 @@ All five are built. What was decided while building them, beyond the design abov
   "Serais-tu prêt à faire du montage / démontage ?" at column 43, which the import used to treat
   as a decoy. It is bound as `phaseHelp` and answers for both phases; two narrow matchers stand
   ready for the day the form splits the question.
+- **The 2026-10 form ticks the days of both phases in that one column** (2026-10-22): « Oui je
+  peux aider le vendredi 12 », « ... le dimanche 14 », « ... le lundi 15 », « Non je ne peux pas ».
+  No answer named a phase, so all 41 real answers were unreadable and the import raised
+  `colonne-mal-associee`. `splitPhaseDays` (presence-days.ts) now gives each « weekday + day »
+  to the phase that has that day on that weekday (never a date without a phase to supply the
+  month); a day neither phase has keeps a yes on both phases with a doubt, never a no. Needs the
+  plan's montage and démontage dates to match the form's (12, then 14 and 15 March 2027).
 - **The orga form's phase answers are kept as words, not hours.** Turning "je serai là mercredi
   midi" into a number needs dates that move for months; the sentence goes into the orga's note
   and the régisseur sets the arrival on the fiche, from a list of that phase's own half-days.

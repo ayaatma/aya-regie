@@ -211,6 +211,47 @@ export function phaseDayWindows(phase: Phase, dates: readonly CalendarDay[]): Wi
 }
 
 /**
+ * « vendredi 12 »: a weekday and a day of the month, with no month. What a form offering the
+ * days to tick writes, since 2026-10-22 (« Oui je peux aider le vendredi 12 »).
+ *
+ * Never a date on its own, per the rule at the top of this file: only a phase can say which
+ * month it is, and only a phase day carrying both that number and that weekday is taken. The
+ * weekday is the check that keeps « 12 » from landing on the 12th of the wrong month.
+ */
+const WEEKDAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
+interface BareDay {
+  weekday: number;
+  day: number;
+}
+
+function bareDaysIn(text: string): BareDay[] {
+  const v = normalise(text);
+  // Not when a month follows: « vendredi 12 mars » is a full date, which `datesIn` already has.
+  const pattern = new RegExp(`\\b(${WEEKDAYS.join('|')}) (\\d{1,2})(?:er)?\\b(?! (?:${MONTHS.join('|')}|\\d)\\b)`, 'g');
+  return [...v.matchAll(pattern)].map((m) => ({ weekday: WEEKDAYS.indexOf(m[1]!), day: Number(m[2]) }));
+}
+
+/** The phase days a bare day names: the ones with that day of the month on that weekday. */
+function phaseDaysOn(phase: Phase, bare: BareDay): CalendarDay[] {
+  return phaseDays(phase)
+    .map((day) => new Date(new Date(phase.startISO).getTime() + (day.midnight + 12) * 3600_000))
+    .filter((at) => at.getDate() === bare.day && at.getDay() === bare.weekday)
+    .map((at) => ({ day: at.getDate(), month: at.getMonth() + 1 }));
+}
+
+/**
+ * Every day an answer names, each as the calendar days it is in `phase`: the date itself for a
+ * full date the phase has, the matching phase day for a bare « vendredi 12 », nothing otherwise.
+ */
+function namedDays(raw: string, phase: Phase): CalendarDay[][] {
+  return [
+    ...datesIn(raw).map((d) => (phaseDayWindows(phase, [d]).length > 0 ? [d] : [])),
+    ...bareDaysIn(raw).map((bare) => phaseDaysOn(phase, bare)),
+  ];
+}
+
+/**
  * « Mardi 15 septembre (montage), Mercredi 16 septembre (montage) »: the days ticked, as windows.
  *
  * Empty for an answer naming no date, which `PhasePresence` reads as the whole opening, and for an
@@ -218,16 +259,68 @@ export function phaseDayWindows(phase: Phase, dates: readonly CalendarDay[]): Wi
  * form and the phase disagree, and only the régisseur knows which one moved.
  */
 export function parsePhaseDays(raw: string, phase: Phase): AnswerReading<Window[]> {
-  const dates = datesIn(raw);
-  if (dates.length === 0 || /integralite|tous les jours/.test(normalise(raw))) return sure([]);
-  const windows = phaseDayWindows(phase, dates);
-  const matched = dates.filter((d) => phaseDayWindows(phase, [d]).length > 0).length;
-  if (matched === dates.length) return sure(windows);
+  const named = namedDays(raw, phase);
+  if (named.length === 0 || /integralite|tous les jours/.test(normalise(raw))) return sure([]);
+  const windows = phaseDayWindows(phase, named.flat());
+  const missed = named.filter((days) => days.length === 0).length;
+  if (missed === 0) return sure(windows);
   const label = phase.label || (phase.id === 'montage' ? 'Montage' : 'Démontage');
   return {
     value: windows,
     confident: false,
-    reason: `${label}: ${dates.length - matched} jour(s) de « ${raw.trim()} » hors des dates de la phase. À vérifier.`,
+    reason: `${label}: ${missed} jour(s) de « ${raw.trim()} » hors des dates de la phase. À vérifier.`,
+  };
+}
+
+/** What one answer ticking days says about both phases at once. */
+export interface PhaseDaysSplit {
+  /** Whether each phase gets a presence, and over which windows (empty: its whole opening). */
+  montage: { present: boolean; windows: Window[] };
+  demontage: { present: boolean; windows: Window[] };
+  /** Why the régisseur should look, or null. */
+  reason: string | null;
+}
+
+/**
+ * ONE QUESTION TICKING THE DAYS OF BOTH PHASES, since 2026-10-22: « Serais-tu prêt·e à faire du
+ * montage / démontage ? » answered « Oui je peux aider le vendredi 12, Oui je peux aider le
+ * lundi 15 ». No answer names a phase, the days do: each goes to the phase that has it.
+ *
+ * Null when the answer names no day at all, so the caller reads it as words instead.
+ *
+ * A DAY NEITHER PHASE HAS IS NEVER A NO. When none of them falls in a phase, the plan's dates
+ * and the form's most likely disagree, and the person said yes: both phases keep a presence over
+ * their whole opening, with the doubt on the fiche. Turning that yes into a no would take a
+ * volunteer off the montage without anybody deciding it.
+ */
+export function splitPhaseDays(
+  raw: string,
+  phases: { montage: Phase; demontage: Phase },
+): PhaseDaysSplit | null {
+  const inMontage = namedDays(raw, phases.montage);
+  const inDemontage = namedDays(raw, phases.demontage);
+  if (inMontage.length === 0) return null;
+  const missed = inMontage.filter((days, i) => days.length === 0 && inDemontage[i]!.length === 0).length;
+  if (missed === inMontage.length) {
+    return {
+      montage: { present: true, windows: [] },
+      demontage: { present: true, windows: [] },
+      reason:
+        `Montage / démontage: aucun jour de « ${raw.trim()} » ne tombe dans les dates du montage ` +
+        'ou du démontage. Présence retenue sur les deux phases, à vérifier sur la fiche et dans les dates des phases.',
+    };
+  }
+  const side = (phase: Phase, days: CalendarDay[][]) => {
+    const flat = days.flat();
+    return { present: flat.length > 0, windows: flat.length > 0 ? phaseDayWindows(phase, flat) : [] };
+  };
+  return {
+    montage: side(phases.montage, inMontage),
+    demontage: side(phases.demontage, inDemontage),
+    reason:
+      missed === 0
+        ? null
+        : `Montage / démontage: ${missed} jour(s) de « ${raw.trim()} » hors des dates des phases. À vérifier.`,
   };
 }
 

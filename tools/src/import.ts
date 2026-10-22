@@ -26,6 +26,7 @@ import {
   type EnergyProfile,
   type SlotId,
   type Volunteer,
+  type Window,
 } from './model.js';
 import {
   maxAchievableHours,
@@ -33,7 +34,7 @@ import {
   usableWindows,
 } from './availability.js';
 import { parseAvailabilityNote, parsePhaseAnswer, parsePoleAnswer, type AnswerReading } from './answers.js';
-import { parseArrival, parseDeparture, parsePhaseDays, unavailableFrom } from './presence-days.js';
+import { parseArrival, parseDeparture, parsePhaseDays, splitPhaseDays, unavailableFrom } from './presence-days.js';
 import type { Phase } from './phase.js';
 import { resolveConstraints, type ConstraintSettings } from './constraints.js';
 import { DEFAULT_VOLUME, eventDays, type VolumeSettings } from './days.js';
@@ -1261,30 +1262,46 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const bothCell = cell(row, 'phaseHelp');
     const montageCell = cell(row, 'montage') || bothCell;
     const demontageCell = cell(row, 'demontage') || bothCell;
-    const montageReading = parsePhaseAnswer(montageCell, 'montage');
-    const demontageReading = parsePhaseAnswer(demontageCell, 'demontage');
-    // One doubt, not two, when one answer covers both phases: the régisseur reads the same
-    // sentence twice otherwise, on every fiche that carries a doubt at all.
-    if (montageReading.reason) reviewReasons.push(montageReading.reason);
-    if (demontageReading.reason && demontageCell !== montageCell) {
-      reviewReasons.push(demontageReading.reason);
+    // The one question ticking days of both phases (« Oui je peux aider le vendredi 12 »): the
+    // days say which phase, the words say nothing. See `splitPhaseDays`.
+    const split =
+      bothCell.trim() !== '' && cell(row, 'montage') === '' && cell(row, 'demontage') === '' && options.phases
+        ? splitPhaseDays(bothCell, options.phases)
+        : null;
+    let phasePresence: Record<'montage' | 'demontage', { present: boolean; note: string; windows: Window[] }>;
+    if (split) {
+      if (split.reason) reviewReasons.push(split.reason);
+      readable.saw('phaseHelp', true);
+      phasePresence = {
+        montage: { ...split.montage, note: bothCell.trim() },
+        demontage: { ...split.demontage, note: bothCell.trim() },
+      };
+    } else {
+      const montageReading = parsePhaseAnswer(montageCell, 'montage');
+      const demontageReading = parsePhaseAnswer(demontageCell, 'demontage');
+      // One doubt, not two, when one answer covers both phases: the régisseur reads the same
+      // sentence twice otherwise, on every fiche that carries a doubt at all.
+      if (montageReading.reason) reviewReasons.push(montageReading.reason);
+      if (demontageReading.reason && demontageCell !== montageCell) {
+        reviewReasons.push(demontageReading.reason);
+      }
+      readable.saw('phaseHelp', bothCell.trim() === '' || parsePhaseAnswer(bothCell, 'montage').confident);
+      readable.saw('montage', cell(row, 'montage').trim() === '' || montageReading.confident);
+      readable.saw('demontage', cell(row, 'demontage').trim() === '' || demontageReading.confident);
+      // The days ticked, when the form asks the phase on its own and the plan's phases are known.
+      const daysOf = (id: 'montage' | 'demontage', present: boolean) => {
+        const own = cell(row, id);
+        const phase = options.phases?.[id];
+        if (!present || own === '' || !phase) return [];
+        const reading = parsePhaseDays(own, phase);
+        if (reading.reason) reviewReasons.push(reading.reason);
+        return reading.value;
+      };
+      phasePresence = {
+        montage: { present: montageReading.value, note: montageCell.trim(), windows: daysOf('montage', montageReading.value) },
+        demontage: { present: demontageReading.value, note: demontageCell.trim(), windows: daysOf('demontage', demontageReading.value) },
+      };
     }
-    readable.saw('phaseHelp', bothCell.trim() === '' || parsePhaseAnswer(bothCell, 'montage').confident);
-    readable.saw('montage', cell(row, 'montage').trim() === '' || montageReading.confident);
-    readable.saw('demontage', cell(row, 'demontage').trim() === '' || demontageReading.confident);
-    // The days ticked, when the form asks the phase on its own and the plan's phases are known.
-    const daysOf = (id: 'montage' | 'demontage', present: boolean) => {
-      const own = cell(row, id);
-      const phase = options.phases?.[id];
-      if (!present || own === '' || !phase) return [];
-      const reading = parsePhaseDays(own, phase);
-      if (reading.reason) reviewReasons.push(reading.reason);
-      return reading.value;
-    };
-    const phasePresence = {
-      montage: { present: montageReading.value, note: montageCell.trim(), windows: daysOf('montage', montageReading.value) },
-      demontage: { present: demontageReading.value, note: demontageCell.trim(), windows: daysOf('demontage', demontageReading.value) },
-    };
 
     /*
      * THE POLE CHOICES, one column after another in rank order. A column may hold several ticked

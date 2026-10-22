@@ -704,3 +704,25 @@ test('the wrong tab says so once, and a title line above the headers is skipped'
   strictEqual(titled.volunteers.length, 1);
   strictEqual(titled.volunteers[0]!.firstName, 'Ana');
 });
+
+test('the 2026-10 form ticks montage / démontage days in one column, and the column is read', async () => {
+  const { alignPhase, defaultPhase, defaultPhaseStart } = await import('./phase.js');
+  const phase = (id: 'montage' | 'demontage') =>
+    alignPhase({ ...defaultPhase(id, defaultPhaseStart(id, EVENT_START_ISO, 18)), enabled: true }, EVENT_START_ISO, 18);
+  const phases = { montage: phase('montage'), demontage: phase('demontage') };
+  const result = (answer: string) =>
+    importVolunteers(rowCsv({ 43: answer }), { poles, artists, startISO: EVENT_START_ISO, phases });
+
+  const ticked = result('Oui je peux aider le vendredi 12, Oui je peux aider le lundi 15');
+  ok(!ticked.issues.some((i) => i.code === 'colonne-mal-associee'), 'la colonne des phases est lue');
+  const v = ticked.volunteers[0]!;
+  strictEqual(v.montage.present, true);
+  strictEqual(v.demontage.present, true);
+  ok(v.montage.windows.length > 0 && v.demontage.windows.length > 0, 'les jours cochés, pas toute la phase');
+  ok(!v.reviewReasons.some((r) => r.startsWith('Montage')));
+
+  const no = result('Non je ne peux pas');
+  ok(!no.issues.some((i) => i.code === 'colonne-mal-associee'));
+  strictEqual(no.volunteers[0]!.montage.present, false);
+  strictEqual(no.volunteers[0]!.demontage.present, false);
+});

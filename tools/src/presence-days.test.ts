@@ -16,6 +16,7 @@ import {
   parseDeparture,
   parsePhaseDays,
   phaseDayTicks,
+  splitPhaseDays,
   unavailableFrom,
   withDayAvailability,
 } from './presence-days.js';
@@ -93,4 +94,48 @@ test('the days a form ticks for the montage become those days, and a stray date 
   const stray = parsePhaseDays(`${answer}, 25/12`, montage);
   ok(!stray.confident);
   deepStrictEqual(parsePhaseDays("Oui sur l'intégralité", montage).value, []);
+});
+
+// The 2026-10 form asks the two phases in one question and ticks days with no month.
+const FRIDAY = 'Oui je peux aider le vendredi 12';
+const SUNDAY = 'Oui je peux aider le dimanche 14';
+const MONDAY = 'Oui je peux aider le lundi 15';
+const fixturePhases = () => ({
+  montage: { ...defaultPhase('montage', defaultPhaseStart('montage', START, LENGTH)), enabled: true },
+  demontage: { ...defaultPhase('demontage', defaultPhaseStart('demontage', START, LENGTH)), enabled: true },
+});
+
+test('one question ticking « vendredi 12 » and « lundi 15 » puts each day in its own phase', () => {
+  const phases = fixturePhases();
+  const montageDays = phaseDays(phases.montage);
+  const demontageDays = phaseDays(phases.demontage);
+
+  const friday = splitPhaseDays(FRIDAY, phases)!;
+  strictEqual(friday.reason, null);
+  deepStrictEqual(friday.montage, { present: true, windows: montageDays[1]!.segments });
+  deepStrictEqual(friday.demontage, { present: false, windows: [] });
+
+  const both = splitPhaseDays(`${FRIDAY}, ${SUNDAY}, ${MONDAY}`, phases)!;
+  strictEqual(both.reason, null);
+  strictEqual(both.montage.present, true);
+  deepStrictEqual(both.demontage.windows, [...demontageDays[0]!.segments, ...demontageDays[1]!.segments]);
+
+  strictEqual(splitPhaseDays('Non je ne peux pas', phases), null, 'pas de jour: lu comme des mots');
+});
+
+test('a ticked day is never put on the 12th of another month, nor read on a wrong weekday', () => {
+  const phases = fixturePhases();
+  // The default montage runs from Thursday 11 March, so the 12th is its second day. Friday 12
+  // March 2027 is a Friday; « jeudi 12 » is no day of either phase.
+  const wrong = splitPhaseDays('Oui je peux aider le jeudi 12', phases)!;
+  deepStrictEqual(wrong.montage, { present: true, windows: [] }, 'un oui reste un oui');
+  deepStrictEqual(wrong.demontage, { present: true, windows: [] });
+  ok(wrong.reason);
+  const partly = splitPhaseDays(`${FRIDAY}, Oui je peux aider le jeudi 20`, phases)!;
+  strictEqual(partly.montage.present, true);
+  strictEqual(partly.demontage.present, false);
+  ok(partly.reason);
+  // A full date after the weekday is the full date's business, read once.
+  deepStrictEqual(parsePhaseDays('vendredi 12 mars', phases.montage).value, phaseDays(phases.montage)[1]!.segments);
+  ok(parsePhaseDays('vendredi 12 mars', phases.montage).confident);
 });
