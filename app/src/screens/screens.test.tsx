@@ -2475,7 +2475,7 @@ test('a fiche carries the application, and a cancelled person still placed is of
       v.key === held ? { ...v, status: 'annule' as const, statusSteps: ['confirmation'], energy: 'fatigable' as const } : v),
   };
   const html = infoOf(cancelled, { kind: 'benevole', volunteerKey: held });
-  assert.ok(shows(html, 'Candidature'));
+  assert.ok(shows(html, 'Suivi'));
   assert.ok(html.includes('>Libérer ses places</button>'), 'le bouton explicite, rien de retiré tout seul');
   assert.ok(shows(html, 'Mail de confirmation envoyé'));
   assert.ok(shows(html, 'Fatigue vite'));
@@ -2483,6 +2483,25 @@ test('a fiche carries the application, and a cancelled person still placed is of
   const reading = infoOf(cancelled, { kind: 'benevole', volunteerKey: held }, true);
   assert.ok(shows(reading, 'Annulée'));
   assert.ok(!reading.includes('>Libérer ses places</button>'), 'rien à modifier en lecture seule');
+});
+
+test('a fiche says at once whether the person is validated, and offers to validate an inscription', () => {
+  const key = plan.volunteers[0]!.key;
+  const pending: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'candidature' as const } : v)) };
+  const html = infoOf(pending, { kind: 'benevole', volunteerKey: key });
+  assert.ok(html.includes('registration is-candidature'));
+  assert.ok(shows(html, 'pas encore validée'));
+  assert.ok(html.includes('>Valider</button>'));
+
+  const validated: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'valide' as const } : v)) };
+  const done = infoOf(validated, { kind: 'benevole', volunteerKey: key });
+  assert.ok(done.includes('registration is-valide'));
+  assert.ok(!done.includes('>Valider</button>'));
+  assert.ok(shows(done, 'Aucun mail envoyé.'));
+
+  const reading = infoOf(pending, { kind: 'benevole', volunteerKey: key }, true);
+  assert.ok(shows(reading, 'Inscription'));
+  assert.ok(!reading.includes('>Valider</button>'), 'rien à valider en lecture seule');
 });
 
 test('a fiche names the tranches somebody would rather avoid, apart from the refused ones', () => {

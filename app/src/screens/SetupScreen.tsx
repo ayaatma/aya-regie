@@ -60,6 +60,7 @@ import { PhaseCard } from './PhaseCard.tsx';
 import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
+import { MailTemplatesCard } from './MailTemplatesCard.tsx';
 import { SkillsCard } from './SkillsCard.tsx';
 import { SkillPicker } from '../components/SkillPicker.tsx';
 import { setPoleSkills } from '../store/skillEdits.ts';
@@ -179,6 +180,7 @@ export function SetupScreen() {
             fiche in Personnes, and the two others are tabs of Logistique.
           */}
           <ApplicationStepsCard />
+          <MailTemplatesCard />
 
           <SkillsCard />
 

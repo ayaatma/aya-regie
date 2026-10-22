@@ -149,6 +149,11 @@ create table event (
   application_steps     jsonb not null default
     '[{"key":"confirmation","label":"Mail de confirmation envoyé"},{"key":"reconfirmee","label":"Présence reconfirmée"},{"key":"infos","label":"Infos pratiques envoyées"}]'::jsonb
     check (jsonb_typeof(application_steps) = 'array'),
+  -- The validation mails, by kind of person, ONLY those the regisseur rewrote: { <audience>:
+  -- {subject, body} }. An absent audience sends the default written in tools/src/registration.ts.
+  -- Since 2026-10-22. A document for the reason form_mapping is one.
+  mail_templates        jsonb not null default '{}'::jsonb
+    check (jsonb_typeof(mail_templates) = 'object'),
 
   -- THE OPTIMISTIC LOCK. Every save states the version it was built on; a save against a stale
   -- version is refused and hands back what the database holds. This is the "quelqu'un a modifie
@@ -263,6 +268,9 @@ create table organiser (
   health_note text not null default '',
   -- The side activities this orga is keen on. Since 2026-09-15.
   side_activity_keys text[] not null default '{}',
+  -- Validated by the regisseur or not, as volunteer.status. Since 2026-10-22. Marks, never blocks.
+  application_status text not null default 'candidature'
+    check (application_status in ('candidature', 'valide', 'annule')),
   sort_order  int not null default 0,
   unique (event_id, key)
 );
@@ -397,6 +405,10 @@ create table artist_member (
   -- stops resolving and the member is counted on their own again.
   volunteer_id  uuid references volunteer(id) on delete set null,
   organiser_id  uuid references organiser(id) on delete set null,
+  -- Where the validation mail goes, and whether the member is validated. Since 2026-10-22.
+  email         text not null default '',
+  application_status text not null default 'candidature'
+    check (application_status in ('candidature', 'valide', 'annule')),
   sort_order    int not null default 0,
   unique (artist_id, key),
   check (num_nonnulls(volunteer_id, organiser_id) <= 1)
@@ -931,6 +943,10 @@ create table extra_person (
   phone         text not null default '',
   drink_tickets int not null default 0 check (drink_tickets >= 0),
   meal_tickets  int not null default 0 check (meal_tickets >= 0),
+  -- As artist_member. NOT status, which says prestataire or autre. Since 2026-10-22.
+  email         text not null default '',
+  application_status text not null default 'candidature'
+    check (application_status in ('candidature', 'valide', 'annule')),
   sort_order    int not null default 0,
   unique (event_id, key)
 );
@@ -1082,7 +1098,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 25,
+values ('min_plan_format', 26,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1296,7 +1312,9 @@ as $fn$
                         'linkedKind',   case when m.organiser_id is not null then 'orga'
                                              when m.volunteer_id is not null then 'benevole'
                                              else null end,
-                        'linkedKey',    coalesce(mo.key, mv.key, ''))
+                        'linkedKey',    coalesce(mo.key, mv.key, ''),
+                        'email',        m.email,
+                        'applicationStatus', m.application_status)
                       order by m.sort_order, m.key)
                from artist_member m
                left join organiser mo on mo.id = m.organiser_id
@@ -1338,6 +1356,7 @@ as $fn$
              'emergencyContact', l.emergency_contact,
              'healthNote',     l.health_note,
              'sideActivityKeys', to_jsonb(l.side_activity_keys),
+             'applicationStatus', l.application_status,
              'montagePoleKeys', coalesce((
                                   select jsonb_agg(pp.key order by opp.sort_order, pp.key)
                                   from organiser_phase_pole opp
@@ -1631,7 +1650,9 @@ as $fn$
                  'status',       x.status,
                  'phone',        x.phone,
                  'drinkTickets', x.drink_tickets,
-                 'mealTickets',  x.meal_tickets)
+                 'mealTickets',  x.meal_tickets,
+                 'email',        x.email,
+                 'applicationStatus', x.application_status)
                order by x.sort_order, x.key)
         from extra_person x where x.event_id = e.id), '[]'::jsonb),
       'choices', coalesce((
@@ -1705,6 +1726,7 @@ as $fn$
         'options',      to_jsonb(e.volume_options)),
       'formMapping', e.form_mapping,
       'applicationSteps', e.application_steps,
+      'mailTemplates', e.mail_templates,
       'skills', e.skills,
       'sideActivities', e.side_activities,
       'equipment', e.equipment,
@@ -1798,6 +1820,8 @@ begin
     -- Absent from anything written before PLAN_FORMAT 16: the column keeps what it holds.
     application_steps     = case when jsonb_typeof(p_plan->'applicationSteps') = 'array'
                                  then p_plan->'applicationSteps' else application_steps end,
+    mail_templates        = case when jsonb_typeof(p_plan->'mailTemplates') = 'object'
+                                 then p_plan->'mailTemplates' else '{}'::jsonb end,
     skills                = case when jsonb_typeof(p_plan->'skills') = 'array'
                                  then p_plan->'skills' else '[]'::jsonb end,
     side_activities       = case when jsonb_typeof(p_plan->'sideActivities') = 'array'
@@ -1831,10 +1855,13 @@ begin
   on conflict do nothing;
 
   insert into extra_person (event_id, key, first_name, last_name, status, phone,
-                            drink_tickets, meal_tickets, sort_order)
+                            drink_tickets, meal_tickets, email, application_status, sort_order)
   select p_event_id, x->>'key', coalesce(x->>'firstName', ''), coalesce(x->>'lastName', ''),
          coalesce(x->>'status', 'autre'), coalesce(x->>'phone', ''),
          coalesce((x->>'drinkTickets')::int, 0), coalesce((x->>'mealTickets')::int, 0),
+         coalesce(x->>'email', ''),
+         case when x->>'applicationStatus' in ('candidature', 'valide', 'annule')
+              then x->>'applicationStatus' else 'candidature' end,
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan#>'{ticketing,extras}', '[]'::jsonb))
        with ordinality as t(x, ord);
@@ -1935,7 +1962,8 @@ begin
 
   insert into organiser (event_id, key, first_name, last_name, email, phone, access_code,
                          diet, allergies, note, montage_from, demontage_until, skills,
-                         emergency_contact, health_note, side_activity_keys, sort_order)
+                         emergency_contact, health_note, side_activity_keys, application_status,
+                         sort_order)
   select p_event_id, x->>'key',
          coalesce(x->>'firstName', ''), coalesce(x->>'lastName', ''),
          coalesce(x->>'email', ''), coalesce(x->>'phone', ''),
@@ -1951,6 +1979,8 @@ begin
                    from jsonb_array_elements(case when jsonb_typeof(x->'sideActivityKeys') = 'array'
                                                   then x->'sideActivityKeys' else '[]'::jsonb end) as oa(k)),
                   '{}'::text[]),
+         case when x->>'applicationStatus' in ('candidature', 'valide', 'annule')
+              then x->>'applicationStatus' else 'candidature' end,
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'organisers', '[]'::jsonb)) with ordinality as t(x, ord);
 
@@ -2087,7 +2117,7 @@ begin
   -- plan does not hold is written as no link, which is exactly how the engine reads it.
   insert into artist_member (artist_id, key, first_name, last_name, role, diet, allergies,
                              drink_tickets, payment, volunteer_id, organiser_id,
-                             sort_order)
+                             email, application_status, sort_order)
   select a.id, m->>'key',
          coalesce(m->>'firstName', ''), coalesce(m->>'lastName', ''),
          coalesce(m->>'role', 'musicien'),
@@ -2096,6 +2126,9 @@ begin
          (m->>'drinkTickets')::int,
          coalesce(m->>'payment', 'cash'),
          lv.id, lo.id,
+         coalesce(m->>'email', ''),
+         case when m->>'applicationStatus' in ('candidature', 'valide', 'annule')
+              then m->>'applicationStatus' else 'candidature' end,
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'artists', '[]'::jsonb)) as t(x)
   join artist a on a.event_id = p_event_id and a.key = x->>'key'
@@ -3048,3 +3081,41 @@ create policy photos_organiser_update on storage.objects
   for update to authenticated using (bucket_id = 'photos') with check (bucket_id = 'photos');
 create policy photos_organiser_delete on storage.objects
   for delete to authenticated using (bucket_id = 'photos');
+
+-- ---------------------------------------------------------------------------
+-- Les mails de validation, since 2026-10-22 (migration 35)
+--
+-- One row per mail the tool tried to send: to whom, what, and whether the mail server took it.
+-- NOT IN THE PLAN DOCUMENT, on purpose: it is written by the server function that sends
+-- (supabase/functions/send-mail), at the moment it sends, and a whole-plan save from a tab opened
+-- before that moment must not be able to erase it. So the person is named by kind and key, as in
+-- ticketing_choice, and a row naming somebody the plan no longer holds is simply never shown.
+--
+-- Append only: an organiser may read and add, nobody's browser may change or remove a row. A
+-- failure the function could not record (it was unreachable) is added by the browser itself.
+-- ---------------------------------------------------------------------------
+
+create table mail_log (
+  id          bigint generated always as identity primary key,
+  event_id    uuid not null references event(id) on delete cascade,
+  person_kind text not null check (person_kind in ('benevole', 'orga', 'artiste', 'extra')),
+  person_key  text not null,
+  recipient   text not null,
+  subject     text not null,
+  body        text not null,
+  -- 'envoye' when the mail server accepted the message, 'echec' otherwise, with what it said.
+  -- Accepted is not delivered: a mailbox that bounces later is not known here.
+  outcome     text not null check (outcome in ('envoye', 'echec')),
+  error       text not null default '',
+  -- Sent by validating somebody, or sent again by hand from their fiche.
+  reason      text not null default 'validation' check (reason in ('validation', 'renvoi')),
+  sent_at     timestamptz not null default now(),
+  sent_by     uuid default auth.uid()
+);
+
+create index mail_log_person_idx on mail_log (event_id, person_kind, person_key, id desc);
+
+alter table mail_log enable row level security;
+
+create policy mail_log_organiser_select on mail_log for select to authenticated using (true);
+create policy mail_log_organiser_insert on mail_log for insert to authenticated with check (true);

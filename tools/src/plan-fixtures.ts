@@ -97,6 +97,7 @@ export function loadScenario(scenario: string, outRoot = 'out'): Plan {
     skills: [],
     teamsEnabled: false,
     defaultShiftHours: 2,
+    mailTemplates: {},
     teams: [],
     sideActivities: [],
     equipment: [],

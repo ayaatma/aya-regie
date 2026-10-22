@@ -77,6 +77,7 @@ function makePlan(artists: Artist[], catering?: CateringSettings): Plan {
     skills: [],
     teamsEnabled: false,
     defaultShiftHours: 2,
+    mailTemplates: {},
     teams: [],
     sideActivities: [],
     equipment: [],

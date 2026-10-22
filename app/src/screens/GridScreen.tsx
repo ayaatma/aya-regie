@@ -60,6 +60,7 @@ import { TrashTarget } from '../components/TrashTarget.tsx';
 import { poleColours } from '../components/poleColours.ts';
 import { laneRows } from '../components/laneRows.ts';
 import { buddiesOf, teammatesOf } from '../components/relations.ts';
+import { pendingPeople } from '../components/PersonMark.tsx';
 import { stepCursor, type NavLanes } from '../components/gridNav.ts';
 import {
   addShift,
@@ -386,6 +387,7 @@ export function GridScreen({
    */
   const buddyKeys = useMemo(() => buddiesOf(plan, selected), [plan, selected]);
   const teammateKeys = useMemo(() => teammatesOf(plan, selected), [plan, selected]);
+  const pendingKeys = useMemo(() => pendingPeople(plan), [plan]);
 
   const namedArtistKeys = useMemo(() => {
     const volunteer = selected ? index.volunteerByKey.get(selected) : undefined;
@@ -1357,6 +1359,7 @@ export function GridScreen({
                                   }
                                   onRemoveOrga={takeOrgaOut}
                                   supportOnlyOrgaKeys={supportOnlyByShift.get(shift.key)}
+                                  pendingKeys={pendingKeys}
                                   slots={layout.get(shift.key)}
                                   readOnly={readOnly}
                                   editing={editing}

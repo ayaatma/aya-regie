@@ -545,6 +545,11 @@ export interface Organiser {
   healthNote?: string;
   /** The side activities this orga is keen on, ticked by hand. Since 2026-09-15. */
   sideActivityKeys?: string[];
+  /**
+   * Where this orga stands, as for a bénévole (`Volunteer.status`). Since 2026-10-22; absent
+   * means « inscription ». Informs and marks, never blocks: an orga is subject to no rule.
+   */
+  applicationStatus?: ApplicationStatus;
 }
 
 /**
@@ -685,6 +690,10 @@ export interface ArtistMember {
    */
   linkedKind: PersonKind | null;
   linkedKey: string;
+  /** Where the validation mail goes. Typed by hand. Since 2026-10-22. */
+  email: string;
+  /** As `Organiser.applicationStatus`. Since 2026-10-22; absent means « inscription ». */
+  applicationStatus?: ApplicationStatus;
 }
 
 /**
@@ -818,6 +827,7 @@ export function makeArtistMember(
     guests: [],
     linkedKind: null,
     linkedKey: '',
+    email: '',
     ...given,
   };
 }
@@ -1067,13 +1077,19 @@ export const APPLICATION_STATUSES: readonly ApplicationStatus[] = ['candidature'
 
 /** Gender-neutral on purpose: half the bénévoles are women. */
 export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
-  candidature: 'Candidature',
+  // « Inscription » on screen since 2026-10-22, the régisseur's word for somebody entered and
+  // not decided yet; the identifier stayed.
+  candidature: 'Inscription',
   valide: 'Validée',
   annule: 'Annulée',
 };
 
 export const statusOf = (volunteer: Pick<Volunteer, 'status'>): ApplicationStatus =>
   volunteer.status ?? 'candidature';
+
+/** The same for an orga, a member of an act or an extra person, whose field has another name. */
+export const applicationStatusOf = (person: { applicationStatus?: ApplicationStatus }): ApplicationStatus =>
+  person.applicationStatus ?? 'candidature';
 
 /**
  * One message or check the régisseur ticks per person ("Mail de confirmation envoyé"). A setting
@@ -1090,6 +1106,20 @@ export const DEFAULT_APPLICATION_STEPS: readonly ApplicationStep[] = [
   { key: 'reconfirmee', label: 'Présence reconfirmée' },
   { key: 'infos', label: 'Infos pratiques envoyées' },
 ];
+
+/**
+ * Who a validation mail speaks to, since 2026-10-22: one message per kind of person, because a
+ * bénévole is told something else than a band. A responsable is an orga holding a pole.
+ */
+export type MailAudience = 'benevole' | 'orga' | 'responsable' | 'artiste' | 'prestataire' | 'autre';
+
+export const MAIL_AUDIENCES: readonly MailAudience[] = ['benevole', 'orga', 'responsable', 'artiste', 'prestataire', 'autre'];
+
+/** One message, with `{prenom}`-style blanks filled at sending time. See `registration.ts`. */
+export interface MailTemplate {
+  subject: string;
+  body: string;
+}
 
 /**
  * Stamina, as a form asks it ("je fonce", "je gère mon rythme"...). Shown on the fiche beside the
@@ -1287,6 +1317,13 @@ export interface ExtraPerson {
   phone: string;
   drinkTickets: number;
   mealTickets: number;
+  /** Where the validation mail goes. Since 2026-10-22; absent means none typed. */
+  email?: string;
+  /**
+   * As `Organiser.applicationStatus`. NOT `status`, which already says prestataire or autre.
+   * Since 2026-10-22; absent means « inscription ».
+   */
+  applicationStatus?: ApplicationStatus;
 }
 
 /**

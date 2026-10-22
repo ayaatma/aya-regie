@@ -119,6 +119,7 @@ function makePlan(parts: {
     skills: [],
     teamsEnabled: false,
     defaultShiftHours: 2,
+    mailTemplates: {},
     teams: [],
     sideActivities: [],
     equipment: [],

@@ -452,6 +452,32 @@ async function main() {
         await clickButton(/^↶$/);
         await sleep(400);
       }
+      if (want('validation')) {
+        // La validation des inscriptions: ⏳ on the grid, the column in Personnes, the preview of
+        // the mail, the failure the fixtures record (no mail server), the Réglages card. Undone after.
+        await tab('Grille');
+        await shot('105-grille-inscriptions');
+        await tab('Personnes');
+        await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
+        await sleep(400);
+        await shot('106-personnes-fiche-inscription');
+        await clickButton(/^Valider$/);
+        await sleep(300);
+        await tall('107-personnes-validation-apercu');
+        await clickButton(/^Valider (et envoyer|sans mail)$/);
+        await sleep(600);
+        await shot('108-personnes-validee-mail');
+        await clickButton(/^↶$/);
+        await sleep(400);
+        await tab('Réglages');
+        await page.evaluate(() => {
+          const head = [...document.querySelectorAll('.setup-mail-templates button')][0];
+          head?.click();
+          document.querySelector('.setup-mail-templates')?.scrollIntoView();
+        });
+        await sleep(400);
+        await tall('109-reglages-mails');
+      }
       if (want('candidature')) {
         // Le suivi des candidatures: the Candidature columns, a fiche cancelled while still placed,
         // then the steps card in Réglages. Everything undone after.
@@ -461,7 +487,8 @@ async function main() {
         await shot('96-personnes-candidature');
         await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
         await sleep(400);
-        await page.select('select[name="fiche-status"]', 'annule');
+        await page.$eval('select[name^="registration-status-benevole"]', (el) => el.setAttribute('data-shot', '1'));
+        await page.select('select[data-shot="1"]', 'annule');
         await sleep(400);
         await shot('97-personnes-fiche-annulee');
         await clickButton(/^↶$/);

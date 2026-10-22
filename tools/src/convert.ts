@@ -30,7 +30,7 @@
 
 import { newAccessCode, volunteerIdentity, VOLUNTEER_CODE_LENGTH } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
-import { absentFromPhase, type Organiser, type PersonKind, type Volunteer } from './model.js';
+import { absentFromPhase, applicationStatusOf, statusOf, type Organiser, type PersonKind, type Volunteer } from './model.js';
 import { PlanIndex, type Assignment, type Plan } from './plan.js';
 import { cateringReport } from './catering.js';
 import type { PhaseAssignment } from './phase.js';
@@ -211,6 +211,8 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
     demontageUntil,
     montagePoleKeys: [],
     demontagePoleKeys: [],
+    // Validated or not, the person stays where they stood: changing kind decides nothing.
+    applicationStatus: statusOf(v),
   };
 
   const mine = plan.assignments.filter((a) => a.volunteerKey === key);
@@ -337,9 +339,9 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
     montage,
     demontage,
     enteredByHand: true,
-    // An orga was already part of the event: turning them into a bénévole does not put them back
-    // among the undecided candidatures.
-    status: 'valide',
+    // Since 2026-10-22 an orga has a status of their own, and it follows them here. (Before, an
+    // orga turned bénévole was always « validée ».)
+    status: applicationStatusOf(o),
   };
 
   const assignments: Assignment[] = [

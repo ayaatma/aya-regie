@@ -21,6 +21,7 @@
 import {
   PERSON_STATUS_LABEL,
   statusOf,
+  applicationStatusOf,
   type ApplicationStatus,
   type BraceletType,
   type PersonStatus,
@@ -56,7 +57,10 @@ export interface TicketingRow {
   diet: string;
   allergies: string;
   statuses: StatusTag[];
-  /** A bénévole's application status; null for everybody else, who has none. */
+  /**
+   * Where the person's inscription stands: a bénévole, an orga, a member of an act or an extra
+   * since 2026-10-22. Null for a guest of an act, who has none.
+   */
   applicationStatus: ApplicationStatus | null;
   drinks: number;
   /** True when the drinks figure is the régisseur's, not the computed one. */
@@ -250,7 +254,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     const statuses: StatusTag[] = [{ status: 'orga', label: PERSON_STATUS_LABEL.orga }];
     if (leaders.has(o.key)) statuses.push({ status: 'responsable', label: PERSON_STATUS_LABEL.responsable });
     statuses.push(...actTags('orga', o.key));
-    push('orga', o.key, o, statuses, fed('orga', o.key));
+    push('orga', o.key, o, statuses, fed('orga', o.key), [], applicationStatusOf(o));
   }
 
   for (const v of plan.volunteers) {
@@ -279,13 +283,14 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
           firstName: member.firstName,
           lastName: member.lastName || (member.firstName === '' ? artistMemberName(artist, member) : ''),
           phone: '',
-          email: '',
+          email: member.email ?? '',
           diet: member.diet,
           allergies: member.allergies,
         },
         [{ status: 'artiste', label: `Artiste: ${artist.name}` }],
         fed('artiste', member.key),
         issues,
+        applicationStatusOf(member),
       );
     }
     for (const { guest } of artistGuests(artist)) {
@@ -303,9 +308,11 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     push(
       'extra',
       extra.key,
-      { firstName: extra.firstName, lastName: extra.lastName, phone: extra.phone, email: '', diet: '', allergies: '' },
+      { firstName: extra.firstName, lastName: extra.lastName, phone: extra.phone, email: extra.email ?? '', diet: '', allergies: '' },
       [{ status: extra.status, label: PERSON_STATUS_LABEL[extra.status] }],
       { drinks: Math.max(0, extra.drinkTickets), meals: Math.max(0, extra.mealTickets), serviceKeys: [] },
+      [],
+      applicationStatusOf(extra),
     );
   }
 
@@ -403,7 +410,8 @@ export function ticketingCsv(
   ];
   // The reserve is on the door's list only when the event says so. See `reserveOnDoorList`.
   const reserve = new Set(plan.reserve);
-  // A cancelled bénévole is not coming, whatever the setting: never on the door's list.
+  // Somebody cancelled is not coming, whatever the setting: never on the door's list. A bénévole
+  // since 2026-09-15, anybody holding a status since 2026-10-22.
   const coming = report.rows.filter((row) => row.applicationStatus !== 'annule');
   const onList = plan.ticketing.reserveOnDoorList
     ? coming

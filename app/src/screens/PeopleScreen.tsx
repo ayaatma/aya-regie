@@ -22,7 +22,6 @@ import {
   APPLICATION_STATUS_LABEL,
   ENERGY_LABEL,
   PERSON_STATUS_LABEL,
-  statusOf,
   type ApplicationStatus,
   ticketingCsv,
   ticketingReport,
@@ -38,7 +37,8 @@ import {
   nextExtraKey,
   setExtraPerson,
 } from '../store/ticketingEdits.ts';
-import { useLoadedPlan } from '../store/store.tsx';
+import { useLoadedPlan, usePlan } from '../store/store.tsx';
+import { sentAtLabel, useMailLog } from '../mail/mailStore.ts';
 import { downloadText, today } from '../components/download.ts';
 import { NumberField } from '../components/NumberField.tsx';
 import {
@@ -66,7 +66,7 @@ const VIEW_LABEL: Record<PeopleView, string> = {
 };
 
 /** The application filter: a status, the Réserve, or everybody. Only bénévoles have one. */
-type FollowUp = ApplicationStatus | 'reserve' | typeof ALL;
+type FollowUp = ApplicationStatus | 'reserve' | 'mail-echec' | typeof ALL;
 
 const flatten = (text: string): string =>
   text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
@@ -116,6 +116,8 @@ export function PeopleScreen({
   const [followUp, setFollowUp] = useState<FollowUp>(ALL);
   const [sort, setSort] = useState<Sort | null>(null);
   const { report: validation } = useLoadedPlan();
+  const { id: eventId } = usePlan();
+  const mails = useMailLog(eventId);
   const onSort = (key: SortKey): void =>
     setSort((now) => (now?.key === key ? { key, descending: !now.descending } : { key, descending: false }));
 
@@ -136,9 +138,12 @@ export function PeopleScreen({
   const needle = flatten(search);
   const matching = report.rows.filter((row) => {
     if (status !== ALL && !row.statuses.some((s) => s.status === status)) return false;
-    if (followUp !== ALL) {
-      if (row.kind !== 'benevole') return false;
-      if (followUp === 'reserve' ? index.volunteerByKey.get(row.key)?.backup !== true : row.applicationStatus !== followUp) return false;
+    if (followUp === 'reserve') {
+      if (row.kind !== 'benevole' || index.volunteerByKey.get(row.key)?.backup !== true) return false;
+    } else if (followUp === 'mail-echec') {
+      if (row.kind === 'invite' || mails.lastOf(row.kind, row.key)?.outcome !== 'echec') return false;
+    } else if (followUp !== ALL && row.applicationStatus !== followUp) {
+      return false;
     }
     if (needle === '') return true;
     return flatten(`${row.lastName} ${row.firstName} ${row.firstName} ${row.lastName}`).includes(needle);
@@ -263,7 +268,7 @@ export function PeopleScreen({
             <select
               className="select"
               value={followUp}
-              aria-label="Filtrer par suivi de candidature"
+              aria-label="Filtrer par inscription"
               onChange={(event) => setFollowUp(event.target.value as FollowUp)}
             >
               <option value={ALL}>Tous</option>
@@ -273,6 +278,9 @@ export function PeopleScreen({
                 </option>
               ))}
               <option value="reserve">Réserve ({plan.volunteers.filter((v) => v.backup === true).length})</option>
+              <option value="mail-echec">
+                Mail en échec ({report.rows.filter((r) => r.kind !== 'invite' && mails.lastOf(r.kind, r.key)?.outcome === 'echec').length})
+              </option>
             </select>
           </label>
           <label className="checkline">
@@ -444,6 +452,7 @@ function PeopleTable({
             {sortHead('lastName', 'Nom')}
             {sortHead('firstName', 'Prénom')}
             <th>Statut</th>
+            <th>Inscription</th>
             {view === 'accueil' && (
               <>
                 <th title="Tickets boisson à remettre">Boissons</th>
@@ -464,7 +473,7 @@ function PeopleTable({
             )}
             {view === 'candidature' && (
               <>
-                <th>Candidature</th>
+                <th>Listes</th>
                 <th>Équipe</th>
                 <th>Étapes</th>
                 <th>Inscription</th>
@@ -562,6 +571,7 @@ function PersonLine({
           </span>
         ))}
       </td>
+      <RegistrationCell row={row} />
 
       {view === 'accueil' && (
         <>
@@ -662,15 +672,11 @@ function ApplicationCells({ row }: { row: TicketingRow }) {
   const { plan, index } = useLoadedPlan();
   const volunteer = row.kind === 'benevole' ? index.volunteerByKey.get(row.key) : undefined;
   if (!volunteer) return <><td /><td /><td /><td /><td /><td /></>;
-  const status = statusOf(volunteer);
   const ticked = new Set(volunteer.statusSteps ?? []);
   const waiting = plan.reserve.includes(volunteer.key);
   return (
     <>
       <td>
-        <span className={`chip ${status === 'annule' ? 'is-bad' : status === 'valide' ? 'is-ok' : ''}`}>
-          {APPLICATION_STATUS_LABEL[status]}
-        </span>
         {waiting && <span className="chip">Liste d'attente</span>}
         {volunteer.backup && <span className="chip is-ok">Réserve</span>}
       </td>
@@ -696,5 +702,38 @@ function ApplicationCells({ row }: { row: TicketingRow }) {
       <td>{volunteer.energy ? ENERGY_LABEL[volunteer.energy] : ''}</td>
       <td>{volunteer.regieNote}</td>
     </>
+  );
+}
+
+/**
+ * « Inscription » on every column set, since 2026-10-22: where the person stands, and whether the
+ * last mail went. ⏳ is the mark the grids use for the same fact. Empty for a guest of an act.
+ */
+function RegistrationCell({ row }: { row: TicketingRow }) {
+  const { id: eventId } = usePlan();
+  const mails = useMailLog(eventId);
+  const status = row.applicationStatus;
+  if (status === null || row.kind === 'invite') return <td />;
+  const last = mails.lastOf(row.kind, row.key);
+  return (
+    <td>
+      <span className={`people-registration is-${status}`}>
+        {status === 'candidature' ? '⏳ ' : status === 'valide' ? '✓ ' : '✕ '}
+        {APPLICATION_STATUS_LABEL[status]}
+      </span>
+      {last && (
+        <span
+          className={`people-registration-mail${last.outcome === 'echec' ? ' is-bad' : ''}`}
+          title={
+            last.outcome === 'envoye'
+              ? `Mail envoyé ${sentAtLabel(last.sentAt)} à ${last.recipient}`
+              : `Échec de l'envoi ${sentAtLabel(last.sentAt)}: ${last.error}`
+          }
+        >
+          {' '}
+          {last.outcome === 'envoye' ? '✉️' : '⚠️'}
+        </span>
+      )}
+    </td>
   );
 }

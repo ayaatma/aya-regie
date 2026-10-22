@@ -1,6 +1,8 @@
 /**
- * « Candidature » on a bénévole's fiche, 2026-09-15: the status, the steps ticked, the régisseur's
- * note, and the two answers that go with them (the Réserve, the stamina).
+ * « Suivi » on a bénévole's fiche, 2026-09-15: the steps ticked, the régisseur's note, and the two
+ * answers that go with them (the Réserve, the stamina). The status itself moved to
+ * `RegistrationSection` on 2026-10-22, one block for every kind of person, with the validation
+ * mail; what stays here is what only a bénévole has, and freeing the places of a cancelled one.
  *
  * At the top of the fiche because it is what the régisseur works through first, person by person,
  * in the weeks before an event: who is in, who was told, who withdrew.
@@ -12,8 +14,6 @@
 import { useEffect, useState } from 'react';
 
 import {
-  APPLICATION_STATUSES,
-  APPLICATION_STATUS_LABEL,
   ENERGY_LABEL,
   ENERGY_PROFILES,
   fmtHours,
@@ -28,7 +28,6 @@ import { setVolunteerTeam } from '../store/teamEdits.ts';
 import {
   placesHeld,
   releasePlaces,
-  setApplicationStatus,
   setApplicationStep,
   setRegieNote,
 } from '../store/applicationEdits.ts';
@@ -56,11 +55,8 @@ export function ApplicationSection({
   if (readOnly) {
     return (
       <div className="panel-section">
-        <p className="panel-section-title">Candidature</p>
+        <p className="panel-section-title">Suivi</p>
         <p>
-          <span className={`chip ${status === 'annule' ? 'is-bad' : status === 'valide' ? 'is-ok' : ''}`}>
-            {APPLICATION_STATUS_LABEL[status]}
-          </span>
           {detail.reserve && <span className="chip">Liste d'attente</span>}
           {volunteer.backup && <span className="chip is-ok">Réserve</span>}
           {volunteer.energy && <span className="chip">{ENERGY_LABEL[volunteer.energy]}</span>}
@@ -74,24 +70,7 @@ export function ApplicationSection({
 
   return (
     <div className="panel-section fiche-edit">
-      <p className="panel-section-title">Candidature</p>
-
-      <label className="field">
-        <span className="field-label">Statut</span>
-        <select
-          className="select"
-          name="fiche-status"
-          value={status}
-          onChange={(event) => {
-            const next = event.target.value as typeof status;
-            edit((p) => setApplicationStatus(p, volunteer.key, next), `candidature de ${name}: ${APPLICATION_STATUS_LABEL[next].toLowerCase()}`);
-          }}
-        >
-          {APPLICATION_STATUSES.map((s) => (
-            <option key={s} value={s}>{APPLICATION_STATUS_LABEL[s]}</option>
-          ))}
-        </select>
-      </label>
+      <p className="panel-section-title">Suivi</p>
 
       {status === 'annule' && holding > 0 && (
         <div className="fiche-review">

@@ -31,6 +31,8 @@ import {
   type Team,
   type SideActivity,
   type EquipmentItem,
+  type MailAudience,
+  type MailTemplate,
 } from './model.js';
 import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
 import { type Phase, alignPhase, defaultPhase, defaultPhaseStart } from './phase.js';
@@ -138,8 +140,11 @@ import {
  *    predates this empties the store on its next save.
  * 25: 2026-09-17, `Plan.defaultShiftHours`, the event's default length of a créneau, which a
  *    pole follows unless it was set by hand. A build that predates this forgets it on its next save.
+ * 26: 2026-10-22, validation of everybody: `applicationStatus` on orgas, members of an act and
+ *    extra people, `email` on the last two, and `Plan.mailTemplates`. A build that predates this
+ *    writes every one of them back as an inscription with no address and the default messages.
  */
-export const PLAN_FORMAT = 25;
+export const PLAN_FORMAT = 26;
 
 /** How an assignment came to exist. A locked one never moves in a re-solve. */
 export type AssignmentSource = 'solver' | 'manual';
@@ -294,6 +299,13 @@ export interface Plan {
    * follows it, and none that the régisseur set. Two hours, as every pole had before.
    */
   defaultShiftHours: number;
+  /**
+   * The validation mails, by kind of person, ONLY WHERE THE RÉGISSEUR REWROTE ONE: an absent
+   * audience sends `DEFAULT_MAIL_TEMPLATES`' text, so a better default reaches every event that
+   * never touched it. Since 2026-10-22. What was sent, and whether it went, is NOT here: see
+   * `mail_log` in `db/schema.sql`, written by the server that sent it.
+   */
+  mailTemplates: Partial<Record<MailAudience, MailTemplate>>;
   /**
    * Orgas standing in créneaux of the exploit, placed by hand and by hand only.
    *
@@ -894,6 +906,7 @@ export function emptyPlan(
     | 'sideActivities'
     | 'equipment'
     | 'defaultShiftHours'
+    | 'mailTemplates'
   > & {
     buddies?: readonly BuddyPair[];
     organisers?: readonly Organiser[];
@@ -931,5 +944,6 @@ export function emptyPlan(
     sideActivities: [],
     equipment: [],
     defaultShiftHours: 2,
+    mailTemplates: {},
   };
 }

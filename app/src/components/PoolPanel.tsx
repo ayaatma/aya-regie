@@ -52,7 +52,7 @@ import { useMemo, useState } from 'react';
 import { fmtHours, type PersonKind, type PhaseId } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { DRAG_MIME, type DragPayload } from './drag.ts';
-import { PersonMark } from './PersonMark.tsx';
+import { PendingMark, PersonMark, pendingPeople } from './PersonMark.tsx';
 import { exploitPoolRows, phasePoolRows, poleMatchOf, type PoleMatch, type PoolRow } from './poolRows.ts';
 import { sameSelection, type Selection } from './selection.ts';
 
@@ -124,6 +124,7 @@ export function PoolPanel(props: PoolPanelProps) {
   } = props;
 
   const { plan, index, report } = useLoadedPlan();
+  const pendingKeys = useMemo(() => pendingPeople(plan), [plan]);
   const [dropHot, setDropHot] = useState(false);
   const [kind, setKind] = useState<PersonKind | typeof ALL_KINDS>(ALL_KINDS);
   const [poleKey, setPoleKey] = useState<string>(ALL_POLES);
@@ -310,6 +311,7 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
             onDragEnd={onDragEndPool}
           >
             <PersonMark kind={row.kind} />
+            <PendingMark pending={pendingKeys.has(`${row.kind}|${row.personKey}`)} />
             <span className="pool-item-name">{row.name}</span>
             {/*
               "À zéro" used to be a tab of its own. It is the same fact, said on the row: a chip

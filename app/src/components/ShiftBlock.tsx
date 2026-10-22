@@ -42,7 +42,7 @@ import {
   type VolunteerColour,
 } from '../engine.ts';
 import { DRAG_MIME, type DragPayload } from './drag.ts';
-import { PersonMark } from './PersonMark.tsx';
+import { PendingMark, PersonMark } from './PersonMark.tsx';
 import { BOX_GAP, BOX_H, levelLabel, starsFor, volumeLabel, volumeMark } from './layout.ts';
 
 export type VolumeBand = Exclude<VolunteerColour, 'rouge'>;
@@ -114,6 +114,8 @@ export interface ShiftBlockProps {
    * this component holds no opinion of its own about it.
    */
   supportOnlyOrgaKeys?: ReadonlySet<string>;
+  /** `kind|key` of the people still in « Inscription », from `pendingPeople`. Marked ⏳. */
+  pendingKeys?: ReadonlySet<string>;
   /**
    * Which row each place of this créneau holds, computed over the whole pole's lane.
    *
@@ -174,6 +176,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     onSelectOrga,
     onRemoveOrga,
     supportOnlyOrgaKeys,
+    pendingKeys,
     slots,
     editing = false,
     onBeginRetime,
@@ -310,6 +313,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
         >
           <span className="box-name">
             <PersonMark kind="orga" />
+            <PendingMark pending={pendingKeys?.has(`orga|${orga.key}`)} />
             {orga.short}
           </span>
           {!readOnly && (
@@ -399,13 +403,14 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
         const bandNote = band === 'aucune' ? '' : `\n${volumeLabel(band)}`;
         const issueNote = entry.issues.map((issue) => `\n${issue.message}`).join('');
         const buddyNote = buddy ? '\nBinôme demandé avec la personne sélectionnée' : '';
+        const pendingNote = pendingKeys?.has(`benevole|${entry.volunteerKey}`) ? '\nInscription, pas encore validée' : '';
 
         return (
           <div
             key={boxKey}
             className={boxClass}
             draggable={!locked && !readOnly && !editing}
-            title={`${entry.name}\n${levelLabel(entry.level)}${locked ? '\nVerrouillé' : ''}${bandNote}${buddyNote}${issueNote}`}
+            title={`${entry.name}${pendingNote}\n${levelLabel(entry.level)}${locked ? '\nVerrouillé' : ''}${bandNote}${buddyNote}${issueNote}`}
             // Clicking a box selects the person, and clicking them again leaves them selected: a
             // second look at somebody is not a request to stop looking. Letting go is done on the
             // grid's own background, or with Échap.
@@ -452,7 +457,10 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
               onDropOnBox(entry.volunteerKey, shift.key);
             }}
           >
-            <span className="box-name">{entry.short}</span>
+            <span className="box-name">
+              <PendingMark pending={pendingKeys?.has(`benevole|${entry.volunteerKey}`)} />
+              {entry.short}
+            </span>
             {/*
               A long day is a glyph and no longer an orange stripe. See `volumeMark`: the grid
               already spends red on "illegal" and blue on "selected", and two more oranges three

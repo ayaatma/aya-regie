@@ -19,6 +19,9 @@ import {
   EQUIPMENT_STATUSES,
   type EquipmentStatus,
   APPLICATION_STATUSES,
+  MAIL_AUDIENCES,
+  type MailAudience,
+  type MailTemplate,
   DEFAULT_APPLICATION_STEPS,
   ENERGY_PROFILES,
   type ApplicationStatus,
@@ -127,7 +130,24 @@ const organiser = (value: unknown): Organiser => {
     emergencyContact: text(loose.emergencyContact),
     healthNote: text(loose.healthNote),
     sideActivityKeys: keys(loose.sideActivityKeys),
+    // Absent from anything written before 2026-10-22: nobody had validated an orga yet.
+    applicationStatus: applicationStatus(loose.applicationStatus),
   };
+};
+
+/** A status, or « inscription » for anything else, which is what absent has always meant. */
+const applicationStatus = (value: unknown): ApplicationStatus =>
+  (APPLICATION_STATUSES as readonly unknown[]).includes(value) ? (value as ApplicationStatus) : 'candidature';
+
+/** The validation mails the régisseur rewrote, by audience; anything else is dropped. */
+const mailTemplates = (value: unknown): Partial<Record<MailAudience, MailTemplate>> => {
+  const loose = (value ?? {}) as Record<string, unknown>;
+  const out: Partial<Record<MailAudience, MailTemplate>> = {};
+  for (const audience of MAIL_AUDIENCES) {
+    const t = loose[audience] as Record<string, unknown> | undefined;
+    if (t && typeof t === 'object') out[audience] = { subject: text(t.subject), body: text(t.body) };
+  }
+  return out;
 };
 
 /** A window, or nothing. A half-written one is nothing: NaN pixels are worse than no box. */
@@ -361,6 +381,9 @@ const artistMember = (value: unknown): ArtistMember => {
         : null,
     linkedKey:
       loose.linkedKind === 'orga' || loose.linkedKind === 'benevole' ? text(loose.linkedKey) : '',
+    // Both absent from anything written before 2026-10-22.
+    email: text(loose.email),
+    applicationStatus: applicationStatus(loose.applicationStatus),
   });
 };
 
@@ -812,6 +835,9 @@ const ticketing = (value: unknown): TicketingSettings => {
           phone: text(x.phone),
           drinkTickets: count(x.drinkTickets),
           mealTickets: count(x.mealTickets),
+          // Both absent from anything written before 2026-10-22.
+          email: text(x.email),
+          applicationStatus: applicationStatus(x.applicationStatus),
         };
       })
       .filter((x) => x.key !== ''),
@@ -1006,6 +1032,8 @@ export function normalisePlan(raw: unknown): Plan {
       .filter((a) => a !== null && typeof a === 'object')
       .map((a) => ({ key: text(a.key), label: text(a.label), when: text(a.when) }))
       .filter((a) => a.key !== ''),
+    // Absent from anything written before 2026-10-22: every audience sends the default text.
+    mailTemplates: mailTemplates((loose as Record<string, unknown>).mailTemplates),
     // Absent from anything written before 2026-09-17: two hours, what every pole had before.
     defaultShiftHours: (() => {
       const hours = (loose as Record<string, unknown>).defaultShiftHours;

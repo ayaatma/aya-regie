@@ -369,3 +369,20 @@ export {
   statusOf,
 } from '@engine/model.ts';
 export type { ApplicationStatus, ApplicationStep, EnergyProfile } from '@engine/model.ts';
+
+// Validation of everybody and the validation mails, 2026-10-22.
+export { MAIL_AUDIENCES, applicationStatusOf } from '@engine/model.ts';
+export type { MailAudience, MailTemplate } from '@engine/model.ts';
+export {
+  DEFAULT_MAIL_TEMPLATES,
+  MAIL_AUDIENCE_LABEL,
+  MAIL_PLACEHOLDERS,
+  isMailAddress,
+  mailTemplateFor,
+  registrantOf,
+  registrants,
+  renderMail,
+  setRegistrationStatus,
+  withMailTemplate,
+} from '@engine/registration.ts';
+export type { Registrant, RegistrantKind, RenderedMail } from '@engine/registration.ts';

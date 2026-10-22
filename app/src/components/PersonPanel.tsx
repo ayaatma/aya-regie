@@ -42,6 +42,7 @@ import {
 import { NumberField } from './NumberField.tsx';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
 import { PersonMark } from './PersonMark.tsx';
+import { RegistrationSection } from './RegistrationSection.tsx';
 import { useNavigation, type PersonRef } from './personNav.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
 
@@ -397,55 +398,59 @@ function MemberFiche({ memberKey }: { memberKey: string }) {
     edit((p) => setArtistMember(p, artist.key, member.key, over), `${what} de ${who}`);
 
   return (
-    <div className="panel-section">
-      <p className="panel-sub">Membre de {artist.name}.</p>
-      <div className="rules-grid">
-        <TextRule label="Prénom" name={`fiche-member-first-${member.key}`} value={member.firstName} who={who} onChange={(v) => change({ firstName: v }, 'prénom')} />
-        <TextRule label="Nom" name={`fiche-member-last-${member.key}`} value={member.lastName} who={who} onChange={(v) => change({ lastName: v }, 'nom')} />
-        <label className="rule">
-          <span className="rule-label">Rôle</span>
-          <select
-            className="select"
-            name={`fiche-member-role-${member.key}`}
-            value={member.role}
-            aria-label={`Rôle de ${who}`}
-            onChange={(event) => change({ role: event.target.value as ArtistMember['role'] }, 'rôle')}
-          >
-            <option value="musicien">Musicien·ne</option>
-            <option value="technicien">Technicien·ne</option>
-          </select>
-        </label>
-        <TextRule label="Régime alimentaire" name={`fiche-member-diet-${member.key}`} value={member.diet} who={who} onChange={(v) => change({ diet: v }, 'régime')} />
-        <TextRule label="Allergies" name={`fiche-member-allergies-${member.key}`} value={member.allergies} who={who} onChange={(v) => change({ allergies: v }, 'allergies')} />
-        <label className="rule">
-          <span className="rule-label">Paiement</span>
-          <select
-            className="select"
-            name={`fiche-member-payment-${member.key}`}
-            value={member.payment}
-            aria-label={`Paiement de ${who}`}
-            onChange={(event) => change({ payment: event.target.value as ArtistMember['payment'] }, 'paiement')}
-          >
-            {(Object.keys(PAYMENT_LABEL) as ArtistMember['payment'][]).map((mode) => (
-              <option key={mode} value={mode}>
-                {PAYMENT_LABEL[mode]}
-              </option>
-            ))}
-          </select>
-        </label>
+    <>
+      <RegistrationSection kind="artiste" personKey={member.key} />
+      <div className="panel-section">
+        <p className="panel-sub">Membre de {artist.name}.</p>
+        <div className="rules-grid">
+          <TextRule label="Prénom" name={`fiche-member-first-${member.key}`} value={member.firstName} who={who} onChange={(v) => change({ firstName: v }, 'prénom')} />
+          <TextRule label="Nom" name={`fiche-member-last-${member.key}`} value={member.lastName} who={who} onChange={(v) => change({ lastName: v }, 'nom')} />
+          <TextRule label="Adresse e-mail" name={`fiche-member-email-${member.key}`} value={member.email} who={who} type="email" onChange={(v) => change({ email: v }, 'adresse e-mail')} />
+          <label className="rule">
+            <span className="rule-label">Rôle</span>
+            <select
+              className="select"
+              name={`fiche-member-role-${member.key}`}
+              value={member.role}
+              aria-label={`Rôle de ${who}`}
+              onChange={(event) => change({ role: event.target.value as ArtistMember['role'] }, 'rôle')}
+            >
+              <option value="musicien">Musicien·ne</option>
+              <option value="technicien">Technicien·ne</option>
+            </select>
+          </label>
+          <TextRule label="Régime alimentaire" name={`fiche-member-diet-${member.key}`} value={member.diet} who={who} onChange={(v) => change({ diet: v }, 'régime')} />
+          <TextRule label="Allergies" name={`fiche-member-allergies-${member.key}`} value={member.allergies} who={who} onChange={(v) => change({ allergies: v }, 'allergies')} />
+          <label className="rule">
+            <span className="rule-label">Paiement</span>
+            <select
+              className="select"
+              name={`fiche-member-payment-${member.key}`}
+              value={member.payment}
+              aria-label={`Paiement de ${who}`}
+              onChange={(event) => change({ payment: event.target.value as ArtistMember['payment'] }, 'paiement')}
+            >
+              {(Object.keys(PAYMENT_LABEL) as ArtistMember['payment'][]).map((mode) => (
+                <option key={mode} value={mode}>
+                  {PAYMENT_LABEL[mode]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="people-meta">
+          {member.guests.length === 0
+            ? 'Aucun invité.'
+            : `Invités: ${member.guests.map((g) => `${g.firstName} ${g.lastName}`.trim() || 'sans nom').join(', ')}.`}{' '}
+          Les invités, les repas par service et le défraiement se règlent sur la fiche du groupe.
+        </p>
+        {nav && (
+          <button className="btn is-small" onClick={nav.openArtists}>
+            Ouvrir l'onglet Artistes
+          </button>
+        )}
       </div>
-      <p className="people-meta">
-        {member.guests.length === 0
-          ? 'Aucun invité.'
-          : `Invités: ${member.guests.map((g) => `${g.firstName} ${g.lastName}`.trim() || 'sans nom').join(', ')}.`}{' '}
-        Les invités, les repas par service et le défraiement se règlent sur la fiche du groupe.
-      </p>
-      {nav && (
-        <button className="btn is-small" onClick={nav.openArtists}>
-          Ouvrir l'onglet Artistes
-        </button>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -491,53 +496,57 @@ function ExtraFiche({ extraKey, onDeleted }: { extraKey: string; onDeleted(): vo
     edit((p) => setExtraPerson(p, extra.key, over), `${what} de ${who}`);
 
   return (
-    <div className="panel-section">
-      <div className="rules-grid">
-        <TextRule label="Prénom" name={`extra-first-${extra.key}`} value={extra.firstName} who={who} onChange={(v) => change({ firstName: v }, 'prénom')} />
-        <TextRule label="Nom" name={`extra-last-${extra.key}`} value={extra.lastName} who={who} onChange={(v) => change({ lastName: v }, 'nom')} />
-        <label className="rule">
-          <span className="rule-label">Statut</span>
-          <select
-            className="select"
-            name={`extra-status-${extra.key}`}
-            value={extra.status}
-            aria-label={`Statut de ${who}`}
-            onChange={(event) => change({ status: event.target.value as ExtraPerson['status'] }, 'statut')}
-          >
-            <option value="prestataire">{PERSON_STATUS_LABEL.prestataire}</option>
-            <option value="autre">{PERSON_STATUS_LABEL.autre}</option>
-          </select>
-        </label>
-        <TextRule label="Téléphone" name={`extra-phone-${extra.key}`} value={extra.phone} who={who} type="tel" onChange={(v) => change({ phone: v }, 'téléphone')} />
-        <label className="rule">
-          <span className="rule-label">Tickets boisson</span>
-          <NumberField
-            value={extra.drinkTickets}
-            ariaLabel={`Tickets boisson de ${who}`}
-            name={`extra-drinks-${extra.key}`}
-            onCommit={(value) => change({ drinkTickets: Math.round(value ?? 0) }, 'tickets boisson')}
-          />
-        </label>
-        <label className="rule">
-          <span className="rule-label">Tickets repas</span>
-          <NumberField
-            value={extra.mealTickets}
-            ariaLabel={`Tickets repas de ${who}`}
-            name={`extra-meals-${extra.key}`}
-            onCommit={(value) => change({ mealTickets: Math.round(value ?? 0) }, 'tickets repas')}
-          />
-        </label>
+    <>
+      <RegistrationSection kind="extra" personKey={extra.key} />
+      <div className="panel-section">
+        <div className="rules-grid">
+          <TextRule label="Prénom" name={`extra-first-${extra.key}`} value={extra.firstName} who={who} onChange={(v) => change({ firstName: v }, 'prénom')} />
+          <TextRule label="Nom" name={`extra-last-${extra.key}`} value={extra.lastName} who={who} onChange={(v) => change({ lastName: v }, 'nom')} />
+          <label className="rule">
+            <span className="rule-label">Statut</span>
+            <select
+              className="select"
+              name={`extra-status-${extra.key}`}
+              value={extra.status}
+              aria-label={`Statut de ${who}`}
+              onChange={(event) => change({ status: event.target.value as ExtraPerson['status'] }, 'statut')}
+            >
+              <option value="prestataire">{PERSON_STATUS_LABEL.prestataire}</option>
+              <option value="autre">{PERSON_STATUS_LABEL.autre}</option>
+            </select>
+          </label>
+          <TextRule label="Téléphone" name={`extra-phone-${extra.key}`} value={extra.phone} who={who} type="tel" onChange={(v) => change({ phone: v }, 'téléphone')} />
+          <TextRule label="Adresse e-mail" name={`extra-email-${extra.key}`} value={extra.email ?? ''} who={who} type="email" onChange={(v) => change({ email: v }, 'adresse e-mail')} />
+          <label className="rule">
+            <span className="rule-label">Tickets boisson</span>
+            <NumberField
+              value={extra.drinkTickets}
+              ariaLabel={`Tickets boisson de ${who}`}
+              name={`extra-drinks-${extra.key}`}
+              onCommit={(value) => change({ drinkTickets: Math.round(value ?? 0) }, 'tickets boisson')}
+            />
+          </label>
+          <label className="rule">
+            <span className="rule-label">Tickets repas</span>
+            <NumberField
+              value={extra.mealTickets}
+              ariaLabel={`Tickets repas de ${who}`}
+              name={`extra-meals-${extra.key}`}
+              onCommit={(value) => change({ mealTickets: Math.round(value ?? 0) }, 'tickets repas')}
+            />
+          </label>
+        </div>
+        <button
+          className="btn is-danger is-small"
+          onClick={() => {
+            edit((p) => deleteExtraPerson(p, extra.key), `${who} retiré·e de la liste`);
+            onDeleted();
+          }}
+        >
+          Retirer de la liste
+        </button>
       </div>
-      <button
-        className="btn is-danger is-small"
-        onClick={() => {
-          edit((p) => deleteExtraPerson(p, extra.key), `${who} retiré·e de la liste`);
-          onDeleted();
-        }}
-      >
-        Retirer de la liste
-      </button>
-    </div>
+    </>
   );
 }
 

@@ -31,6 +31,7 @@ import { setOrganiserPhase } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from './labels.ts';
 import { PersonPhoto } from './PersonPhoto.tsx';
+import { RegistrationSection } from './RegistrationSection.tsx';
 
 export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
   const { plan, index, edit } = useLoadedPlan();
@@ -66,6 +67,7 @@ export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
 
   return (
     <div className="orga-fiche">
+      <RegistrationSection kind="orga" personKey={person.key} />
       <PersonPhoto personKey={person.key} name={who} />
       <div className="rules-grid">
         {field('Prénom', 'firstName', { autoComplete: 'given-name' })}

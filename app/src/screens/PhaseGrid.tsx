@@ -61,7 +61,7 @@ import { EditModeButton, MIN_WINDOW_HOURS, edgeLimits, ghostWindow } from '../co
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from '../components/labels.ts';
 import { InfoPanel } from '../components/InfoPanel.tsx';
-import { PersonMark } from '../components/PersonMark.tsx';
+import { PendingMark, PersonMark, pendingPeople } from '../components/PersonMark.tsx';
 import { PoolPanel, type PanelTab } from '../components/PoolPanel.tsx';
 import { DRAG_MIME } from '../components/drag.ts';
 import { stepBox, type NavBox, type NavRows } from '../components/phaseNav.ts';
@@ -198,6 +198,7 @@ export function PhaseGrid({
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const phase: Phase = id === 'montage' ? plan.montage : plan.demontage;
+  const pendingKeys = useMemo(() => pendingPeople(plan), [plan]);
 
   /**
    * Pixels per hour, continuous, and fitted to the screen whenever the day filter changes.
@@ -1052,6 +1053,7 @@ export function PhaseGrid({
                                 }}
                               >
                                 <PersonMark kind={box.personKind} />
+                                <PendingMark pending={pendingKeys.has(`${box.personKind}|${box.personKey}`)} />
                                 {nameOf(box.personKind, box.personKey)}
                               </span>
                               );
@@ -1232,6 +1234,7 @@ export function PhaseGrid({
                         box={box}
                         row={rows.get(box) ?? 0}
                         label={nameOf(box.personKind, box.personKey)}
+                        pending={pendingKeys.has(`${box.personKind}|${box.personKey}`)}
                         issues={issuesByBox.get(box.assignmentKey) ?? []}
                         picked={
                           selection?.kind === 'case' &&
@@ -1428,6 +1431,7 @@ function Bars({
   box,
   row,
   label,
+  pending,
   issues,
   picked,
   kin,
@@ -1444,6 +1448,8 @@ function Bars({
   box: PhasePlacement;
   row: number;
   label: string;
+  /** Still in « Inscription »: ⏳ before the name. */
+  pending: boolean;
   issues: readonly PhaseIssue[];
   picked: boolean;
   /** Another box of the same person, ringed so a whole phase reads as one person at a glance. */
@@ -1549,6 +1555,7 @@ function Bars({
           {i === 0 && (
             <span className="phase-bar-name">
               <PersonMark kind={box.personKind} />
+              <PendingMark pending={pending} />
               {label}
             </span>
           )}

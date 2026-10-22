@@ -5381,3 +5381,192 @@ textarea.select,
   color: var(--rouge);
   font-size: 12px;
 }
+
+/* --------------------------------------------------------------------------
+   La validation des inscriptions, 2026-10-22
+   -------------------------------------------------------------------------- */
+
+/* ⏳ before a name not validated yet. Same footprint as the orga mark, so a box never reflows. */
+.pending-mark {
+  font-size: 10px;
+  margin-right: 3px;
+  vertical-align: baseline;
+  flex: 0 0 auto;
+}
+
+.registration-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The status, first thing on a fiche: orange to validate, green validated, red cancelled. */
+.registration {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--orange-fonce);
+  border-radius: var(--radius);
+  background: var(--orange-fonce-bg);
+  color: var(--orange-fonce);
+}
+
+.registration.is-valide {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.registration.is-annule {
+  border-color: var(--rouge);
+  background: var(--rouge-bg);
+  color: var(--rouge);
+}
+
+.registration-status {
+  font-weight: 600;
+}
+
+.registration-hint {
+  font-weight: 400;
+}
+
+.registration-audience {
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.registration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.registration-select .select {
+  width: auto;
+}
+
+.registration-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+}
+
+.registration-confirm-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.registration-mail-head {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.registration-mail-body {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.registration-mail {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.registration-mail.is-ok {
+  color: var(--ok);
+}
+
+.registration-mail.is-bad {
+  color: var(--rouge);
+}
+
+.registration-mail-error {
+  color: var(--ink-soft);
+}
+
+.registration-history {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The Personnes list's own status cell. */
+.people-registration {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.people-registration.is-candidature {
+  color: var(--orange-fonce);
+}
+
+.people-registration.is-valide {
+  color: var(--ok);
+}
+
+.people-registration.is-annule {
+  color: var(--rouge);
+}
+
+.people-registration-mail.is-bad {
+  color: var(--rouge);
+}
+
+/* Réglages, the validation mails. */
+.mail-template {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.mail-template .field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mail-template .field .select {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.mail-template textarea {
+  min-height: 180px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.mail-placeholders {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.mail-placeholders code {
+  margin-right: 6px;
+}
