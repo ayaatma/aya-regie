@@ -38,6 +38,7 @@ import {
 import {
   EditModeButton,
   MIN_WINDOW_HOURS,
+  SLIDE_THRESHOLD_PX,
   edgeLimits,
   ghostWindow,
   moveLimits,
@@ -119,9 +120,6 @@ const RESPONSABLE_SNAP = 0.25;
 
 /** Pixels left over when the grid is fitted to the screen, so no scrollbar appears on the nose. */
 const FIT_SLACK = 4;
-
-/** How far the pointer travels on a pressed créneau before the press becomes a slide. */
-const SLIDE_THRESHOLD_PX = 4;
 
 /** A créneau's edge being pulled in « mode édition », and the glued neighbour that follows it. */
 interface Retime {

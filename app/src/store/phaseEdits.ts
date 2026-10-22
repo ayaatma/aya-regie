@@ -241,6 +241,27 @@ export function setPhaseEvent(
   }));
 }
 
+/**
+ * Slides an événement to start at `start`, its length kept, and its people with it.
+ *
+ * The people move by the same amount because they hold their own hours, unlike a créneau's: an
+ * événement slid without them would leave everybody standing at the old time, beside a job that
+ * has gone. It is one edit, made by the régisseur's own drag, and Ctrl+Z puts all of it back.
+ */
+export function slidePhaseEvent(plan: Plan, id: PhaseId, eventKey: string, start: number): Plan {
+  const event = phaseOf(plan, id).events.find((e) => e.key === eventKey);
+  if (!event) return plan;
+  const delta = start - event.start;
+  if (delta === 0) return plan;
+  return edit(plan, id, (phase) => ({
+    ...phase,
+    events: phase.events.map((e) => (e.key === eventKey ? { ...e, start, end: e.end + delta } : e)),
+    assignments: phase.assignments.map((a) =>
+      a.eventKey === eventKey ? { ...a, start: a.start + delta, end: a.end + delta } : a,
+    ),
+  }));
+}
+
 /** Deletes an événement and the placements in it. The count is `phaseEventRemoval`. */
 export function deletePhaseEvent(plan: Plan, id: PhaseId, eventKey: string): Plan {
   return edit(plan, id, (phase) => ({

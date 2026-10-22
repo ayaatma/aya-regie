@@ -5230,6 +5230,16 @@ textarea.select,
   cursor: grabbing;
 }
 
+/* Pareil pour un événement du montage ou du démontage. */
+.phase-event-block.is-editing {
+  cursor: grab;
+  touch-action: none;
+}
+
+.phase-event-block.is-editing:active {
+  cursor: grabbing;
+}
+
 /* Les deux bords d'un créneau, à tirer. */
 .shift-grip {
   position: absolute;

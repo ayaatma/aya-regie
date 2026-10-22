@@ -38,6 +38,7 @@ import {
   setOrganiserPhase,
   setPhase,
   setVolunteerPhase,
+  slidePhaseEvent,
 } from './phaseEdits.ts';
 
 const orga = (key: string, over: Partial<Organiser> = {}): Organiser => ({
@@ -401,4 +402,22 @@ test('an orga who says they are not coming loses their boxes, and keeps their é
     gone.montage.assignments.map((a) => [a.poleKey, a.eventKey]),
     [['', 'camion']],
   );
+});
+
+test('sliding an événement takes its people along, and leaves everybody else where they were', () => {
+  const plan = base({
+    montage: montage({
+      events: [{ key: 'camion', label: 'Camion', start: 2, end: 4, headcount: 3 }],
+    }),
+  });
+  let before = assignWindow(plan, 'montage', me, { kind: 'pole', poleKey: 'scene' }, 0, 2);
+  before = assignWindow(before, 'montage', me, { kind: 'event', eventKey: 'camion' }, 2, 4);
+
+  const after = slidePhaseEvent(before, 'montage', 'camion', 5);
+  const event = after.montage.events.find((e) => e.key === 'camion')!;
+  assert.deepEqual([event.start, event.end], [5, 7], 'la longueur est gardée');
+  assert.deepEqual(boxes(after), [
+    ['scene', 0, 2],
+    ['camion', 5, 7],
+  ]);
 });

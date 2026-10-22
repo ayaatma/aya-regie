@@ -74,5 +74,8 @@ in them.
 - **Alt while pulling a grip unglues** (`edgeLimits(..., free)`): the touching neighbour stays put
   and the edge can come inward, leaving a gap. Read live on every move, so Alt can be pressed
   mid-pull. Alt was my choice, stated to the régisseur.
-- Not done on the phase grid's événements (montage/démontage), where a headcount of 0 means « as
+- **Montage / démontage, same day (2026-10-22): Alt on an événement grip, and press-and-hold slides
+  an événement WITH ITS PEOPLE** (`slidePhaseEvent`: phase people hold their own hours, so they move
+  by the same delta in the same edit). Stays on its day; one cut by a night does not slide.
+- The « − » rule is NOT on the phase grid's événements, where a headcount of 0 means « as
   many as turn up » and is legitimate.

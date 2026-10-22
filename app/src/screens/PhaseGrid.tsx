@@ -55,9 +55,17 @@ import {
   placeDeclared,
   setPhaseAssignment,
   setPhaseEvent,
+  slidePhaseEvent,
 } from '../store/phaseEdits.ts';
 import { eventShiftHours } from '../store/setupEdits.ts';
-import { EditModeButton, MIN_WINDOW_HOURS, edgeLimits, ghostWindow } from '../components/EditModeButton.tsx';
+import {
+  EditModeButton,
+  MIN_WINDOW_HOURS,
+  SLIDE_THRESHOLD_PX,
+  edgeLimits,
+  ghostWindow,
+  moveLimits,
+} from '../components/EditModeButton.tsx';
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from '../components/labels.ts';
 import { InfoPanel } from '../components/InfoPanel.tsx';
@@ -600,19 +608,25 @@ export function PhaseGrid({
       const track = down.currentTarget.closest('.lane-track');
       if (!track) return;
       const left = track.getBoundingClientRect().left;
-      const limits = edgeLimits(event, phase.events, edge, segment.start, segment.end);
-      const lo =
-        edge === 'end'
-          ? Math.max(limits.min, Math.max(event.start, segment.start) + MIN_WINDOW_HOURS)
-          : Math.max(limits.min, segment.start);
-      const hi =
-        edge === 'start'
-          ? Math.min(limits.max, Math.min(event.end, segment.end) - MIN_WINDOW_HOURS)
-          : Math.min(limits.max, segment.end);
-      const glued = limits.glued;
+      // Both readings up front, glued and with Alt held, so Alt can change mid-pull.
+      const bounds = (free: boolean) => {
+        const limits = edgeLimits(event, phase.events, edge, segment.start, segment.end, free);
+        const lo =
+          edge === 'end'
+            ? Math.max(limits.min, Math.max(event.start, segment.start) + MIN_WINDOW_HOURS)
+            : Math.max(limits.min, segment.start);
+        const hi =
+          edge === 'start'
+            ? Math.min(limits.max, Math.min(event.end, segment.end) - MIN_WINDOW_HOURS)
+            : Math.min(limits.max, segment.end);
+        return { lo, hi, glued: limits.glued };
+      };
+      const together = bounds(false);
+      const apart = bounds(true);
 
       let last: EventRetime | null = null;
       const move = (moved: PointerEvent) => {
+        const { lo, hi, glued } = moved.altKey ? apart : together;
         const hour = Math.min(Math.max(hourOn(axis, segment, moved.clientX - left, SNAP), lo), Math.max(lo, hi));
         last = {
           eventKey: event.key,
@@ -639,6 +653,56 @@ export function PhaseGrid({
             ? setPhaseEvent(next, id, done.neighbour.key, { start: done.neighbour.start, end: done.neighbour.end })
             : next;
         }, `horaires de ${event.label}`);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    };
+
+  /**
+   * An événement pressed and held: slide it sideways on its day, its length and its people kept.
+   *
+   * Same rules as a créneau on the exploit (`beginMove` there): a slide only past a few pixels, so
+   * a click still selects; the click after a real slide is swallowed; neighbours are walls. It
+   * stays on the day it is drawn on, and one cut by a night does not slide at all, since its two
+   * halves would not move by the same number of pixels.
+   */
+  const beginEventMove =
+    (event: PhaseEvent, segment: PhaseSegment) => (down: React.PointerEvent<HTMLDivElement>) => {
+      if (readOnly || down.button !== 0) return;
+      const eps = 1e-6;
+      if (event.start < segment.start - eps || event.end > segment.end + eps) return;
+      const track = down.currentTarget.closest('.lane-track');
+      if (!track) return;
+      down.preventDefault();
+      const left = track.getBoundingClientRect().left;
+      const originX = down.clientX;
+      const origin = hourOn(axis, segment, originX - left, 0);
+      const { min, max } = moveLimits(event, phase.events, segment.start, segment.end);
+      const length = event.end - event.start;
+
+      let sliding = false;
+      let last: EventRetime | null = null;
+      const move = (moved: PointerEvent) => {
+        if (!sliding && Math.abs(moved.clientX - originX) < SLIDE_THRESHOLD_PX) return;
+        sliding = true;
+        const delta = Math.round((hourOn(axis, segment, moved.clientX - left, 0) - origin) / SNAP) * SNAP;
+        const start = Math.min(max, Math.max(min, event.start + delta));
+        last = { eventKey: event.key, start, end: start + length, neighbour: null };
+        setEventRetime(last);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        if (!sliding) return;
+        const swallow = (clicked: MouseEvent) => clicked.stopPropagation();
+        window.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0);
+        setEventRetime(null);
+        const done = last as EventRetime | null;
+        if (!done || done.start === event.start) return;
+        edit((p) => slidePhaseEvent(p, id, done.eventKey, done.start), `${event.label} déplacé`);
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
@@ -804,8 +868,9 @@ export function PhaseGrid({
           <span className="toolbar-note">
             {editing && keyNote === null ? (
               <strong className="edit-mode-note">
-                Mode édition: tirer un bord d'un événement, « + » pour une place de plus, cliquer dans
-                le vide de la ligne Événements pour en créer un. Échap pour sortir.
+                Mode édition: tirer un bord d'un événement (Alt pour le décoller de son voisin),
+                glisser un événement pour le déplacer avec ses personnes, « + » pour une place de
+                plus, cliquer dans le vide de la ligne Événements pour en créer un. Échap pour sortir.
               </strong>
             ) : keyNote ??
               (issues.length > 0
@@ -966,6 +1031,7 @@ export function PhaseGrid({
                             fill: false,
                           })
                         }
+                        onPointerDown={editing && !readOnly ? beginEventMove(stored, piece.segment) : undefined}
                       >
                         <div className="phase-event-title">
                           <span className="phase-event-name">{event.label}</span>
@@ -1120,7 +1186,7 @@ export function PhaseGrid({
                             {Math.abs(piece.start - event.start) < 1e-6 && (
                               <span
                                 className="phase-event-grip is-start"
-                                title="Tirer pour changer le début"
+                                title="Tirer pour changer le début. Avec Alt, l'événement d'avant ne suit pas."
                                 onPointerDown={beginEventRetime(stored, 'start', piece.segment)}
                                 onClick={(clicked) => clicked.stopPropagation()}
                               />
@@ -1128,7 +1194,7 @@ export function PhaseGrid({
                             {Math.abs(piece.end - event.end) < 1e-6 && (
                               <span
                                 className="phase-event-grip is-end"
-                                title="Tirer pour changer la fin"
+                                title="Tirer pour changer la fin. Avec Alt, l'événement d'après ne suit pas."
                                 onPointerDown={beginEventRetime(stored, 'end', piece.segment)}
                                 onClick={(clicked) => clicked.stopPropagation()}
                               />

@@ -10,6 +10,9 @@
 /** What a créneau, or an événement, can be trimmed down to: a quarter of an hour. */
 export const MIN_WINDOW_HOURS = 0.25;
 
+/** How far the pointer travels on a pressed créneau or événement before the press is a slide. */
+export const SLIDE_THRESHOLD_PX = 4;
+
 export function EditModeButton({ editing, onToggle }: { editing: boolean; onToggle(): void }) {
   return (
     <button
