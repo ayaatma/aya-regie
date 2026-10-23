@@ -1583,7 +1583,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
 
     const buddyMentions = parseBuddyAnswer(cell(row, 'buddies'));
 
-    const formAnswers: Partial<Record<EditableField, string>> = {};
+    const formAnswers: Partial<Record<EditableField | 'photo', string>> = {};
+    if (cell(row, 'photo') !== '') formAnswers.photo = cell(row, 'photo');
     for (const field of EDITABLE_FIELDS) {
       const cells = FORM_SOURCES[field].map((source) => cell(row, source));
       if (field === 'choices') cells.push(...binding.choices.flatMap((c) => [at(row, c.pole), at(row, c.level)]));

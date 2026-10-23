@@ -6,7 +6,7 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PhotoError, readDrivePhoto, sizedThumbnail } from '../../supabase/functions/drive-photo/core.js';
+import { PhotoError, readDrivePhoto, sizedThumbnail, thumbnailSize } from '../../supabase/functions/drive-photo/core.js';
 
 const SA = 'lecture@projet.iam.gserviceaccount.com';
 const ID = 'AbCdEfGhIjKlMnOp_123';
@@ -70,4 +70,18 @@ test('anything but a Drive id is refused before Google is asked', async () => {
   const { fetcher, calls } = fakeFetch([]);
   await rejects(readDrivePhoto('../../etc', 'tok', fetcher, SA), (e: unknown) => e instanceof PhotoError && e.status === 400);
   ok(calls.length === 0);
+});
+
+test('the crop tool may ask for a larger picture, within bounds', async () => {
+  strictEqual(thumbnailSize(undefined), 800);
+  strictEqual(thumbnailSize(1600), 1600);
+  strictEqual(thumbnailSize(99999), 2400);
+  strictEqual(thumbnailSize('grand'), 800);
+  const { fetcher, calls } = fakeFetch([
+    [`${FILES}${ID}?fields`, meta({ mimeType: 'image/jpeg', size: '3000000', thumbnailLink: 'https://lh3.googleusercontent.com/t=s220' })],
+    ['https://lh3.googleusercontent.com/t=s1600', image('image/jpeg', [4])],
+  ]);
+  const photo = await readDrivePhoto(ID, 'tok', fetcher, SA, 1600);
+  deepStrictEqual([...photo.bytes], [4]);
+  ok(calls.some((c) => c.endsWith('=s1600')));
 });

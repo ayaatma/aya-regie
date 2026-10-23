@@ -65,3 +65,33 @@ export function squareCrop(width: number, height: number): { x: number; y: numbe
   const y = Math.round((height - size) * 0.3);
   return { x, y, size };
 }
+
+/**
+ * A framing chosen in the crop tool, since 2026-10-23: `zoom` 1 is the short side filling the
+ * square, `cx` / `cy` the centre of the square in pixels of the picture.
+ */
+export interface PhotoFraming {
+  zoom: number;
+  cx: number;
+  cy: number;
+}
+
+/** The furthest the crop tool zooms in: a fifth of the short side. */
+export const MAX_PHOTO_ZOOM = 5;
+
+/** Keeps the square inside the picture, so no empty band ever ends up in somebody's photo. */
+export function clampFraming(framing: PhotoFraming, width: number, height: number): PhotoFraming {
+  const zoom = Math.min(MAX_PHOTO_ZOOM, Math.max(1, framing.zoom));
+  const half = Math.min(width, height) / zoom / 2;
+  return {
+    zoom,
+    cx: Math.min(width - half, Math.max(half, framing.cx)),
+    cy: Math.min(height - half, Math.max(half, framing.cy)),
+  };
+}
+
+/** The square of the picture a framing keeps, in its own pixels. */
+export function framedSquare(framing: PhotoFraming, width: number, height: number): { x: number; y: number; size: number } {
+  const size = Math.min(width, height) / framing.zoom;
+  return { x: framing.cx - size / 2, y: framing.cy - size / 2, size };
+}

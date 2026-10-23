@@ -17,7 +17,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { accessToken, type ServiceAccountKey } from '../sheet-csv/core.ts';
-import { DRIVE_READONLY, PhotoError, readDrivePhoto } from './core.ts';
+import { DRIVE_READONLY, PhotoError, readDrivePhoto, thumbnailSize } from './core.ts';
 
 const cors = {
   'access-control-allow-origin': '*',
@@ -59,16 +59,19 @@ Deno.serve(async (request: Request) => {
   }
 
   let fileId = '';
+  let size = thumbnailSize(undefined);
   try {
-    fileId = String(((await request.json()) as { fileId?: unknown }).fileId ?? '');
+    const body = (await request.json()) as { fileId?: unknown; size?: unknown };
+    fileId = String(body.fileId ?? '');
+    size = thumbnailSize(body.size);
   } catch {
-    return json(400, { error: 'Corps JSON { fileId } attendu.' });
+    return json(400, { error: 'Corps JSON { fileId, size? } attendu.' });
   }
 
   try {
     const now = Math.floor(Date.now() / 1000);
     if (!cached || cached.expiresAt - 60 < now) cached = await accessToken(key, fetch, now, DRIVE_READONLY);
-    const photo = await readDrivePhoto(fileId, cached.token, fetch, key.client_email);
+    const photo = await readDrivePhoto(fileId, cached.token, fetch, key.client_email, size);
     return new Response(photo.bytes, {
       status: 200,
       headers: { ...cors, 'content-type': 'application/octet-stream', 'x-photo-type': photo.contentType },

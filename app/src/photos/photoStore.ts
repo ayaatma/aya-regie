@@ -203,10 +203,23 @@ export async function shrinkPhoto(file: Blob): Promise<{ blob: Blob; extension: 
  * so a caller hands in the file as it came.
  */
 export async function putPhoto(eventId: string, personKey: string, file: Blob, source: PhotoSource): Promise<void> {
+  const { blob, extension } = await shrinkPhoto(file);
+  await storeSquare(eventId, personKey, blob, extension, source);
+}
+
+/**
+ * Keeps a square the crop tool already drew at PHOTO_SIZE (2026-10-23), under the same source as
+ * before: a form photo reframed stays the form's, so the next import does not fetch it again and
+ * undo the framing, while a NEW upload in the form still replaces it.
+ */
+export async function putCroppedPhoto(eventId: string, personKey: string, square: Blob, source: PhotoSource): Promise<void> {
+  await storeSquare(eventId, personKey, square, square.type === 'image/webp' ? 'webp' : 'jpg', source);
+}
+
+async function storeSquare(eventId: string, personKey: string, blob: Blob, extension: 'webp' | 'jpg', source: PhotoSource): Promise<void> {
   await loadBook(eventId);
   const book = bookOf(eventId);
   const hash = await personHash(personKey);
-  const { blob, extension } = await shrinkPhoto(file);
   const name = photoObjectName(hash, source, extension);
   const storage = getSupabase().storage.from(BUCKET);
 
@@ -242,24 +255,75 @@ export async function removePhoto(eventId: string, personKey: string): Promise<v
 /** What the `drive-photo` function answered: the picture, a reason, or no function to ask. */
 type DriveRead = { blob: Blob } | { error: string } | { unavailable: string };
 
-async function readFromDrive(fileId: string): Promise<DriveRead> {
+async function readFromDrive(fileId: string, size?: number): Promise<DriveRead> {
   try {
-    const { data, error } = await getSupabase().functions.invoke<Blob>('drive-photo', { body: { fileId } });
+    const { data, error } = await getSupabase().functions.invoke<Blob>('drive-photo', { body: size === undefined ? { fileId } : { fileId, size } });
     if (!error && data instanceof Blob) return { blob: data };
     const response = (error as { context?: unknown } | null)?.context;
-    if (!(response instanceof Response)) return { unavailable: 'La fonction drive-photo ne répond pas (pas encore déployée ?).' };
+    /*
+     * Since 2026-10-23 only « there is no function » and « it is not configured » stop the whole
+     * run. A dropped connection, a timeout or a busy function used to count as « unavailable »
+     * too, which silently left every photo after it unfetched: they are now one person's failure,
+     * tried again, and the run goes on.
+     */
+    if (!(response instanceof Response)) return { error: "La fonction drive-photo n'a pas répondu (réseau, ou fonction occupée)." };
     let body: { error?: string } = {};
     try {
       body = (await response.clone().json()) as typeof body;
     } catch {
-      // Not our JSON: the gateway answering for a function that does not exist.
+      // Not our JSON: the gateway answering, for a function that does not exist or failed.
     }
-    if (body.error === undefined) return { unavailable: "La fonction drive-photo n'est pas déployée." };
+    if (body.error === undefined) {
+      return response.status === 404
+        ? { unavailable: "La fonction drive-photo n'est pas déployée." }
+        : { error: `La fonction drive-photo a répondu ${response.status}.` };
+    }
     if (response.status === 503) return { unavailable: body.error };
     return { error: body.error };
   } catch (cause) {
-    return { unavailable: message(cause) };
+    return { error: message(cause) };
   }
+}
+
+/** One read, and a second one after a pause when the first failed for a reason other than access. */
+async function readFromDriveTwice(fileId: string, size?: number): Promise<DriveRead> {
+  const first = await readFromDrive(fileId, size);
+  if (!('error' in first) || /inaccessible|pas une image|trop lourde|identifiant/i.test(first.error)) return first;
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  return readFromDrive(fileId, size);
+}
+
+/**
+ * The form's photo of one person, fetched now: the fiche's « Récupérer la photo du formulaire »,
+ * since 2026-10-23, for a photo an import could not bring. Null when it came, else why not.
+ */
+export async function fetchFormPhoto(eventId: string, personKey: string, fileId: string): Promise<string | null> {
+  const read = await readFromDriveTwice(fileId);
+  if ('unavailable' in read) return read.unavailable;
+  if ('error' in read) return read.error;
+  try {
+    await putPhoto(eventId, personKey, read.blob, { kind: 'drive', fileId });
+    return null;
+  } catch (cause) {
+    return message(cause);
+  }
+}
+
+/**
+ * The picture the crop tool frames, as large as it can be had: the form's photo asked again from
+ * Drive at 1600 px when it came from there, else the square already kept (a photo dropped by hand
+ * keeps no original).
+ */
+export async function cropSource(fileId: string | null, currentUrl: string | null): Promise<Blob> {
+  if (fileId !== null) {
+    const read = await readFromDriveTwice(fileId, 1600);
+    if ('blob' in read) return read.blob;
+    if (currentUrl === null) throw new Error('unavailable' in read ? read.unavailable : read.error);
+  }
+  if (currentUrl === null) throw new Error('Pas de photo à recadrer.');
+  const response = await fetch(currentUrl);
+  if (!response.ok) throw new Error(`La photo n'a pas pu être relue (${response.status}).`);
+  return response.blob();
 }
 
 export interface PhotoSyncReport {
@@ -298,7 +362,7 @@ export async function syncFormPhotos(
   const worker = async (): Promise<void> => {
     while (next < todo.length && report.unavailable === null) {
       const link = todo[next++]!;
-      const read = await readFromDrive(link.driveFileId);
+      const read = await readFromDriveTwice(link.driveFileId);
       if ('unavailable' in read) report.unavailable = read.unavailable;
       else if ('error' in read) report.failed.push({ volunteerKey: link.volunteerKey, reason: read.error });
       else {

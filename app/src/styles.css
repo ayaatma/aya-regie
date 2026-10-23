@@ -6109,3 +6109,35 @@ textarea.select,
   border-left: 2px dashed var(--ink-soft);
   max-width: 140px;
 }
+
+/* Recadrer une photo, since 2026-10-23: the frame at its real size, grabbed to move. */
+.photo-crop-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 300px;
+  height: 300px;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.photo-crop-frame canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.photo-crop-frame canvas:active {
+  cursor: grabbing;
+}
+
+.photo-crop-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.photo-crop-zoom input {
+  flex: 1 1 auto;
+}

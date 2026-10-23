@@ -807,11 +807,13 @@ function markers(value: unknown): TimelineMarker[] {
 }
 
 /** The raw form answers by correctable field, absent when there are none (imported before 2026-10-23). */
-function formAnswers(value: unknown): { formAnswers?: Partial<Record<EditableField, string>> } {
+function formAnswers(value: unknown): { formAnswers?: Partial<Record<EditableField | 'photo', string>> } {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
-  const out: Partial<Record<EditableField, string>> = {};
+  const out: Partial<Record<EditableField | 'photo', string>> = {};
   for (const [field, answer] of Object.entries(value as Record<string, unknown>)) {
-    if ((EDITABLE_FIELDS as readonly string[]).includes(field) && typeof answer === 'string') out[field as EditableField] = answer;
+    if ((field === 'photo' || (EDITABLE_FIELDS as readonly string[]).includes(field)) && typeof answer === 'string') {
+      out[field as EditableField | 'photo'] = answer;
+    }
   }
   return Object.keys(out).length > 0 ? { formAnswers: out } : {};
 }

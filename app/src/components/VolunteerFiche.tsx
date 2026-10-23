@@ -28,6 +28,7 @@ import {
 } from '../store/edits.ts';
 import {
   choicePoleLabel,
+  driveFileIds,
   fmtHours,
   windowHours,
   isNoAllergy,
@@ -201,7 +202,12 @@ function VolunteerDetail({
         mark beside the name and this one never did.
       */}
       <RegistrationSection kind="benevole" personKey={volunteer.key} readOnly={readOnly} />
-      <PersonPhoto personKey={volunteer.key} name={`${volunteer.firstName} ${volunteer.lastName}`} readOnly={readOnly} />
+      <PersonPhoto
+        personKey={volunteer.key}
+        name={`${volunteer.firstName} ${volunteer.lastName}`}
+        readOnly={readOnly}
+        formFileId={driveFileIds(volunteer.formAnswers?.photo ?? '')[0] ?? null}
+      />
       <p className="panel-sub">
         {preferenceLabel(index.plan.preferenceSlots, volunteer.preferredSlotId)},{' '}
         {volumeText(volunteer.requestedHours, index.dayMode)} demandées

@@ -1050,8 +1050,10 @@ export interface Volunteer {
    * form's READING flagged it on every import, since a correction differs from the reading by
    * definition; comparing the raw answers flags it only when the person changed what they said.
    * Absent on a fiche imported before, or entered by hand: nothing to compare, nothing flagged.
+   * `photo` is the form's upload answer, kept so a photo that failed to come can be asked again
+   * from the fiche (2026-10-23); it is never compared.
    */
-  formAnswers?: Partial<Record<EditableField, string>>;
+  formAnswers?: Partial<Record<FormAnswerKey, string>>;
   /**
    * True when somebody has to read this fiche before trusting it.
    *
@@ -1393,6 +1395,9 @@ export const EDITABLE_FIELDS = [
 ] as const;
 
 export type EditableField = (typeof EDITABLE_FIELDS)[number];
+
+/** What `Volunteer.formAnswers` is keyed by: a correctable field, or the photo upload. */
+export type FormAnswerKey = EditableField | 'photo';
 
 export interface SyntheticEvent {
   name: string;

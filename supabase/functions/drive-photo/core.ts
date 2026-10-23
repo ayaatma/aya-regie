@@ -29,6 +29,15 @@ export const MAX_BYTES = 15 * 1024 * 1024;
 /** The size the thumbnail is asked at, in pixels on its long side. The app keeps 320. */
 const THUMBNAIL_SIZE = 800;
 
+/**
+ * The sizes a caller may ask for, since 2026-10-23: the crop tool asks for a large picture so the
+ * régie frames the face from the whole photo, not from the 320 px square already kept.
+ */
+export function thumbnailSize(asked: unknown): number {
+  const size = typeof asked === 'number' && Number.isFinite(asked) ? Math.round(asked) : THUMBNAIL_SIZE;
+  return Math.min(2400, Math.max(200, size));
+}
+
 /** A failure the régisseur can act on, with the HTTP status the function answers. */
 export class PhotoError extends Error {
   constructor(message: string, readonly status: number) {
@@ -52,6 +61,7 @@ export async function readDrivePhoto(
   token: string,
   fetcher: Fetch,
   serviceAccount: string,
+  size: number = THUMBNAIL_SIZE,
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
   if (!isDriveFileId(fileId)) throw new PhotoError("Ce n'est pas un identifiant de fichier Drive.", 400);
   const auth = { headers: { authorization: `Bearer ${token}` } };
@@ -69,7 +79,7 @@ export async function readDrivePhoto(
   const info = (await meta.json()) as { mimeType?: string; size?: string; thumbnailLink?: string };
 
   if (info.thumbnailLink) {
-    const thumbnail = await fetcher(sizedThumbnail(info.thumbnailLink), auth);
+    const thumbnail = await fetcher(sizedThumbnail(info.thumbnailLink, size), auth);
     const type = thumbnail.headers.get('content-type') ?? '';
     if (thumbnail.ok && type.startsWith('image/')) {
       return { bytes: new Uint8Array(await thumbnail.arrayBuffer()), contentType: type.split(';')[0]! };

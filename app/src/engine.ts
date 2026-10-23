@@ -197,7 +197,8 @@ export type {
 } from '@engine/import.ts';
 
 /** The trombinoscope's photos: object names, what a re-import fetches, the crop. */
-export { driveFileIds, needsDriveFetch, parsePhotoObjectName, photoObjectName, squareCrop } from '@engine/photos.ts';
+export { MAX_PHOTO_ZOOM, clampFraming, driveFileIds, framedSquare, needsDriveFetch, parsePhotoObjectName, photoObjectName, squareCrop } from '@engine/photos.ts';
+export type { PhotoFraming } from '@engine/photos.ts';
 export type { PhotoSource } from '@engine/photos.ts';
 
 /**
