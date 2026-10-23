@@ -80,3 +80,15 @@ two lists, then applies `plan` as ONE edit (one Ctrl+Z) and moves the focus to t
   `importOrganisers({volunteers})` skips a row naming a bénévole with warning `deja-benevole`.
 - Migration 22 was generated from `db/schema.sql`'s two functions after checking they were
   byte-identical to migration 21's (scratch script, not kept).
+
+## Nickname everywhere (2026-10-24, app only, no schema)
+
+Asked: see the surnom everywhere, and choose per person whether the planning shows it. The
+per-person switch already existed (`nicknameMatters`, the form's « surnom important » question,
+read by `display.ts`) but sat after the e-mail as « Surnom important » and was not found. Now:
+a « Surnom » column after « Prénom » in every column set (bénévoles only, organisers have no
+nickname), the search matches it, fiche titles in Personnes and in « Info sélection » read
+« Prénom Nom · Surnom » (`withNickname` in `labels.ts`), the switch is « Sur le planning »
+(Surnom / Prénom) right beside the Surnom field, greyed when there is none, and the read fiche
+says « Sur le planning: Titi D. ». The short label keeps the surname initial on purpose: it is
+what tells two Titi apart.

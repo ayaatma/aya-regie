@@ -19,6 +19,17 @@ export const organiserName = (organiser: Organiser): string =>
   `${organiser.firstName} ${organiser.lastName}`.trim();
 
 /**
+ * "Marie Dubois · Titi": a whole name with the nickname after it, wherever a fiche or a list
+ * names somebody in full. Since 2026-10-24, so a bénévole their team calls Titi is recognised
+ * everywhere and not only on the grid's short labels. Unchanged when there is no nickname.
+ */
+export const withNickname = (name: string, nickname: string | undefined): string => {
+  const alias = (nickname ?? '').trim();
+  if (alias === '') return name;
+  return name.trim() === '' ? alias : `${name} · ${alias}`;
+};
+
+/**
  * What a slot is called, from the plan rather than from a constant.
  *
  * Slots are the régisseur's to word, because they are the form's own questions. A volunteer's

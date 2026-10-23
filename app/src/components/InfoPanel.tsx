@@ -43,7 +43,7 @@ import { addOrganiserToShift, removeOrganiserFromShift } from '../store/edits.ts
 import { removeLeaderRole } from '../store/setupEdits.ts';
 import { assignWindow, renamePhaseEvent, setPhaseAssignment } from '../store/phaseEdits.ts';
 import { useLoadedPlan } from '../store/store.tsx';
-import { organiserName } from './labels.ts';
+import { organiserName, withNickname } from './labels.ts';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
 import { PersonMark } from './PersonMark.tsx';
 import { useNavigation } from './personNav.ts';
@@ -225,7 +225,7 @@ function BenevoleBody({ volunteerKey, readOnly }: { volunteerKey: string; readOn
 
   return (
     <>
-      <Head what="Bénévole" name={index.volunteerName(volunteerKey)} kind="benevole" />
+      <Head what="Bénévole" name={withNickname(index.volunteerName(volunteerKey), volunteer.nickname)} kind="benevole" />
       {!readOnly && <OpenInPeople kind="benevole" personKey={volunteerKey} />}
       <VolunteerFiche volunteerKey={volunteerKey} readOnly={readOnly} />
     </>

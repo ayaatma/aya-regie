@@ -212,6 +212,11 @@ function VolunteerDetail({
         {preferenceLabel(index.plan.preferenceSlots, volunteer.preferredSlotId)},{' '}
         {volumeText(volunteer.requestedHours, index.dayMode)} demandées
       </p>
+      {volunteer.nickname.trim() !== '' && (
+        <p className="panel-sub" title="Se règle dans « Modifier la fiche », champ « Sur le planning »">
+          Sur le planning: {index.volunteerShortName(volunteer.key)}
+        </p>
+      )}
 
       <ApplicationSection volunteer={volunteer} detail={detail} readOnly={readOnly} />
 

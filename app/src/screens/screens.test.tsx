@@ -2918,3 +2918,25 @@ test('a binôme is settled on a fiche still being imported, against the file and
   assert.ok(applied.buddies.some((b) => b.fromKey === ana!.key && b.toKey === ben!.key && b.manual));
   assert.ok(!applied.buddies.some((b) => b.toKey === 'parti'), 'personne qui ne reste pas: pas de binôme');
 });
+
+test('a nickname shows in the Personnes list, beside the name on the fiche, and says what the planning shows', () => {
+  const [first] = plan.volunteers;
+  const current: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) => (v.key === first!.key ? { ...v, nickname: 'Titi' } : v)),
+  };
+  const list = peopleOf(current);
+  assert.ok(list.includes('>Surnom</th>'), 'a column of its own');
+  assert.ok(shows(list, 'Titi'));
+
+  const fiche = peopleOf(current, { kind: 'benevole', key: first!.key });
+  assert.ok(shows(fiche, `${first!.firstName} ${first!.lastName} · Titi`), 'after the name, with a middle dot');
+  assert.ok(shows(fiche, 'Sur le planning: Titi'));
+
+  const info = infoOf(current, { kind: 'benevole', volunteerKey: first!.key });
+  assert.ok(shows(info, `${first!.firstName} ${first!.lastName} · Titi`), 'the grids name them the same way');
+
+  // Without a nickname, nothing changes.
+  const plain = peopleOf(plan, { kind: 'benevole', key: first!.key });
+  assert.ok(!plain.includes(' · Titi') && !shows(plain, 'Sur le planning:'));
+});

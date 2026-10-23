@@ -43,6 +43,7 @@ import {
   personLabel,
 } from './DoorFields.tsx';
 import { NumberField } from './NumberField.tsx';
+import { withNickname } from './labels.ts';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
 import { PersonMark } from './PersonMark.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
@@ -97,7 +98,9 @@ function PersonBody({
   onClose(): void;
   onFocus(person: PersonRef): void;
 }) {
+  const { index } = useLoadedPlan();
   const who = personLabel(row);
+  const nickname = row.kind === 'benevole' ? index.volunteerByKey.get(row.key)?.nickname : undefined;
   const mark = row.kind === 'orga' || row.kind === 'benevole' || row.kind === 'artiste' ? row.kind : null;
 
   return (
@@ -105,7 +108,7 @@ function PersonBody({
       <p className="panel-kind">{row.statuses.map((s) => s.label).join(' · ')}</p>
       <h2 className="panel-title">
         {mark && <PersonMark kind={mark} />}
-        {`${row.firstName} ${row.lastName}`.trim() || 'Sans nom'}
+        {withNickname(`${row.firstName} ${row.lastName}`.trim(), nickname) || 'Sans nom'}
       </h2>
 
       {row.kind === 'benevole' && <VolunteerFiche volunteerKey={row.key} />}

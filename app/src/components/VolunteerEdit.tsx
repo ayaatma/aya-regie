@@ -345,6 +345,26 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
             onChange={(event) => set('nickname', event.target.value)}
           />
         </label>
+        {/*
+          Beside the nickname since 2026-10-24, where it used to sit after the e-mail as
+          « Surnom important » and nobody found it. It is the form's question, and it is also the
+          régisseur's switch for what the grid's small boxes say about this one person.
+        */}
+        <label className="field">
+          <span className="field-label">Sur le planning</span>
+          <select
+            className="select"
+            name="fiche-nickname-matters"
+            value={draft.nicknameMatters === true ? 'oui' : draft.nicknameMatters === false ? 'non' : ''}
+            disabled={draft.nickname.trim() === ''}
+            title={draft.nickname.trim() === '' ? 'Sans surnom, le planning affiche le prénom' : undefined}
+            onChange={(event) => set('nicknameMatters', event.target.value === '' ? null : event.target.value === 'oui')}
+          >
+            <option value="">Surnom (non renseigné au formulaire)</option>
+            <option value="oui">Surnom</option>
+            <option value="non">Prénom</option>
+          </select>
+        </label>
         <label className="field">
           <span className="field-label">Téléphone</span>
           <input
@@ -360,19 +380,6 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
             value={draft.email}
             onChange={(event) => set('email', event.target.value)}
           />
-        </label>
-        <label className="field">
-          <span className="field-label">Surnom important</span>
-          <select
-            className="select"
-            name="fiche-nickname-matters"
-            value={draft.nicknameMatters === true ? 'oui' : draft.nicknameMatters === false ? 'non' : ''}
-            onChange={(event) => set('nicknameMatters', event.target.value === '' ? null : event.target.value === 'oui')}
-          >
-            <option value="">Non renseigné (surnom affiché)</option>
-            <option value="oui">Oui, surnom affiché</option>
-            <option value="non">Non, prénom affiché</option>
-          </select>
         </label>
       </div>
 

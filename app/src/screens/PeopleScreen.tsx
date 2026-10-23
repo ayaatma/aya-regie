@@ -187,7 +187,8 @@ export function PeopleScreen({
       return false;
     }
     if (needle === '') return true;
-    return flatten(`${row.lastName} ${row.firstName} ${row.firstName} ${row.lastName}`).includes(needle);
+    const nickname = row.kind === 'benevole' ? (index.volunteerByKey.get(row.key)?.nickname ?? '') : '';
+    return flatten(`${row.lastName} ${row.firstName} ${row.firstName} ${row.lastName} ${nickname}`).includes(needle);
   });
 
   /*
@@ -509,6 +510,7 @@ function PeopleTable({
           <tr>
             {sortHead('lastName', 'Nom')}
             {sortHead('firstName', 'Prénom')}
+            <th>Surnom</th>
             <th>Statut</th>
             <th>Inscription</th>
             {view === 'accueil' && (
@@ -590,8 +592,9 @@ function PersonLine({
   onOpen(): void;
   flags: Flags;
 }) {
-  const { plan, edit } = useLoadedPlan();
+  const { plan, index, edit } = useLoadedPlan();
   const who = personLabel(row);
+  const nickname = row.kind === 'benevole' ? (index.volunteerByKey.get(row.key)?.nickname.trim() ?? '') : '';
   const extra = row.kind === 'extra' ? plan.ticketing.extras.find((x) => x.key === row.key) : undefined;
 
   const changeExtra = (over: Partial<Omit<ExtraPerson, 'key'>>, what: string): void =>
@@ -622,6 +625,7 @@ function PersonLine({
         </button>
       </td>
       <td>{row.firstName}</td>
+      <td>{nickname}</td>
       <td>
         {row.statuses.map((tag) => (
           <span key={tag.label} className={`chip is-status is-${tag.status}`}>
