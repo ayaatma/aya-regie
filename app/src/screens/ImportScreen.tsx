@@ -391,7 +391,12 @@ export function ImportScreen() {
    */
   const startPhotoSync = (result: ImportResult): void => {
     const links = result.photos ?? [];
-    if (!photosAvailable || eventId === null || links.length === 0) return;
+    if (!photosAvailable || eventId === null) return;
+    // Said out loud since 2026-10-24: an import that brought no photo used to show nothing at all.
+    if (links.length === 0) {
+      setPhotoSync({ running: false, report: { fetched: 0, kept: 0, failed: [], unavailable: null }, names: new Map() });
+      return;
+    }
     const names = new Map(result.volunteers.map((v) => [v.key, `${v.firstName} ${v.lastName}`.trim()]));
     setPhotoSync({ running: true, done: 0, total: links.length });
     void syncFormPhotos(eventId, links, (done, total) => setPhotoSync({ running: true, done, total })).then((report) =>
@@ -888,7 +893,7 @@ function PhotoSyncNotice({
   const bad = report.unavailable !== null || report.failed.length > 0;
   return (
     <div className={`alert is-${bad ? 'bad' : 'ok'} import-notice`} role="status">
-      Photos du formulaire: {parts.length > 0 ? parts.join(', ') : 'aucune à récupérer'}.
+      Photos du formulaire: {parts.length > 0 ? parts.join(', ') : "aucune réponse n'en contient (vérifier la colonne de la photo dans la correspondance des colonnes)"}.
       {report.unavailable && <> Récupération interrompue: {report.unavailable}</>}{' '}
       <button type="button" className="btn is-small" onClick={onClose}>
         OK

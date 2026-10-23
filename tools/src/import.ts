@@ -1081,6 +1081,8 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     ['refusedPoles', 'les pôles refusés'],
     ['halfPreference', 'la tranche préférée'],
     ['choices', 'les choix de pôles'],
+    // 2026-10-24: without it the photos were simply never fetched, and nothing said why.
+    ['photo', 'la photo du trombinoscope'],
   ];
   for (const [field, words] of expected) {
     const bound = field === 'choices' ? binding.choices.length > 0 : map[field] !== undefined;
@@ -1612,6 +1614,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     // The first file of the answer: the question takes one photo, and a second is a mistake.
     const photo = driveFileIds(cell(row, 'photo'))[0];
     if (photo) photoOf.set(key, photo);
+    readable.saw('photo', cell(row, 'photo').trim() === '' || photo !== undefined);
     const existing = options.existingCodes?.get(normalise(person));
     volunteers.push({
       key,

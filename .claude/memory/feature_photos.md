@@ -56,3 +56,9 @@ on every photo: `readDrivePhoto` turned EVERY 403/404 into that sentence. It now
 and a token without the Drive scope (old deployed function) answer 503 with their own sentence,
 which stops the run; only a 404 or `notFound`/`forbidden` still blames the sharing; any other
 403 shows Google's message. Needs `drive-photo` redeployed to take effect.
+Same day, the import « went well » but brought no photo and the fiche showed no « Récupérer »
+button: both come from the photo column (no binding, or no Drive link in it), and an import with
+no photo said nothing. Now: an unbound photo column is a « colonne-non-reliee » warning, a column
+where no answer holds a Drive link is « colonne-mal-associee », and the import always shows the
+« Photos du formulaire » notice, « aucune réponse n'en contient » included. Cause on the real
+form still unknown when this was written.
