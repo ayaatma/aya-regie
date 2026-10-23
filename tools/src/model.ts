@@ -1417,6 +1417,13 @@ export function toLabel(startISO: string, hours: number): string {
          `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** "22:00": `toLabel` without its date, for an exploit too short for an hour to fall twice. */
+export function toTimeOfDay(startISO: string, hours: number): string {
+  const d = atHour(startISO, hours);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /**
  * "22h" or "22h30": the hour alone, for an axis where the day is obvious.
  *

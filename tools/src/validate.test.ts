@@ -1092,3 +1092,9 @@ test('outside the imposed pole is reported, and refused only when the event bloc
   const blocking = { ...plan, assignments: [], constraints: { ...plan.constraints, criteria: { imposedPole: { mode: 'block' as const } } } };
   ok(blockersFor(new PlanIndex(blocking), v1, s1).some((b) => b.code === TIER1.horsPoleImpose));
 });
+
+test('an exploit of a day or less names its hours without the date, a longer one with it', () => {
+  const short = makePlan({});
+  strictEqual(new PlanIndex(short).label(10), '22:00');
+  strictEqual(new PlanIndex({ ...short, lengthHours: 30 }).label(10), '13/03 22:00');
+});

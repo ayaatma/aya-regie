@@ -33,7 +33,7 @@ import {
   type EquipmentItem,
   type MailSet,
 } from './model.js';
-import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel } from './model.js';
+import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel, toTimeOfDay } from './model.js';
 import {
   DEFAULT_PHASE_OPTIONS,
   type Phase,
@@ -814,8 +814,13 @@ export class PlanIndex {
       .filter((a): a is Artist => a !== undefined && overlaps(a, window));
   }
 
+  /**
+   * An hour of the exploit, as the screens name it: « 13/03 22:00 », or « 22:00 » alone when the
+   * exploit lasts a day or less (since 2026-10-23). No clock hour then falls twice, so the date
+   * says nothing and crowds every créneau. The exports keep the date: they call `toLabel`.
+   */
   label(hours: number): string {
-    return toLabel(this.plan.startISO, hours);
+    return this.plan.lengthHours <= 24 ? toTimeOfDay(this.plan.startISO, hours) : toLabel(this.plan.startISO, hours);
   }
 
   /** "Bar / Service, 13/03 22:00 -> 14/03 00:00", the way a shift is named in a message. */
