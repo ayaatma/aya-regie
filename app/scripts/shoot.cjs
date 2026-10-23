@@ -374,20 +374,19 @@ async function main() {
         await page.evaluate(() => document.querySelector('.import-todo')?.scrollIntoView());
         await sleep(300);
         await shot('53-import-a-regler');
-        const scrollOf = () => page.evaluate(() => {
-          let at = document.querySelector('.import-todo');
-          while (at && !(['auto', 'scroll'].includes(getComputedStyle(at).overflowY) && at.scrollHeight > at.clientHeight)) at = at.parentElement;
-          return (at ?? document.scrollingElement).scrollTop;
+        // Since 2026-10-23 the fiche opens on the right, level with its line, and nothing scrolls.
+        const lineTop = await page.evaluate(() => {
+          const button = [...document.querySelectorAll('.import-todo-people button')].at(-1);
+          const top = button.closest('.import-todo-item').getBoundingClientRect().top;
+          button.click();
+          return Math.round(top);
         });
-        const before = await scrollOf();
-        await page.evaluate(() => [...document.querySelectorAll('.import-todo-people button')].at(-1)?.click());
-        await sleep(900);
-        const down = await scrollOf();
+        await sleep(700);
+        const ficheTop = await page.evaluate(() => Math.round(document.querySelector('.import-side-fiche')?.getBoundingClientRect().top ?? -1));
         await shot('54-import-sur-la-fiche');
-        await page.evaluate(() => [...document.querySelectorAll('.import-review button')].find((b) => /Enregistrer/.test(b.textContent || ''))?.click());
-        await sleep(1800);
-        const back = await scrollOf();
-        problems.push(`${scheme} a-regler: défilement ${before} → fiche ${down} → retour ${back}`);
+        await page.evaluate(() => [...document.querySelectorAll('.import-side-fiche button')].find((b) => /Enregistrer/.test(b.textContent || ''))?.click());
+        await sleep(900);
+        problems.push(`${scheme} a-regler: ligne à ${lineTop}, fiche à ${ficheTop}, après Enregistrer fiche ${await page.evaluate(() => (document.querySelector('.import-side-fiche') ? 'encore ouverte' : 'fermée'))}`);
         await shot('55-import-retour-liste');
         await page.evaluate(() => {
           const select = document.querySelector('.import-todo-decide select');

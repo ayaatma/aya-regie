@@ -4156,6 +4156,50 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+/*
+ * The fiche opened from a line of « À régler », since 2026-10-23: on the right of the list, level
+ * with the line, over the empty side of the screen and out of the flow, so opening it moves
+ * nothing. Without room on the right it becomes a drawer along the window's edge.
+ */
+.import-review-layout {
+  position: relative;
+  max-width: 1000px;
+}
+
+.import-side-fiche {
+  position: absolute;
+  left: calc(100% + 16px);
+  width: 460px;
+  z-index: 3;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.14);
+}
+
+.import-side-fiche .setup-organiser-who {
+  position: relative;
+  padding-right: 32px;
+}
+
+.import-side-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+@media (max-width: 1520px) {
+  .import-side-fiche {
+    position: fixed;
+    left: auto;
+    right: 12px;
+    top: 96px !important;
+    bottom: 12px;
+    width: min(460px, calc(100vw - 24px));
+    overflow: auto;
+  }
+}
+
 .import-review .issue {
   display: block;
 }

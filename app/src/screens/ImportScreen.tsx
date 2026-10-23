@@ -56,15 +56,6 @@ import {
   type ImportSource as Source,
 } from '../import/importSession.ts';
 
-/** The nearest ancestor that scrolls, which is where « back to the list » has to go back in. */
-function scrollParent(el: HTMLElement): HTMLElement {
-  for (let at = el.parentElement; at; at = at.parentElement) {
-    const { overflowY } = getComputedStyle(at);
-    if ((overflowY === 'auto' || overflowY === 'scroll') && at.scrollHeight > at.clientHeight) return at;
-  }
-  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
-}
-
 /** A fiche's corrections replayed on a fresh reading of it, exactly as `correct` first made them. */
 function withFix(v: Volunteer, fix: FicheFix | undefined): Volunteer {
   if (!fix) return v;
@@ -123,12 +114,12 @@ export function ImportScreen() {
   /** Whose reading is being corrected, before any of it is applied. */
   const [correcting, setCorrecting] = useState<string | null>(null);
   /**
-   * Where « Régler directement sur la fiche » was clicked, to come back to once the fiche is
-   * saved: the scrolling box and how far down it was. `go` asks for the jump down to the fiche.
+   * The fiche opened from a line of « À régler », since 2026-10-23: drawn on the right of the list,
+   * starting level with the line it was opened from (`top`, in px from the top of the list),
+   * rather than scrolled to at the bottom of the screen.
    */
-  const [jump, setJump] = useState<{ key: string; scroller: HTMLElement; top: number; go: boolean } | null>(null);
-  const [comeBack, setComeBack] = useState<{ scroller: HTMLElement; top: number } | null>(null);
-  const ficheRefs = useRef(new Map<string, HTMLDivElement>());
+  const [opened, setOpened] = useState<{ key: string; top: number } | null>(null);
+  const reviewLayout = useRef<HTMLDivElement | null>(null);
   /**
    * What the last action did, said on the screen, since 2026-09-16: « Appliquer ces réglages » used
    * to change the plan without a word and leave the card as it was, which reads as nothing having
@@ -199,32 +190,18 @@ export function ImportScreen() {
     closeFiche(key);
   };
 
-  /** The fiche's editor closes; when the list sent the régisseur here, the list is where they go back. */
+  /** The opened fiche closes; the list stays where it was, since nothing scrolled. */
   const closeFiche = (key: string): void => {
     setCorrecting(null);
-    if (jump?.key === key) {
-      setComeBack({ scroller: jump.scroller, top: jump.top });
-      setJump(null);
-    }
+    setOpened((current) => (current?.key === key ? null : current));
   };
 
   const jumpTo = (key: string, from: HTMLElement): void => {
-    const scroller = scrollParent(from);
+    const line = (from.closest('.import-todo-item') as HTMLElement | null) ?? from;
+    const top = reviewLayout.current ? line.getBoundingClientRect().top - reviewLayout.current.getBoundingClientRect().top : 0;
     setCorrecting(key);
-    setJump({ key, scroller, top: scroller.scrollTop, go: true });
+    setOpened({ key, top: Math.max(0, top) });
   };
-
-  useEffect(() => {
-    if (!jump?.go) return;
-    ficheRefs.current.get(jump.key)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    setJump({ ...jump, go: false });
-  }, [jump]);
-
-  useEffect(() => {
-    if (!comeBack) return;
-    comeBack.scroller.scrollTo({ top: comeBack.top, behavior: 'smooth' });
-    setComeBack(null);
-  }, [comeBack]);
 
   const importOptions = (withMapping: FormMapping): ImportOptions => ({
     poles: plan.poles,
@@ -425,12 +402,8 @@ export function ImportScreen() {
   /** True when the field holds exactly the link this plan already imported from. */
   const isRemembered = plan.sheetUrl !== '' && sheetUrl.trim() === plan.sheetUrl;
 
-  /**
-   * The fiches the importer was not sure of, which are the ones worth a human's eyes. As the plan
-   * will hold them, since 2026-10-23: a fiche settled on an earlier import, whose answers did not
-   * change, is not asked again. See `mergeWithManual`.
-   */
-  const toRead = planned.filter((v) => v.needsReview);
+  /** The fiche opened from « À régler », as the plan will hold it. */
+  const openedFiche = opened ? planned.find((v) => v.key === opened.key && v.needsReview) ?? null : null;
   /** Whom a binôme may name: this file's people, then the plan's people the file does not carry. */
   const buddyPeople = useMemo(() => {
     const inFile = imported?.result.volunteers ?? [];
@@ -628,15 +601,81 @@ export function ImportScreen() {
                 </div>
               </section>
 
-              <ImportReview
-                plan={plan}
-                survey={survey}
-                volunteers={planned}
-                doubts={imported.result.doubts ?? []}
-                fileIssues={fileIssues}
-                onDecide={decideAnswer}
-                onJump={jumpTo}
-              />
+              <div className="import-review-layout" ref={reviewLayout}>
+                <ImportReview
+                  plan={plan}
+                  survey={survey}
+                  volunteers={planned}
+                  doubts={imported.result.doubts ?? []}
+                  fileIssues={fileIssues}
+                  onDecide={decideAnswer}
+                  onJump={jumpTo}
+                />
+                {openedFiche && imported && (
+                  <div className="import-review import-side-fiche" style={{ top: opened!.top }}>
+                    <div className="setup-organiser-who">
+                      <strong>
+                        {openedFiche.firstName} {openedFiche.lastName}
+                        {openedFiche.nickname.trim() !== '' && ` (${openedFiche.nickname})`}
+                      </strong>
+                      <button
+                        type="button"
+                        className="btn is-small import-side-close"
+                        aria-label="Fermer la fiche"
+                        onClick={() => closeFiche(openedFiche.key)}
+                      >
+                        ×
+                      </button>
+                      {openedFiche.reviewReasons.map((reason, i) => (
+                        <span key={i} className="issue is-tier2">
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+
+                    <RawAnswer label="Contrainte horaire" value={openedFiche.availabilityNote} />
+                    {openedFiche.choices.map((c, i) => (
+                      <RawAnswer key={i} label={`Choix ${i + 1}`} value={c.raw} />
+                    ))}
+                    <RawAnswer label="Montage" value={openedFiche.montage.note} />
+                    <RawAnswer label="Démontage" value={openedFiche.demontage.note} />
+                    <RawAnswer label="Binômes" value={openedFiche.buddyRawNames.join(', ')} />
+
+                    {(correcting === openedFiche.key ||
+                      openedFiche.buddyRawNames.length > 0 ||
+                      session?.fixes[openedFiche.key]?.buddies !== undefined) && (
+                      <ImportBuddies
+                        volunteer={openedFiche}
+                        resolved={imported.result.buddies.filter((b) => b.fromKey === openedFiche.key)}
+                        people={buddyPeople}
+                        fix={session?.fixes[openedFiche.key]?.buddies}
+                        onChange={(next) => changeBuddies(openedFiche.key, next)}
+                      />
+                    )}
+
+                    {correcting === openedFiche.key ? (
+                      <VolunteerEdit
+                        index={index}
+                        volunteer={openedFiche}
+                        onCancel={() => closeFiche(openedFiche.key)}
+                        onSave={(changes) => {
+                          correct(openedFiche.key, changes);
+                          validate(openedFiche.key);
+                        }}
+                      />
+                    ) : (
+                      <span className="setup-confirm">
+                        <button className="btn" onClick={() => setCorrecting(openedFiche.key)}>
+                          Corriger la lecture
+                        </button>
+                        <button className="btn" onClick={() => validate(openedFiche.key)}>
+                          La lecture est bonne
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {reconciliation.removed.length > 0 && (
                 <section className="setup-group">
@@ -793,87 +832,6 @@ export function ImportScreen() {
                 </section>
               )}
 
-              {toRead.length > 0 && (
-                <section className="setup-group">
-                  <div className="setup-group-head">
-                    <span className="setup-group-title">
-                      Fiches à relire ({toRead.length})
-                    </span>
-                    <span className="people-meta">
-                      Ce que l'outil a lu, et la phrase à côté
-                    </span>
-                  </div>
-                  <p className="panel-sub">
-                    L'outil n'est pas sûr de ces fiches-là. Corrigez la lecture ici, avant
-                    d'appliquer: une correction faite maintenant part avec l'import, et le
-                    prochain export ne la défera pas. Une fiche validée ou corrigée quitte la liste.
-                  </p>
-
-                  {toRead.map((v) => (
-                    <div
-                      key={v.key}
-                      className="import-review"
-                      ref={(el) => {
-                        if (el) ficheRefs.current.set(v.key, el);
-                        else ficheRefs.current.delete(v.key);
-                      }}
-                    >
-                      <div className="setup-organiser-who">
-                        <strong>
-                          {v.firstName} {v.lastName}
-                          {v.nickname.trim() !== '' && ` (${v.nickname})`}
-                        </strong>
-                        {v.reviewReasons.map((reason, i) => (
-                          <span key={i} className="issue is-tier2">
-                            {reason}
-                          </span>
-                        ))}
-                      </div>
-
-                      <RawAnswer label="Contrainte horaire" value={v.availabilityNote} />
-                      {v.choices.map((c, i) => (
-                        <RawAnswer key={i} label={`Choix ${i + 1}`} value={c.raw} />
-                      ))}
-                      <RawAnswer label="Montage" value={v.montage.note} />
-                      <RawAnswer label="Démontage" value={v.demontage.note} />
-                      <RawAnswer label="Binômes" value={v.buddyRawNames.join(', ')} />
-
-                      {(correcting === v.key ||
-                        v.buddyRawNames.length > 0 ||
-                        session?.fixes[v.key]?.buddies !== undefined) && (
-                        <ImportBuddies
-                          volunteer={v}
-                          resolved={imported.result.buddies.filter((b) => b.fromKey === v.key)}
-                          people={buddyPeople}
-                          fix={session?.fixes[v.key]?.buddies}
-                          onChange={(next) => changeBuddies(v.key, next)}
-                        />
-                      )}
-
-                      {correcting === v.key ? (
-                        <VolunteerEdit
-                          index={index}
-                          volunteer={v}
-                          onCancel={() => closeFiche(v.key)}
-                          onSave={(changes) => {
-                            correct(v.key, changes);
-                            validate(v.key);
-                          }}
-                        />
-                      ) : (
-                        <span className="setup-confirm">
-                          <button className="btn" onClick={() => setCorrecting(v.key)}>
-                            Corriger la lecture
-                          </button>
-                          <button className="btn" onClick={() => validate(v.key)}>
-                            La lecture est bonne
-                          </button>
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </section>
-              )}
             </>
           )}
 

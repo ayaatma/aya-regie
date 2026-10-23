@@ -31,6 +31,8 @@ const KIND_LABEL: Record<AnswerKind, string> = {
   artist: 'Artiste à ne pas manquer',
 };
 
+const UNEXPLAINED = 'Fiche à relire, sans raison précise.';
+
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 interface AnswerGroup {
@@ -84,6 +86,12 @@ export function ImportReview({
       const keys = lines.get(reason) ?? [];
       if (!keys.includes(v.key)) keys.push(v.key);
       lines.set(reason, keys);
+    }
+    // No per-person list below any more (2026-10-23): a fiche to read with no reason is a line too.
+    if (v.reviewReasons.length === 0) {
+      const keys = lines.get(UNEXPLAINED) ?? [];
+      keys.push(v.key);
+      lines.set(UNEXPLAINED, keys);
     }
   }
 
