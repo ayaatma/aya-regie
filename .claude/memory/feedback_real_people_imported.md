@@ -27,3 +27,7 @@ seeing it.
 - Still the ground rule: never drop or reassign a volunteer silently.
 
 See [[feature-import-review]], [[feature-free-text-answers]].
+
+**Principle the developer stated the same day:** a correction by the régisseur must never come
+back « à relire » on a refresh unless the form's own answer behind it changed. Raw form answers
+and corrected values are stored apart for that (`Volunteer.formAnswers`, migration 39).

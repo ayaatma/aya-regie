@@ -157,8 +157,11 @@ import {
  * 29: 2026-10-23, the ToDo batch: `Plan.phaseOptions`, `PhaseEvent.mirrorOf`,
  *    `CateringRules.organiserDrinksFixed`, `TicketingSettings.guestTypes`, `TicketType.bracelet`,
  *    `TicketingChoice.braceletKeys`. A build that predates this writes every one of them away.
+ * 30: 2026-10-23, `Volunteer.formAnswers`: the raw form answers behind each correctable field, so
+ *    a hand correction comes back « à relire » only when the person changed their answer. A build
+ *    that predates this writes them away.
  */
-export const PLAN_FORMAT = 29;
+export const PLAN_FORMAT = 30;
 
 /** See `Plan.availabilityMode`. */
 export type AvailabilityMode = 'tranches' | 'plages';

@@ -1024,6 +1024,16 @@ export interface Volunteer {
    */
   manualFields: EditableField[];
   /**
+   * The form's own answers behind each correctable field, as the last import read them: the raw
+   * cells joined, keyed by field. Since 2026-10-23 (PLAN_FORMAT 30).
+   *
+   * What a re-import compares a hand correction against. Comparing the correction with the
+   * form's READING flagged it on every import, since a correction differs from the reading by
+   * definition; comparing the raw answers flags it only when the person changed what they said.
+   * Absent on a fiche imported before, or entered by hand: nothing to compare, nothing flagged.
+   */
+  formAnswers?: Partial<Record<EditableField, string>>;
+  /**
    * True when somebody has to read this fiche before trusting it.
    *
    * Set by the importer whenever it had to interpret prose and is not certain of its reading:

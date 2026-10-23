@@ -552,6 +552,9 @@ create table volunteer (
   -- the review queue. Both are bookkeeping about the fiche rather than answers: they are what
   -- stops a re-import undoing a correction, and what lets a human say "I have read this".
   manual_fields   text[] not null default '{}',
+  -- The form's own answers behind each correctable field, raw, at the last import, since
+  -- 2026-10-23. A hand correction is flagged again only when these change. See mergeWithManual.
+  form_answers    jsonb not null default '{}'::jsonb check (jsonb_typeof(form_answers) = 'object'),
   needs_review    boolean not null default false,
   review_reasons  text[] not null default '{}',
   -- What the volunteer typed for "who would you like to work with", not a resolved reference.
@@ -1121,7 +1124,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 29,
+values ('min_plan_format', 30,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1468,6 +1471,7 @@ as $fn$
                                   where va.volunteer_id = v.id), '[]'::jsonb),
              'buddyRawNames',   to_jsonb(v.buddy_raw_names),
              'manualFields',    to_jsonb(v.manual_fields),
+             'formAnswers',     v.form_answers,
              'needsReview',     v.needs_review,
              'reviewReasons',   to_jsonb(v.review_reasons),
              'enteredByHand',   v.entered_by_hand,
@@ -2043,7 +2047,7 @@ begin
                          requested_hours, preferred_slot_key, availability_note, avoided_slot_keys, unavailable,
                          skills, skills_note, emergency_contact, health_note, minor, nickname_matters,
                          imposed_pole_key, team_key, side_activity_keys, equipment_note,
-                         buddy_raw_names, manual_fields, needs_review, review_reasons,
+                         buddy_raw_names, manual_fields, form_answers, needs_review, review_reasons,
                          montage_present, montage_note, demontage_present, demontage_note,
                          on_reserve, entered_by_hand,
                          status, status_steps, regie_note, registered_at, backup, energy,
@@ -2092,6 +2096,7 @@ begin
                    from jsonb_array_elements(coalesce(x->'manualFields', '[]'::jsonb))
                         as mf(field)),
                   '{}'::text[]),
+         case when jsonb_typeof(x->'formAnswers') = 'object' then x->'formAnswers' else '{}'::jsonb end,
          coalesce((x->>'needsReview')::boolean, false),
          coalesce((select array_agg(reason #>> '{}')
                    from jsonb_array_elements(coalesce(x->'reviewReasons', '[]'::jsonb))

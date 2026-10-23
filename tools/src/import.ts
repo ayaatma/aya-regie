@@ -16,7 +16,9 @@ import {
   DEFAULT_PREFERENCE_SLOTS,
   DEFAULT_RULES,
   DEFAULT_SLOTS,
+  EDITABLE_FIELDS,
   type Artist,
+  type EditableField,
   type EventSlot,
   type PoleChoice,
   type PreferenceSlot,
@@ -441,6 +443,11 @@ export interface ImportResult {
   /** The closed answers read with a doubt, one per fiche and answer. See `AnswerDoubt`. */
   doubts?: AnswerDoubt[];
   /**
+   * The fiches the régisseur read during this import's review, never set by the importer: the
+   * import screen adds them. They leave the queue on apply. See `mergeWithManual`.
+   */
+  validated?: string[];
+  /**
    * The photo each person uploaded with the form, as a Drive file id, since 2026-10-10. Absent
    * when the form asks for none. Kept out of `Volunteer` on purpose: a photo is a file in the
    * photo store, not an answer of the plan, and the plan never carries it.
@@ -697,6 +704,40 @@ const splitAnswers = (value: string): string[] => {
     if (i + 1 < parts.length && /^je\b/.test(normalise(parts[i + 1]!))) i += 1;
   }
   return out;
+};
+
+/**
+ * The form's fields behind each correctable field, for `Volunteer.formAnswers`. The pole choices
+ * and the side activities add their own columns, which are not single fields. Since 2026-10-23.
+ */
+const FORM_SOURCES: Record<EditableField, readonly FormField[]> = {
+  firstName: ['firstName'],
+  lastName: ['lastName'],
+  nickname: ['nickname'],
+  email: ['email'],
+  phone: ['phone'],
+  requestedHours: ['volume', 'exploitHelp'],
+  preferredSlotId: ['halfPreference'],
+  refusedSlotIds: ['refusedSlotChoice', 'availabilityNote', 'slotComfort', 'arrival', 'departure', 'exploitHelp'],
+  avoidedSlotIds: ['slotComfort', 'availabilityNote'],
+  unavailable: ['refusedSlotChoice', 'availabilityNote', 'slotComfort', 'arrival', 'departure', 'exploitHelp'],
+  skills: ['skills', 'skillCheck'],
+  emergencyContact: ['emergencyContact'],
+  healthNote: ['healthCheck', 'healthNote'],
+  minor: ['birthDate'],
+  nicknameMatters: ['nicknameMatters'],
+  imposedPoleKey: ['assignedBy', 'leadsTeam'],
+  sideActivityKeys: [],
+  refusedPoleKeys: ['refusedPoles'],
+  choices: [],
+  artistKeys: ['artist'],
+  buddyRawNames: ['buddies'],
+  diet: ['diet'],
+  allergies: ['allergies'],
+  montage: ['phaseHelp', 'montage'],
+  demontage: ['phaseHelp', 'demontage'],
+  backup: ['backup'],
+  energy: ['energy'],
 };
 
 const splitList = (value: string): string[] =>
@@ -1542,6 +1583,14 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
 
     const buddyMentions = parseBuddyAnswer(cell(row, 'buddies'));
 
+    const formAnswers: Partial<Record<EditableField, string>> = {};
+    for (const field of EDITABLE_FIELDS) {
+      const cells = FORM_SOURCES[field].map((source) => cell(row, source));
+      if (field === 'choices') cells.push(...binding.choices.flatMap((c) => [at(row, c.pole), at(row, c.level)]));
+      if (field === 'sideActivityKeys') cells.push(...activityColumns.map(({ column }) => (row[column] ?? '').trim()));
+      formAnswers[field] = cells.join(' | ');
+    }
+
     const identity = volunteerIdentity(firstName, lastName, cell(row, 'email'));
     let key = identity;
     for (let n = 2; identities.has(key); n++) key = `${identity}#${n}`;
@@ -1615,6 +1664,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       // A fresh import has corrected nothing yet. `applyReconciliation` is what carries a
       // régisseur's corrections across a re-import; see `reconcile.ts`.
       manualFields: [],
+      formAnswers,
       needsReview: reviewReasons.length > 0,
       reviewReasons,
       montage: phasePresence.montage,

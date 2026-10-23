@@ -22,7 +22,7 @@
  */
 
 import { fmtHours, type Plan } from './plan.js';
-import { ENERGY_LABEL, choicePoleLabel, type EditableField, type Volunteer } from './model.js';
+import { EDITABLE_FIELDS, ENERGY_LABEL, choicePoleLabel, type EditableField, type Volunteer } from './model.js';
 import { parseSubmittedAt, type ImportIssue, type ImportResult } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
 
@@ -189,6 +189,8 @@ function changesBetween(
     // something the régisseur has to know before accepting the import.
     manualFields: null,
     reviewReasons: null,
+    // The raw answers themselves: their readings above are what the régisseur is told about.
+    formAnswers: null,
     // Bookkeeping too, and it only ever goes from true to false: the person filled the form in.
     enteredByHand: null,
     // The régisseur's own tracking, never an answer: kept across every import by `mergeWithManual`,
@@ -238,6 +240,19 @@ const RAW_ANSWERS: ReadonlyArray<(v: Volunteer) => unknown> = [
   // The pole answers as typed, in order. Since 2026-09-14 they live inside `choices`.
   (v) => v.choices.map((c) => c.raw),
 ];
+
+/**
+ * The fields whose raw answer can raise a doubt, compared to decide whether one is new. The
+ * contact fields are left out: a new phone number is a change to show, not a reason to read the
+ * whole fiche again.
+ */
+const DOUBTFUL_FIELDS: readonly EditableField[] = EDITABLE_FIELDS.filter(
+  (field) => !['firstName', 'lastName', 'nickname', 'email', 'phone', 'diet', 'allergies', 'emergencyContact'].includes(field),
+);
+
+/** A raw answer as `Volunteer.formAnswers` joins it, shown without its empty cells. */
+const shownAnswer = (raw: string): string =>
+  raw.split(' | ').filter((cell) => cell !== '').join(' / ') || '(vide)';
 
 /** The raw answer each interpreted field is a reading of, as the text the doubt quotes. */
 const BACKED_BY: Partial<Record<EditableField, (v: Volunteer) => string>> = {
@@ -299,20 +314,28 @@ export const FIELD_LABEL: Record<EditableField, string> = {
  *   1. every answer comes from the export, as before. A re-import is still how somebody’s new
  *      phone number reaches the plan.
  *   2. a field the régisseur corrected keeps the corrected value. An export does not get to
- *      undo a human reading of a sentence that a parser could only guess at.
- *   3. when the export contradicts a correction, or when the sentence behind it changed, the
- *      fiche goes back into the review queue with the reason, and the correction is kept. The
- *      tool never chooses between a person’s new answer and a human’s old correction on its
- *      own; it keeps both and says so.
+ *      undo a human reading of a sentence that a parser could only guess at. A field corrected
+ *      during this very import's review (`imported.manualFields`, which a fresh read never
+ *      sets) is the newest human word and wins over an older correction.
+ *   3. when the person's ANSWER behind a correction changed, the fiche goes back into the review
+ *      queue with the reason, and the correction is kept. The tool never chooses between a
+ *      person’s new answer and a human’s old correction on its own; it keeps both and says so.
+ *      Since 2026-10-23 the answer is `formAnswers`, the raw cells: a correction never matches
+ *      the form's reading, so comparing readings flagged every corrected fiche on every import.
+ *
+ * `validated`: the régisseur read this fiche during this import's review (« La lecture est
+ * bonne », or a correction saved). The fiche then leaves the queue whatever it held before.
  *
  * The access code is preserved for a different reason: it is not an answer, it is ours, and it
  * may already be in somebody's inbox.
  */
-export function mergeWithManual(before: Volunteer, imported: Volunteer): Volunteer {
+export function mergeWithManual(before: Volunteer, imported: Volunteer, options: { validated?: boolean } = {}): Volunteer {
+  const corrected = new Set<EditableField>([...before.manualFields, ...imported.manualFields]);
   const merged: Volunteer = {
     ...imported,
     accessCode: before.accessCode,
-    manualFields: [...before.manualFields],
+    manualFields: EDITABLE_FIELDS.filter((field) => corrected.has(field)),
+    ...(imported.formAnswers ?? before.formAnswers ? { formAnswers: imported.formAnswers ?? before.formAnswers } : {}),
     // The régisseur's tracking of the application is not in any export. An import that let a
     // fresh row reset it would put a cancelled person back among the candidatures in silence.
     status: before.status,
@@ -330,52 +353,66 @@ export function mergeWithManual(before: Volunteer, imported: Volunteer): Volunte
    * would put every fiche a human has validated straight back into the queue on the next
    * import, forever, and a queue that refills itself is a queue nobody works through.
    *
-   * So the doubt is only new when the ANSWER is new. If the sentences are word for word what
-   * this plan already holds, the fiche keeps the state a human left it in.
+   * So the doubt is only new when the ANSWER is new. If the answers are word for word what
+   * this plan already holds, the fiche keeps the state a human left it in. Since 2026-10-23 every
+   * answer a doubt can come from is compared when both sides kept them, not only the sentences.
    */
-  const sameAnswers = RAW_ANSWERS.every((read) => same(read(before), read(imported)));
+  const sameAnswers =
+    RAW_ANSWERS.every((read) => same(read(before), read(imported))) &&
+    (!before.formAnswers ||
+      !imported.formAnswers ||
+      DOUBTFUL_FIELDS.every((field) => (before.formAnswers![field] ?? '') === (imported.formAnswers![field] ?? '')));
   const reasons = sameAnswers ? [...before.reviewReasons] : [...imported.reviewReasons];
   let needsReview = sameAnswers ? before.needsReview : imported.needsReview;
 
   for (const field of before.manualFields) {
-    const corrected = before[field];
-    const fromExport = imported[field];
+    if (imported.manualFields.includes(field)) continue;
     carry(merged, before, field);
 
-    const backing = BACKED_BY[field];
-    if (backing) {
-      /*
-       * An interpreted field. The export always "disagrees" with the correction, because the
-       * parser reads the same sentence the same way every time and the correction is precisely
-       * a human overruling that reading. Saying so on every import would flag the fiche forever.
-       *
-       * What is worth saying is that the SENTENCE changed: the correction was then made against
-       * something this person no longer says, and only they know which of the two is right now.
-       */
-      if (!same(backing(before), backing(imported))) {
+    const was = before.formAnswers?.[field];
+    const now = imported.formAnswers?.[field];
+    if (was !== undefined && now !== undefined) {
+      if (was !== now) {
         needsReview = true;
         reasons.push(
-          `La réponse derrière "${FIELD_LABEL[field]}" a changé depuis votre correction. ` +
-            `Avant: "${backing(before)}". Maintenant: "${backing(imported)}".`,
+          `La réponse au formulaire derrière "${FIELD_LABEL[field]}" a changé depuis votre correction. ` +
+            `Avant: "${shownAnswer(was)}". Maintenant: "${shownAnswer(now)}". Votre correction a été conservée.`,
         );
       }
       continue;
     }
 
     /*
-     * An ordinary answer, corrected by hand: a phone number retyped from a voicemail, say.
-     * Here the export changing IS news, because the person themselves changed their answer.
+     * A fiche corrected before 2026-10-23 kept no raw answer. The sentences it did keep still
+     * say whether the person changed their answer; any other field is taken as unchanged, which
+     * is what the régisseur asked for, rather than flagged on every import as it used to be.
      */
-    if (!same(corrected, fromExport)) {
+    const backing = BACKED_BY[field];
+    if (backing && !same(backing(before), backing(imported))) {
       needsReview = true;
       reasons.push(
-        `L’export propose une autre valeur pour "${FIELD_LABEL[field]}": ` +
-          `"${String(fromExport)}". Votre correction a été conservée.`,
+        `La réponse derrière "${FIELD_LABEL[field]}" a changé depuis votre correction. ` +
+          `Avant: "${backing(before)}". Maintenant: "${backing(imported)}".`,
       );
     }
   }
 
+  if (options.validated) return { ...merged, needsReview: false, reviewReasons: [] };
   return { ...merged, needsReview, reviewReasons: reasons };
+}
+
+/**
+ * What the plan will hold for every person of an import once it is applied: the merge with the
+ * fiche already there, or the fresh fiche. The import screen's review lists read this, so a fiche
+ * a human settled on an earlier import does not come back to be read again.
+ */
+export function plannedVolunteers(plan: Plan, imported: ImportResult): Volunteer[] {
+  const current = new Map(plan.volunteers.map((v) => [v.key, v]));
+  const validated = new Set(imported.validated ?? []);
+  return imported.volunteers.map((fresh) => {
+    const before = current.get(fresh.key);
+    return before ? mergeWithManual(before, fresh, { validated: validated.has(fresh.key) }) : fresh;
+  });
 }
 
 /** The earlier of two form timestamps, either of which may be missing or unreadable. */
@@ -426,7 +463,7 @@ export function reconcileVolunteers(plan: Plan, imported: ImportResult): Reconci
       continue;
     }
     // Diffed against what accepting the import would really produce, corrections included.
-    const after = mergeWithManual(before, fresh);
+    const after = mergeWithManual(before, fresh, { validated: imported.validated?.includes(key) });
     const changes = changesBetween(before, after, poleName, artistName);
     if (changes.length === 0) unchanged++;
     else updated.push({ key, name: name(after), before, after, changes });
@@ -521,7 +558,7 @@ export function applyReconciliation(
     const before = byKey.get(volunteer.key);
     // The access code, and every field the régisseur corrected by hand. Both are things a
     // re-import must never undo; `mergeWithManual` is the single place that says so.
-    const merged = before ? mergeWithManual(before, volunteer) : volunteer;
+    const merged = before ? mergeWithManual(before, volunteer, { validated: imported.validated?.includes(volunteer.key) }) : volunteer;
     volunteers.push(
       before && reinstate.has(volunteer.key) && before.status === 'annule' ? { ...merged, status: 'candidature' } : merged,
     );

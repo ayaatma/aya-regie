@@ -23,6 +23,7 @@ import {
   foldIssuesIntoFiches,
   surveyForm,
   reconcileVolunteers,
+  plannedVolunteers,
   applyReconciliation,
   summariseReconciliation,
   EDITABLE_FIELDS,
@@ -261,7 +262,8 @@ export function ImportScreen() {
     if (!session) return null;
     try {
       const raw = foldIssuesIntoFiches(importVolunteers(session.csv, importOptions(session.mapping)));
-      return { result: { ...raw, volunteers: raw.volunteers.map((v) => withFix(v, session.fixes[v.key])) }, error: null };
+      const validated = Object.entries(session.fixes).filter(([, fix]) => fix.validated).map(([key]) => key);
+      return { result: { ...raw, volunteers: raw.volunteers.map((v) => withFix(v, session.fixes[v.key])), validated }, error: null };
     } catch (cause: unknown) {
       return { result: null, error: cause instanceof Error ? cause.message : String(cause) };
     }
@@ -271,6 +273,9 @@ export function ImportScreen() {
     () => (session && reading?.result ? { result: reading.result, source: session.source, csv: session.csv } : null),
     [session, reading],
   );
+
+  /** Every person of the file as the plan will hold them once the import is applied. */
+  const planned = useMemo(() => (imported ? plannedVolunteers(plan, imported.result) : []), [plan, imported]);
 
   const reconciliation = useMemo<Reconciliation | null>(
     () => (imported ? reconcileVolunteers(plan, imported.result) : null),
@@ -388,7 +393,7 @@ export function ImportScreen() {
       );
       setSession(null);
       startPhotoSync(imported.result);
-      const review = imported.result.volunteers.filter((v) => v.needsReview).length;
+      const review = planned.filter((v) => v.needsReview).length;
       setNotice({
         tone: 'ok',
         text:
@@ -420,8 +425,12 @@ export function ImportScreen() {
   /** True when the field holds exactly the link this plan already imported from. */
   const isRemembered = plan.sheetUrl !== '' && sheetUrl.trim() === plan.sheetUrl;
 
-  /** The fiches the importer was not sure of, which are the ones worth a human's eyes. */
-  const toRead = imported?.result.volunteers.filter((v) => v.needsReview) ?? [];
+  /**
+   * The fiches the importer was not sure of, which are the ones worth a human's eyes. As the plan
+   * will hold them, since 2026-10-23: a fiche settled on an earlier import, whose answers did not
+   * change, is not asked again. See `mergeWithManual`.
+   */
+  const toRead = planned.filter((v) => v.needsReview);
   /** Whom a binôme may name: this file's people, then the plan's people the file does not carry. */
   const buddyPeople = useMemo(() => {
     const inFile = imported?.result.volunteers ?? [];
@@ -622,7 +631,7 @@ export function ImportScreen() {
               <ImportReview
                 plan={plan}
                 survey={survey}
-                volunteers={imported.result.volunteers}
+                volunteers={planned}
                 doubts={imported.result.doubts ?? []}
                 fileIssues={fileIssues}
                 onDecide={decideAnswer}

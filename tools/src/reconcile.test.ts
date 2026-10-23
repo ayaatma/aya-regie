@@ -19,6 +19,7 @@ import {
   existingCodes,
   keptByDefault,
   mergeWithManual,
+  plannedVolunteers,
   reconcileVolunteers,
   summariseReconciliation,
 } from './reconcile.js';
@@ -416,6 +417,69 @@ test('a sentence rewritten by the volunteer sends the fiche back to relecture, c
     alice.reviewReasons.some((r) => r.includes('changé')),
     'et la raison doit dire que la réponse a changé',
   );
+});
+
+// 2026-10-23, the régisseur's case: Volante chosen AND refused, the refusal taken off by hand on
+// the first import, then the form refreshed with the same answers.
+const VOLANTE_BOTH: Row = { ...BASE[0]!, choice1: 'Bar / Service', refusedPoles: 'Bar / Service' };
+
+test('a pole refusal corrected by hand stays settled while the person does not change that answer', () => {
+  const plan = planWith([VOLANTE_BOTH]);
+  const key = plan.volunteers[0]!.key;
+  ok(plan.volunteers[0]!.needsReview, 'la contradiction est signalée au premier import');
+  ok(plan.volunteers[0]!.formAnswers?.refusedPoleKeys?.includes('Bar / Service'), 'la réponse brute est gardée');
+  const fixed = corrected(plan, key, { refusedPoleKeys: [] }, ['refusedPoleKeys']);
+
+  const again = importOf([VOLANTE_BOTH], fixed);
+  ok(again.volunteers[0]!.needsReview, 'la lecture seule du fichier doute encore');
+  const planned = plannedVolunteers(fixed, again).find((v) => v.key === key)!;
+  ok(!planned.needsReview, "l'écran d'import ne la redemande pas");
+  const after = applyReconciliation(fixed, again, reconcileVolunteers(fixed, again));
+  const alice = after.volunteers.find((v) => v.key === key)!;
+  deepStrictEqual(alice.refusedPoleKeys, []);
+  ok(!alice.needsReview, JSON.stringify(alice.reviewReasons));
+  deepStrictEqual(alice.reviewReasons, []);
+});
+
+test('a pole refusal corrected by hand comes back when the person changed that answer, correction kept', () => {
+  const plan = planWith([VOLANTE_BOTH]);
+  const key = plan.volunteers[0]!.key;
+  const fixed = corrected(plan, key, { refusedPoleKeys: [] }, ['refusedPoleKeys']);
+
+  const again = importOf([{ ...VOLANTE_BOTH, refusedPoles: 'Propreté' }], fixed);
+  const after = applyReconciliation(fixed, again, reconcileVolunteers(fixed, again));
+  const alice = after.volunteers.find((v) => v.key === key)!;
+  deepStrictEqual(alice.refusedPoleKeys, [], 'la correction est conservée');
+  ok(alice.needsReview);
+  ok(alice.reviewReasons.some((r) => r.includes('"Pôles refusés" a changé') && r.includes('Propreté')), JSON.stringify(alice.reviewReasons));
+});
+
+test('a fiche corrected before the raw answers were kept is not flagged for a reading it disagrees with', () => {
+  const plan = planWith([VOLANTE_BOTH]);
+  const key = plan.volunteers[0]!.key;
+  const fixed = corrected(plan, key, { refusedPoleKeys: [], formAnswers: undefined }, ['refusedPoleKeys']);
+  const again = importOf([VOLANTE_BOTH], fixed);
+  const after = applyReconciliation(fixed, again, reconcileVolunteers(fixed, again));
+  const alice = after.volunteers.find((v) => v.key === key)!;
+  ok(!alice.needsReview, JSON.stringify(alice.reviewReasons));
+  ok(alice.formAnswers?.refusedPoleKeys, 'et les réponses brutes sont gardées pour la suite');
+});
+
+test("a fiche corrected and read during an import's review keeps both, on a person already in the plan", () => {
+  const plan = planWith([VOLANTE_BOTH]);
+  const key = plan.volunteers[0]!.key;
+  // Already imported, still to read, corrected now on the import screen.
+  const fresh = importOf([VOLANTE_BOTH], plan);
+  const fixedNow: ImportResult = {
+    ...fresh,
+    volunteers: fresh.volunteers.map((v) => (v.key === key ? { ...v, refusedPoleKeys: [], manualFields: ['refusedPoleKeys'] } : v)),
+    validated: [key],
+  };
+  const after = applyReconciliation(plan, fixedNow, reconcileVolunteers(plan, fixedNow));
+  const alice = after.volunteers.find((v) => v.key === key)!;
+  deepStrictEqual(alice.refusedPoleKeys, []);
+  deepStrictEqual(alice.manualFields, ['refusedPoleKeys'], 'la correction est marquée, le prochain import ne la défera pas');
+  ok(!alice.needsReview);
 });
 
 test('the review screen shows what accepting the import really does, corrections included', () => {

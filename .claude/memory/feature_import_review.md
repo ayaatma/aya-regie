@@ -94,3 +94,28 @@ clean, no migration (`form_mapping` is jsonb), no PLAN_FORMAT change, app deploy
   change (raw answers unchanged). See [[feedback-real-people-imported]].
 - Known limit: `splitList` still splits on « et », so an act named « X et Y » answered on its own
   is two answers.
+
+## Follow-up 2026-10-23: a hand correction stays settled until the person changes that answer
+
+Reported by the developer on the real plan: a person chose AND refused the Volante, the refusal
+was taken off by hand on the first import, and every refresh showed the warning again. Two causes,
+both fixed. **MIGRATION 39 WRITTEN AND NOT APPLIED (`2026-10-23_form_answers.sql`), PLAN_FORMAT 30,
+min_plan_format 30: apply it, THEN deploy the front.**
+
+1. `mergeWithManual` flagged every corrected field without a backing sentence (refused poles,
+   artists, imposed pole...) whenever the correction differed from the form's READING, which is
+   always. Now `Volunteer.formAnswers` (column `volunteer.form_answers` jsonb) keeps, per
+   EditableField, the raw cells behind it (`FORM_SOURCES` in `import.ts`, joined with ` | `), and
+   a correction is flagged only when those cells changed (« La réponse au formulaire derrière
+   "X" a changé depuis votre correction »). A fiche without them (everyone imported before this)
+   keeps the old sentence check for BACKED_BY fields and is otherwise never flagged; it gets its
+   raw answers on the next import. `sameAnswers` also compares the raw answers of every doubt-prone
+   field (`DOUBTFUL_FIELDS`, contact fields excluded) when both sides have them.
+2. The import screen's « À régler » and « Fiches à relire » read the FRESH import, so a fiche
+   validated on an earlier import came back every time. They now read `plannedVolunteers(plan,
+   result)`, the merged state the plan will hold. Corrections made during the review on a person
+   already in the plan are kept marked (`manualFields` is the union, the session's value wins), and
+   « La lecture est bonne » on them sticks through `ImportResult.validated`.
+
+Consequence: an answer doubt (« À régler ») no longer lists people already validated; they get
+the reading through the reconciliation's « Réponses modifiées » instead.
