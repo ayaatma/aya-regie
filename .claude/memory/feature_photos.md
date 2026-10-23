@@ -68,3 +68,5 @@ under the BÉNÉVOLE key, so the photo landed under a hash no fiche reads; and `
 gives a new key (`resp-...`), stranding a photo too. Now `startPhotoSync` redirects such links
 to the organiser's key (by `organiserIdentity`), and the « Passer Staff / Responsable / bénévole »
 button calls `movePhoto`. The stranded objects under the old hashes stay in the bucket.
+**Verified live by the developer on 2026-10-24: bénévoles' photos show, and with this fix the
+Staff / Responsables' too.** Open: orphan objects under old hashes (cleanup offered, not asked).
