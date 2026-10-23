@@ -55,6 +55,48 @@ export function sizedThumbnail(link: string, size: number = THUMBNAIL_SIZE): str
   return /=s\d+(-c)?$/.test(link) ? link.replace(/=s\d+(-c)?$/, `=s${size}`) : `${link}=s${size}`;
 }
 
+/**
+ * Why Drive refused, 2026-10-24. A 403 is not always a sharing problem: the Drive API left
+ * disabled in the Cloud project, or a token without the Drive scope, answer 403 too, and every
+ * one of them used to read « partagez le dossier », sending the régie to a folder already shared.
+ * Google names the cause in `error.errors[].reason` (v3) or `error.details[].reason` (newer).
+ */
+async function refusal(response: Response, serviceAccount: string): Promise<PhotoError> {
+  let reasons: string[] = [];
+  let message = '';
+  try {
+    const body = (await response.json()) as {
+      error?: { message?: string; errors?: Array<{ reason?: string }>; details?: Array<{ reason?: string }> };
+    };
+    message = body.error?.message ?? '';
+    reasons = [...(body.error?.errors ?? []), ...(body.error?.details ?? [])].map((entry) => entry.reason ?? '');
+  } catch {
+    // Not JSON: nothing more to tell than the status.
+  }
+  const has = (pattern: RegExp) => reasons.some((reason) => pattern.test(reason)) || pattern.test(message);
+
+  if (has(/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/)) {
+    return new PhotoError(
+      "L'API Google Drive n'est pas activée dans le projet Google Cloud du compte de service. Activez-la (API et services, Bibliothèque, Google Drive API), attendez quelques minutes, puis réessayez.",
+      503,
+    );
+  }
+  if (has(/insufficientPermissions|ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient authentication scopes/i)) {
+    return new PhotoError(
+      "Le jeton Google n'a pas le droit de lire Drive: la fonction drive-photo déployée est sans doute ancienne. Redéployez-la, puis réessayez.",
+      503,
+    );
+  }
+  if (response.status === 404 || has(/notFound|forbidden|appNotAuthorizedToFile/)) {
+    // Drive answers 404 for a file that exists but is not shared with the caller.
+    return new PhotoError(
+      `Photo inaccessible. Partagez le dossier des photos du formulaire (dans le Drive du formulaire) en lecture avec ${serviceAccount}.`,
+      403,
+    );
+  }
+  return new PhotoError(`Google refuse la lecture de la photo (403${message ? `: ${message}` : ''}).`, 403);
+}
+
 /** The bytes of the photo and their type, thumbnail first, the file itself if it can be drawn. */
 export async function readDrivePhoto(
   fileId: string,
@@ -68,13 +110,7 @@ export async function readDrivePhoto(
   const api = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`;
 
   const meta = await fetcher(`${api}?fields=mimeType,size,thumbnailLink&supportsAllDrives=true`, auth);
-  if (meta.status === 403 || meta.status === 404) {
-    // Drive answers 404 for a file that exists but is not shared with the caller.
-    throw new PhotoError(
-      `Photo inaccessible. Partagez le dossier des photos du formulaire (dans le Drive du formulaire) en lecture avec ${serviceAccount}.`,
-      403,
-    );
-  }
+  if (meta.status === 403 || meta.status === 404) throw await refusal(meta, serviceAccount);
   if (!meta.ok) throw new PhotoError(`Google a répondu ${meta.status} en cherchant la photo.`, 502);
   const info = (await meta.json()) as { mimeType?: string; size?: string; thumbnailLink?: string };
 

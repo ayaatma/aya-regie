@@ -66,6 +66,28 @@ test('a file not shared with the account names the address to share the folder w
   await rejects(readDrivePhoto(ID, 'tok', fetcher, SA), (e: unknown) => e instanceof PhotoError && e.status === 403 && e.message.includes(SA));
 });
 
+const refused = (status: number, error: object): Route => () =>
+  new Response(JSON.stringify({ error }), { status, headers: { 'content-type': 'application/json' } });
+
+test('a Drive API left disabled says so, not « partagez le dossier »', async () => {
+  const { fetcher } = fakeFetch([
+    [`${FILES}${ID}?fields`, refused(403, { message: 'Google Drive API has not been used in project 123 before or it is disabled.', errors: [{ reason: 'accessNotConfigured' }] })],
+  ]);
+  await rejects(readDrivePhoto(ID, 'tok', fetcher, SA), (e: unknown) => e instanceof PhotoError && /API Google Drive n'est pas activée/.test(e.message) && !e.message.includes(SA));
+});
+
+test('a token without the Drive scope asks for the function to be redeployed', async () => {
+  const { fetcher } = fakeFetch([
+    [`${FILES}${ID}?fields`, refused(403, { message: 'Request had insufficient authentication scopes.', details: [{ reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' }] })],
+  ]);
+  await rejects(readDrivePhoto(ID, 'tok', fetcher, SA), (e: unknown) => e instanceof PhotoError && /Redéployez/.test(e.message));
+});
+
+test('a 403 of another kind shows what Google said', async () => {
+  const { fetcher } = fakeFetch([[`${FILES}${ID}?fields`, refused(403, { message: 'Rate Limit Exceeded', errors: [{ reason: 'userRateLimitExceeded' }] })]]);
+  await rejects(readDrivePhoto(ID, 'tok', fetcher, SA), (e: unknown) => e instanceof PhotoError && e.message.includes('Rate Limit Exceeded'));
+});
+
 test('anything but a Drive id is refused before Google is asked', async () => {
   const { fetcher, calls } = fakeFetch([]);
   await rejects(readDrivePhoto('../../etc', 'tok', fetcher, SA), (e: unknown) => e instanceof PhotoError && e.status === 400);

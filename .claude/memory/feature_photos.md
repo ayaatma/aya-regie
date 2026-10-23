@@ -47,3 +47,12 @@ event, signed URLs 6 h, `putPhoto`, `removePhoto`, `syncFormPhotos` three at a t
 Orphan photos (a person removed, a plan deleted) stay in the bucket. No photo in the Personnes
 list, the printable trombinoscope, or the volunteer view, although the form promises volunteers
 they will see who they work with. The orgas' own form is not read for a photo.
+
+## 2026-10-24: a 403 is not always the sharing
+
+The developer had shared the folder and still read « Photo inaccessible. Partagez le dossier »
+on every photo: `readDrivePhoto` turned EVERY 403/404 into that sentence. It now reads Google's
+`reason`: Drive API disabled in the Cloud project (`accessNotConfigured`, `SERVICE_DISABLED`)
+and a token without the Drive scope (old deployed function) answer 503 with their own sentence,
+which stops the run; only a 404 or `notFound`/`forbidden` still blames the sharing; any other
+403 shows Google's message. Needs `drive-photo` redeployed to take effect.
