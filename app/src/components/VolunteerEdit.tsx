@@ -84,6 +84,7 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
     compare('unavailable');
     compare('avoidedSlotIds');
     compare('refusedPoleKeys');
+    compare('artistKeys');
     compare('choices');
     compare('requestedHours');
     compare('montage');
@@ -231,6 +232,24 @@ export function VolunteerEdit({ index, volunteer, onCancel, onSave }: VolunteerE
           </label>
         ))}
       </div>
+
+      {/* Since 2026-10-23: an act the form words unlike its fiche had nothing to correct it with here. */}
+      {index.plan.artists.length > 0 && (
+        <div className="panel-section">
+          <p className="panel-section-title">Artistes à ne pas manquer</p>
+          <p className="panel-sub">La personne ne sera pas placée pendant ces passages, autant que possible.</p>
+          {index.plan.artists.map((artist) => (
+            <label className="checkline" key={artist.key}>
+              <input
+                type="checkbox"
+                checked={draft.artistKeys.includes(artist.key)}
+                onChange={() => set('artistKeys', toggle(draft.artistKeys, artist.key))}
+              />
+              {artist.name}
+            </label>
+          ))}
+        </div>
+      )}
 
       {/* The montage and démontage reading, since 2026-10-22: a doubt on it had nothing to correct it with here. */}
       {volunteerPhases(index.plan).length > 0 && (

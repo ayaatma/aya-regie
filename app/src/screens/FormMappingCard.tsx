@@ -228,6 +228,7 @@ const ANSWER_TABLES: ReadonlyArray<[AnswerKind, string]> = [
   ['refusedSlots', 'Réponses: tranches refusées'],
   ['slotComfort', 'Réponses: tranche refusée ou à éviter'],
   ['pole', 'Réponses: pôles'],
+  ['artist', 'Réponses: artistes à ne pas manquer'],
 ];
 
 /**
@@ -268,6 +269,11 @@ export function answerOptions(plan: Plan, kind: AnswerKind, survey: FormSurvey):
         // An answer naming no pole: every pole as a choice, nothing as a refusal.
         { value: '', label: 'Aucun pôle précis (tous acceptés)' },
         ...plan.poles.map((p) => ({ value: p.key, label: p.path })),
+      ];
+    case 'artist':
+      return [
+        { value: '', label: 'Aucun artiste précis' },
+        ...plan.artists.map((a) => ({ value: a.key, label: a.name })),
       ];
   }
 }

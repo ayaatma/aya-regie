@@ -782,6 +782,8 @@ function formMapping(value: unknown): FormMapping {
   if (slotAnswers) answers.refusedSlots = slotAnswers;
   if (poleAnswers) answers.pole = poleAnswers;
   if (comfortAnswers) answers.slotComfort = comfortAnswers;
+  const artistAnswers = pick('artist', (v): v is string => typeof v === 'string');
+  if (artistAnswers) answers.artist = artistAnswers;
   return { columns, ...(choices === undefined ? {} : { choices }), answers };
 }
 

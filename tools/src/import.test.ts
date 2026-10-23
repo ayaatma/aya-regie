@@ -759,6 +759,34 @@ test('the 2026-10 form\'s « none » answers name no refusal and no artist, and 
   ok(!result.issues.some((i) => i.code === 'pole-inconnu' || i.code === 'artiste-inconnu'), JSON.stringify(result.issues));
 });
 
+test('an act the form words unlike its fiche is a doubt, offered when its words are all there, and settled once', () => {
+  const guessed = importOne({ 27: 'Le grand set de Mira Dust' });
+  const doubt = (guessed.doubts ?? []).find((d) => d.kind === 'artist');
+  ok(doubt, JSON.stringify(guessed.doubts));
+  strictEqual(doubt.read, 'mira-dust');
+  deepStrictEqual(guessed.volunteers[0]!.artistKeys, ['mira-dust'], 'lue sans certitude, mais lue');
+
+  const unknown = importOne({ 27: 'Le set final des copains' });
+  const missing = (unknown.doubts ?? []).find((d) => d.kind === 'artist');
+  ok(missing, JSON.stringify(unknown.doubts));
+  strictEqual(missing.read, null);
+  deepStrictEqual(unknown.volunteers[0]!.artistKeys, []);
+  ok(unknown.issues.some((i) => i.code === 'artiste-inconnu'));
+
+  const survey = surveyForm(rowCsv({ 27: 'Le set final des copains' }), { poles, artists, startISO: EVENT_START_ISO });
+  deepStrictEqual(survey.answers.artist.map((a) => [a.answer, a.auto]), [['Le set final des copains', null]]);
+
+  const decided = importVolunteers(rowCsv({ 27: 'Le set final des copains' }), {
+    poles,
+    artists,
+    startISO: EVENT_START_ISO,
+    mapping: { columns: {}, answers: { artist: { [normalise('Le set final des copains')]: 'voltz' } } },
+  });
+  deepStrictEqual(decided.volunteers[0]!.artistKeys, ['voltz']);
+  ok(!(decided.doubts ?? []).some((d) => d.kind === 'artist'));
+  ok(!decided.issues.some((i) => i.code === 'artiste-inconnu'));
+});
+
 test('a refused pole is read like a choice, emoji and parenthesis included', () => {
   const result = importOne({ 24: '🛠️ VOLANTE (Bénévole polyvalent), 🌳 BRIGADE VERTE' });
   const volante = poles.find((p) => p.name === 'Volante')!;

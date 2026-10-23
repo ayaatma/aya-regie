@@ -98,7 +98,12 @@ type ComparedFields = {
 /**
  * Every answer worth telling the régisseur about, in the words the form used.
  */
-function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: string) => string): FieldChange[] {
+function changesBetween(
+  before: Volunteer,
+  after: Volunteer,
+  poleName: (key: string) => string,
+  artistName: (key: string) => string,
+): FieldChange[] {
   const compared: ComparedFields = {
     key: null,
     accessCode: null,
@@ -165,7 +170,7 @@ function changesBetween(before: Volunteer, after: Volunteer, poleName: (key: str
               .map((c, i) => `${i + 1}. ${choicePoleLabel(c, poleName)} (${c.level})`)
               .join(', '),
     },
-    artistKeys: { label: 'Artistes à ne pas manquer', show: (v) => v.join(', ') },
+    artistKeys: { label: 'Artistes à ne pas manquer', show: (v) => (v.length > 0 ? v.map(artistName).join(', ') : 'aucun') },
     buddyRawNames: { label: 'Binômes demandés', show: (v) => v.join(', ') },
     // The two phase answers, shown as the régisseur reads them: whether the person comes, and
     // the sentence they wrote. The hours themselves are not compared, because a re-import
@@ -391,6 +396,7 @@ function earliestRegistration(a: string | undefined, b: string | undefined): str
 export function reconcileVolunteers(plan: Plan, imported: ImportResult): Reconciliation {
   const poleName = (key: string): string =>
     plan.poles.find((p) => p.key === key)?.path ?? (key === '' ? 'aucun' : key);
+  const artistName = (key: string): string => plan.artists.find((a) => a.key === key)?.name ?? key;
 
   const current = new Map(plan.volunteers.map((v) => [v.key, v]));
   const incoming = new Map(imported.volunteers.map((v) => [v.key, v]));
@@ -421,7 +427,7 @@ export function reconcileVolunteers(plan: Plan, imported: ImportResult): Reconci
     }
     // Diffed against what accepting the import would really produce, corrections included.
     const after = mergeWithManual(before, fresh);
-    const changes = changesBetween(before, after, poleName);
+    const changes = changesBetween(before, after, poleName, artistName);
     if (changes.length === 0) unchanged++;
     else updated.push({ key, name: name(after), before, after, changes });
   }

@@ -33,7 +33,7 @@ import {
   refusedWindows,
   usableWindows,
 } from './availability.js';
-import { parseAvailabilityNote, parseAvailabilityWindows, parsePhaseAnswer, parsePoleAnswer, type AnswerReading } from './answers.js';
+import { parseArtistAnswer, parseAvailabilityNote, parseAvailabilityWindows, parsePhaseAnswer, parsePoleAnswer, type AnswerReading } from './answers.js';
 import { parseArrival, parseDeparture, parsePhaseDays, splitPhaseDays, unavailableFrom } from './presence-days.js';
 import { mergeWindows, type Phase } from './phase.js';
 import type { AvailabilityMode } from './plan.js';
@@ -1518,13 +1518,26 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
       }
     }
 
+    /*
+     * Read like a pole since 2026-10-23: the régisseur's decision first, then the line-up. An
+     * answer worded unlike any act is a doubt of the fiche, settled once for everybody in « À
+     * régler » or the form correspondence, or by hand on the fiche.
+     */
     const artistKeys: string[] = [];
     for (const raw of splitList(cell(row, 'artist'))) {
-      // « Ça n'a pas d'importance », the form's own way of naming no artist.
-      if (/pas d importance|peu importe|^aucun|^rien|^personne|^non$|tout me va/.test(normalise(raw))) continue;
-      const artist = artists.find((a) => normalise(a.name) === normalise(raw));
-      if (artist) artistKeys.push(artist.key);
-      else issues.push({ severity: 'warning', code: 'artiste-inconnu', row: rowNumber, person, message: `Artiste introuvable dans la programmation: "${raw}".` });
+      const decided = decidedAnswer('artist', raw);
+      const reading: AnswerReading<string> =
+        decided !== undefined && (decided === '' || artists.some((a) => a.key === decided))
+          ? { value: decided, confident: true, reason: null }
+          : parseArtistAnswer(raw, artists);
+      if (reading.value !== '' && !artistKeys.includes(reading.value)) artistKeys.push(reading.value);
+      if (reading.confident) continue;
+      const message =
+        reading.value === ''
+          ? `${reading.reason} Choisir l'artiste dans « À régler » ou sur la fiche.`
+          : `${reading.reason} À confirmer dans « À régler » ou sur la fiche.`;
+      issues.push({ severity: 'warning', code: 'artiste-inconnu', row: rowNumber, person, message });
+      rowDoubts.push({ kind: 'artist', answer: raw.trim(), read: reading.value === '' ? null : reading.value, messages: [message] });
     }
 
     const buddyMentions = parseBuddyAnswer(cell(row, 'buddies'));
@@ -1851,6 +1864,7 @@ export interface FormSurvey {
     refusedSlots: SurveyAnswer<SlotId[]>[];
     slotComfort: SurveyAnswer<SlotComfort>[];
     pole: SurveyAnswer<string>[];
+    artist: SurveyAnswer<string>[];
   };
 }
 
@@ -1928,6 +1942,10 @@ export function surveyForm(csvText: string, options: ImportOptions): FormSurvey 
         const reading = parsePoleAnswer(raw, options.poles);
         if (NO_POLE_WORDS.test(normalise(raw))) return { value: '' };
         return reading.value === '' ? null : { value: reading.value };
+      }),
+      artist: collect(column(binding.map.artist).flatMap(splitList), (raw) => {
+        const reading = parseArtistAnswer(raw, options.artists);
+        return reading.value === '' && !reading.confident ? null : { value: reading.value };
       }),
     },
   };

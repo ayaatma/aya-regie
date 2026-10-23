@@ -2767,6 +2767,19 @@ test('the correction form reads and ticks the montage and démontage days, when 
   assert.ok(html.includes(`name="edit-${volunteer.key}-montage-day-`), 'une case par jour du montage');
 });
 
+test('the correction form lists every act of the line-up, the ones the person named ticked', () => {
+  assert.ok(plan.artists.length > 1, 'la fixture a une programmation');
+  const [named, other] = plan.artists;
+  const volunteer = { ...plan.volunteers[0]!, artistKeys: [named!.key] };
+  const html = render(<VolunteerEdit index={new PlanIndex(plan)} volunteer={volunteer} onCancel={noop} onSave={noop} />);
+  assert.ok(shows(html, 'Artistes à ne pas manquer'));
+  assert.ok(shows(html, named!.name) && shows(html, other!.name));
+  const empty = render(
+    <VolunteerEdit index={new PlanIndex({ ...plan, artists: [] })} volunteer={volunteer} onCancel={noop} onSave={noop} />,
+  );
+  assert.ok(!shows(empty, 'Artistes à ne pas manquer'), 'rien à cocher sans programmation');
+});
+
 test('Réglages offers the two ways of holding « ne peut pas travailler »', () => {
   const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>);
   assert.ok(shows(html, 'Indisponibilités des bénévoles'));

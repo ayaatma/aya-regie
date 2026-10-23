@@ -71,3 +71,26 @@ See [[feature-free-text-answers]], [[feature-generic-event]], [[feature-form-imp
 - The rule, unchanged since the brief: one-way requests, reciprocity assumed, several per person,
   each a PAIR (A with B and A with C never pairs B with C), weight 5000 when honoured.
 - `npm run shots -- binomes` replays it.
+
+## Follow-up 2026-10-23: artists read like poles
+
+Asked by the developer: the form names an act « Set final par les artistes de l'association Aya
+Atma », the line-up calls it « Final Aya Atma », and the import only had a warning with no way to
+fix it, nor any way to edit a fiche's artists. Built, green (420 engine + 468 app tests), build
+clean, no migration (`form_mapping` is jsonb), no PLAN_FORMAT change, app deploy only.
+
+- `parseArtistAnswer` (`answers.ts`): exact name, « none » answers, else an answer holding every
+  word of exactly one act's name is that act, UNSURE; otherwise unsure with no act.
+- `AnswerMaps.artist` (key or ''), `ANSWER_KIND_OF.artist`, `FormSurvey.answers.artist`, a table
+  « Réponses: artistes à ne pas manquer » in the mapping card, `answerOptions` case 'artist',
+  `KIND_LABEL.artist` in « À régler ». An unsure reading is an `artiste-inconnu` warning AND an
+  `AnswerDoubt` kind 'artist', so it is settled once for every fiche in « À régler ».
+- `VolunteerEdit` has an « Artistes à ne pas manquer » checkbox section (`artistKeys` was already
+  an `EditableField`), so the fiche, and the fiche being imported, can correct it by hand.
+- The reconciliation shows artist names, not keys.
+- People already imported: the « À régler » list is built from the FRESH import, so the doubt
+  lists them too; « Retenir » re-reads the file and the reconciliation shows « Artistes à ne pas
+  manquer: aucun → Final Aya Atma » for each, applied on accept. Their review state does not
+  change (raw answers unchanged). See [[feedback-real-people-imported]].
+- Known limit: `splitList` still splits on « et », so an act named « X et Y » answered on its own
+  is two answers.

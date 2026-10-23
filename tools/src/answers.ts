@@ -20,7 +20,7 @@
  * makes to the people who registered.
  */
 
-import type { EventSlot, Pole, SlotId } from './model.js';
+import type { Artist, EventSlot, Pole, SlotId } from './model.js';
 import { editDistance, normalise } from './text.js';
 
 /** What a parser read, and whether a human needs to check it. */
@@ -305,6 +305,35 @@ export function parseAvailabilityNote(
 /** An answer that names no pole, and is not meant to. */
 const NO_POLE =
   /^(aucun|aucune|tout me va|peu importe|n importe|indifferent|pas de preference|non)\b/;
+
+/** An answer of « artistes à ne pas manquer » naming no act on purpose. */
+const NO_ARTIST = /pas d importance|peu importe|^aucun|^rien|^personne|^non$|tout me va/;
+
+/**
+ * Which act of the line-up one answer of « artistes à ne pas manquer » names, '' for none.
+ *
+ * Since 2026-10-23: the form may word an act differently from its fiche (« Set final par les
+ * artistes de l'association Aya Atma » for « Final Aya Atma »). An answer holding every word of
+ * exactly one act's name is offered as that act, unsure, so the régisseur confirms it once in
+ * the form correspondence. Anything else unread is unsure with no act.
+ */
+export function parseArtistAnswer(raw: string, artists: readonly Artist[]): AnswerReading<string> {
+  const value = normalise(raw);
+  if (value === '' || NO_ARTIST.test(value)) return sure('');
+
+  const exact = artists.find((artist) => normalise(artist.name) === value);
+  if (exact) return sure(exact.key);
+
+  const words = new Set(value.split(' '));
+  const named = artists.filter((artist) => {
+    const name = normalise(artist.name).split(' ').filter((w) => w !== '');
+    return name.length > 0 && name.every((w) => words.has(w));
+  });
+  if (named.length === 1) {
+    return unsure(named[0]!.key, `Artiste interprété: "${raw.trim()}" lu comme ${named[0]!.name}.`);
+  }
+  return unsure('', `Artiste introuvable dans la programmation: "${raw.trim()}".`);
+}
 
 /**
  * Reading a pole answer that may or may not be one of the form's own options.

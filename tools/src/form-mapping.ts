@@ -87,6 +87,8 @@ export interface AnswerMaps {
   pole?: Record<string, string>;
   /** The tranches one answer refuses and avoids (« shifts de nuit ? »). Since 2026-09-15. */
   slotComfort?: Record<string, { refused: SlotId[]; avoided: SlotId[] }>;
+  /** An act's key, or '' for an answer naming no act. Since 2026-10-23. */
+  artist?: Record<string, string>;
 }
 
 export type AnswerKind = keyof AnswerMaps;
@@ -153,4 +155,5 @@ export const ANSWER_KIND_OF: Partial<Record<MappedField, AnswerKind>> = {
   refusedSlotChoice: 'refusedSlots',
   refusedPoles: 'pole',
   slotComfort: 'slotComfort',
+  artist: 'artist',
 };

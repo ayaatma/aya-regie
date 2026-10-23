@@ -28,6 +28,7 @@ const KIND_LABEL: Record<AnswerKind, string> = {
   preferredSlot: 'Tranche préférée',
   refusedSlots: 'Tranches refusées',
   slotComfort: 'Tranche refusée ou à éviter',
+  artist: 'Artiste à ne pas manquer',
 };
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
