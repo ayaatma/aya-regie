@@ -339,7 +339,7 @@ function VolunteerDetail({
         </p>
       )}
 
-      <dl className="kv">
+      <dl className="kv is-near">
         <dt>Heures affectées</dt>
         <dd>
           {fmtHours(detail.assignedHours)} / {fmtHours(detail.requestedTotalHours)}

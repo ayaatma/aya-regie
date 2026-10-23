@@ -329,7 +329,7 @@ function OrgaBody({
         silently fail, since their session has no write access at all. See `GridScreenProps`.
       */}
       {readOnly ? (
-        <dl className="kv">
+        <dl className="kv is-near">
           {person.phone !== '' && (
             <>
               <dt>Téléphone</dt>

@@ -1303,26 +1303,46 @@ button {
   color: var(--ink-faint);
 }
 
+/*
+ * A label and its value side by side on a fiche, the value starting right after a label column
+ * rather than at the far edge of the pane: on a wide pane « Volume ........ 4 h » read as two
+ * unrelated things (reported 2026-10-23). Same rule for the fiche read and the fiche edited.
+ */
+.panel .field,
 .fiche-edit .field {
-  display: flex;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
+  justify-items: start;
   gap: 8px;
   margin-bottom: 6px;
 }
 
+.panel .field-label,
 .fiche-edit .field-label {
   font-size: 12px;
   color: var(--ink-soft);
-  /* Never shrunk: `.panel .select` asks for the whole width, and the pane's `overflow-wrap:
-     anywhere` then broke the label mid-word (« Préno m », « Volum e »). */
-  flex: 0 0 auto;
+  /* Never broken mid-word by the pane's `overflow-wrap: anywhere` (« Préno m », « Volum e »). */
+  overflow-wrap: normal;
 }
 
-.fiche-edit .select {
-  max-width: 190px;
-  flex: 1 1 auto;
+.panel .field > .select,
+.panel .field > .input,
+.fiche-edit .field > .select,
+.fiche-edit .field > .input,
+.fiche-edit .field > input:not([type='checkbox']) {
+  width: 100%;
+  max-width: 260px;
   min-width: 0;
+}
+
+/* The same idea for a fiche's figures: the value beside its name, not across the pane. */
+.kv.is-near {
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+}
+
+.kv.is-near dd {
+  text-align: left;
 }
 
 .fiche-actions {
