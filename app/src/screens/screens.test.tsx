@@ -2852,7 +2852,7 @@ test('an import under review survives leaving the screen, its corrections replay
     assert.ok(shows(html, 'essai.csv'), "l'import en cours est revenu");
     // One of the two fiches was validated before leaving: the line now counts one.
     assert.ok(shows(html, 'Retenir pour cette fiche'), html);
-    assert.ok(shows(html, 'Fiches à relire (1)'));
+    assert.ok(shows(html, '1 fiche(s) à relire'), 'et une seule fiche reste à relire');
   } finally {
     saveImportSession('balanced', null);
   }
