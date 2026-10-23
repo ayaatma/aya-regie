@@ -23,6 +23,7 @@ import {
 } from '../engine.ts';
 import { startBatch, useBatch, type BatchJob } from '../mail/mailStore.ts';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
+import { drawMissingCodes, giveDrawnCodes } from '../store/setupEdits.ts';
 import { SendDialog, type DialogPerson } from './SendDialog.tsx';
 
 const siteUrl = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
@@ -42,18 +43,22 @@ export function BulkValidateButton({ className = 'btn' }: { className?: string }
   const { id: eventId } = usePlan();
   const running = useBatch()?.running === true;
   const [open, setOpen] = useState(false);
-  const people = pendingPeople(plan);
+  // The codes the mails carry for whoever has none yet, drawn when the window opens so the
+  // preview shows them (see `drawMissingCodes`).
+  const [codes, setCodes] = useState<ReadonlyMap<string, string>>(new Map());
+  const people = pendingPeople(open ? giveDrawnCodes(plan, codes) : plan);
   if (people.length === 0) return null;
 
   const confirm = (): void => {
+    const mailed = people.filter((p) => p.mail !== null && isMailAddress(p.mail.to));
+    // Only a mail that leaves gives its code; nothing leaves without the event.
+    const given = new Map(eventId === null ? [] : [...codes].filter(([id]) => mailed.some((p) => p.id === id)));
     edit(
-      (p) => people.reduce((next, person) => setRegistrationStatus(next, person.kind, person.key, 'valide'), p),
+      (p) => giveDrawnCodes(people.reduce((next, person) => setRegistrationStatus(next, person.kind, person.key, 'valide'), p), given),
       `validation de ${people.length} personne(s) placée(s)`,
     );
     if (eventId === null) return;
-    const jobs: BatchJob[] = people
-      .filter((p) => p.mail !== null && isMailAddress(p.mail.to))
-      .map((p) => ({ kind: p.kind, key: p.key, name: p.name, mail: p.mail!, reason: 'validation', stepKey: '', planning: '' }));
+    const jobs: BatchJob[] = mailed.map((p) => ({ kind: p.kind, key: p.key, name: p.name, mail: p.mail!, reason: 'validation', stepKey: '', planning: '' }));
     startBatch(eventId, 'Validation', jobs);
   };
 
@@ -64,7 +69,10 @@ export function BulkValidateButton({ className = 'btn' }: { className?: string }
         className={className}
         disabled={running}
         title={running ? 'Un envoi groupé est en cours' : "Valide d'un coup les inscriptions qui ont déjà une place"}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setCodes(drawMissingCodes(plan, placedPending(plan)));
+          setOpen(true);
+        }}
       >
         Valider les {people.length} personne{people.length > 1 ? 's' : ''} placée{people.length > 1 ? 's' : ''}
       </button>

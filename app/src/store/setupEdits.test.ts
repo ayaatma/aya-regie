@@ -24,6 +24,8 @@ import {
   removeLeaderRole,
   giveOrganiserCode,
   clearOrganiserCode,
+  drawMissingCodes,
+  giveDrawnCodes,
   addPole,
   addShift,
   canMovePole,
@@ -758,4 +760,21 @@ test('deleting a shift also takes off the orgas standing in it', () => {
     [other.key],
     'l’orga reste sur son autre créneau, et seulement là',
   );
+});
+
+test('a validation mail draws the missing code, and only the mail that goes stores it', () => {
+  const { plan: withOne, organiser } = oneOrganiser();
+  const codes = drawMissingCodes(withOne, [{ kind: 'orga', key: organiser.key }]);
+  const code = codes.get(`orga|${organiser.key}`)!;
+  assert.equal(code.length, 14, "le code d'un Staff, pas celui d'un bénévole");
+  assert.equal(withOne.organisers.find((l) => l.key === organiser.key)!.accessCode, '', 'tirer ne donne rien');
+
+  const given = giveDrawnCodes(withOne, codes);
+  assert.equal(given.organisers.find((l) => l.key === organiser.key)!.accessCode, code);
+
+  // Somebody who holds a code by then keeps it: replacing it would lock them out.
+  assert.equal(drawMissingCodes(given, [{ kind: 'orga', key: organiser.key }]).size, 0);
+  const regenerated = giveOrganiserCode(withOne, organiser.key);
+  const kept = giveDrawnCodes(regenerated, codes);
+  assert.notEqual(kept.organisers.find((l) => l.key === organiser.key)!.accessCode, code);
 });

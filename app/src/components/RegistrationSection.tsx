@@ -5,7 +5,8 @@
  *
  * VALIDATING SHOWS THE MAIL FIRST. One click opens the message exactly as it will leave (rendered
  * here from the event's template, `renderMail`), with the box « Envoyer le mail » ticked when the
- * address is one; the second click validates and sends. A status changed by mistake costs nothing,
+ * address is one; the second click validates and sends, or « Valider sans envoyer de mail » beside
+ * it (2026-10-24) validates alone. A status changed by mistake costs nothing,
  * a mail sent by mistake cannot be called back, so the mail is the thing the régisseur reads
  * before committing, never after.
  *
@@ -17,6 +18,10 @@
  * for that kind of person, « Envoyer ce mail » ticked: the régisseur asked for one, sent on a box
  * left ticked. A kind with no mail of that list is cancelled or validated without one, and the
  * window says so.
+ *
+ * A MISSING CODE IS DRAWN WITH THE WINDOW since 2026-10-24: a bénévole or a Staff without one
+ * (typed into Réglages) got « ton code : » and nothing. The preview shows the code drawn, and the
+ * mail that leaves gives it to them (`drawMissingCodes`).
  *
  * READ-ONLY (an orga's code): the status only. The mail record needs a régisseur's session.
  */
@@ -39,6 +44,7 @@ import {
 import { sendMail, sentAtLabel, useMailLog, type MailEntry } from '../mail/mailStore.ts';
 import { TONE_CHIP } from './FollowUpSteps.tsx';
 import { SendDialog } from './SendDialog.tsx';
+import { drawMissingCodes, giveDrawnCodes } from '../store/setupEdits.ts';
 import { useLoadedPlan, usePlan } from '../store/store.tsx';
 
 const siteUrl = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
@@ -56,7 +62,7 @@ export function RegistrationSection({
   const { id: eventId } = usePlan();
   const log = useMailLog(readOnly ? null : eventId);
   const [confirming, setConfirming] = useState<null | 'validation' | 'renvoi' | 'annulation'>(null);
-  const [withMail, setWithMail] = useState(true);
+  const [codes, setCodes] = useState<ReadonlyMap<string, string>>(new Map());
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -66,7 +72,9 @@ export function RegistrationSection({
   const who = `${person.firstName} ${person.lastName}`.trim() || 'cette personne';
   const status = person.status;
   // The mail of the window open, or of the validation when none is: the cancellation has its own.
-  const mail = renderMail(plan, person, siteUrl(), confirming === 'annulation' ? 'annulation' : 'validation');
+  // Rendered with the code drawn for the window, the one the mail gives.
+  const addressee = confirming !== null && codes.size > 0 ? (registrantOf(giveDrawnCodes(plan, codes), kind, personKey) ?? person) : person;
+  const mail = renderMail(plan, addressee, siteUrl(), confirming === 'annulation' ? 'annulation' : 'validation');
   const addressOk = mail !== null && isMailAddress(mail.to);
   const history = log.entriesOf(kind, personKey);
   const last = log.lastValidationOf(kind, personKey);
@@ -81,16 +89,26 @@ export function RegistrationSection({
     edit((p) => setRegistrationStatus(p, kind, personKey, next), `inscription de ${who}: ${APPLICATION_STATUS_LABEL[next].toLowerCase()}`);
 
   const open = (mode: 'validation' | 'renvoi' | 'annulation'): void => {
+    setCodes(mode === 'annulation' ? new Map() : drawMissingCodes(plan, [{ kind, key: personKey }]));
     setConfirming(mode);
-    setWithMail(true);
   };
 
-  const confirm = async (): Promise<void> => {
+  const confirm = async (withMail: boolean): Promise<void> => {
     const mode = confirming;
     if (mode === null) return;
-    if (mode === 'validation') setStatus('valide');
-    if (mode === 'annulation') setStatus('annule');
-    if ((mode === 'renvoi' || withMail) && mail !== null && addressOk && eventId !== null) {
+    const goes = withMail && mail !== null && addressOk && eventId !== null;
+    const next: ApplicationStatus | null = mode === 'validation' ? 'valide' : mode === 'annulation' ? 'annule' : null;
+    // The status and the code the mail carries in one edit: the journal and the undo see one act.
+    if (next !== null || (goes && codes.size > 0)) {
+      edit(
+        (p) => {
+          const moved = next === null ? p : setRegistrationStatus(p, kind, personKey, next);
+          return goes ? giveDrawnCodes(moved, codes) : moved;
+        },
+        next === null ? `code d'accès pour ${who}` : `inscription de ${who}: ${APPLICATION_STATUS_LABEL[next].toLowerCase()}`,
+      );
+    }
+    if (goes && mail !== null && eventId !== null) {
       setSending(true);
       await sendMail(eventId, kind, personKey, mail, mode);
       setSending(false);
@@ -192,16 +210,8 @@ export function RegistrationSection({
                   Vide dans ce message: {mail.empty.join(', ')}. Le texte se change dans Réglages, Mails.
                 </p>
               )}
-              {confirming !== 'renvoi' && addressOk && (
-                <label className="fiche-step">
-                  <input
-                    type="checkbox"
-                    name="registration-with-mail"
-                    checked={withMail}
-                    onChange={(event) => setWithMail(event.target.checked)}
-                  />
-                  <span>Envoyer ce mail</span>
-                </label>
+              {mail !== null && addressOk && codes.size > 0 && (
+                <p className="people-meta">Pas encore de code d'accès: celui du mail lui est donné quand le mail part.</p>
               )}
             </>
           }
@@ -209,7 +219,7 @@ export function RegistrationSection({
             {
               id: `${kind}|${personKey}`,
               name: who,
-              mail: confirming !== 'renvoi' && !withMail ? null : mail,
+              mail,
               kind,
               key: personKey,
             },
@@ -228,7 +238,15 @@ export function RegistrationSection({
                   ? 'Valider et envoyer'
                   : 'Valider sans mail'
           }
-          onConfirm={() => void confirm()}
+          onConfirm={() => void confirm(true)}
+          secondary={
+            confirming !== 'renvoi' && mail !== null && addressOk
+              ? {
+                  label: confirming === 'validation' ? 'Valider sans envoyer de mail' : 'Annuler sans envoyer de mail',
+                  onConfirm: () => void confirm(false),
+                }
+              : undefined
+          }
           onClose={() => {
             if (!sending) setConfirming(null);
           }}

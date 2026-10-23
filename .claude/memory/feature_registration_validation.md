@@ -48,3 +48,12 @@ Extends [[feature-application-tracking]].
 
 A person whose key changes (conversion) loses sight of their mail history. Accepted ≠ delivered:
 bounces are not seen. No bulk validation.
+
+## 2026-10-24, tested on a real fiche by the developer
+
+- « Valider sans envoyer de mail » (and « Annuler sans envoyer de mail ») is a second button of the
+  window (`SendDialog.secondary`), replacing the « Envoyer ce mail » checkbox.
+- `{code}` was empty for a Staff typed into Réglages (no code, see `addOrganiser`). Now
+  `drawMissingCodes` (setupEdits.ts) draws one when the window opens (fiche and « Valider les
+  personnes placées »), the preview shows it, and `giveDrawnCodes` stores it only with a mail that
+  leaves. Validating without a mail still invents no credential.

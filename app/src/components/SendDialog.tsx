@@ -36,6 +36,7 @@ export function SendDialog({
   confirmLabel,
   withoutMailNote,
   onConfirm,
+  secondary,
   onClose,
 }: {
   title: string;
@@ -45,6 +46,11 @@ export function SendDialog({
   /** What happens to the people without an address; omitted, they are simply left out. */
   withoutMailNote?: string;
   onConfirm(): void;
+  /**
+   * A second way out beside the main button, e.g. « Valider sans envoyer de mail » (2026-10-24):
+   * the decision without the mail, said in so many words rather than by unticking a box.
+   */
+  secondary?: { label: string; onConfirm(): void };
   onClose(): void;
 }) {
   const mailed = people.filter((p) => p.mail !== null && isMailAddress(p.mail.to));
@@ -139,6 +145,18 @@ export function SendDialog({
           >
             {confirmLabel(mailed.length)}
           </button>
+          {secondary && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                secondary.onConfirm();
+                onClose();
+              }}
+            >
+              {secondary.label}
+            </button>
+          )}
           <button type="button" className="btn" onClick={onClose}>
             Annuler
           </button>

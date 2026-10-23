@@ -18,7 +18,7 @@
  * tool must not do.
  */
 
-import { ORGANISER_CODE_LENGTH, alignPhases, makeArtist, newAccessCode } from '../engine.ts';
+import { ORGANISER_CODE_LENGTH, VOLUNTEER_CODE_LENGTH, alignPhases, makeArtist, newAccessCode } from '../engine.ts';
 import type { Artist, AvailabilityMode, Organiser, LeaderRole, Plan, Pole, SchedulingRules, Shift, VolumeSettings } from '../engine.ts';
 
 // ---------------------------------------------------------------------------
@@ -719,6 +719,45 @@ export function giveOrganiserCode(plan: Plan, organiserKey: string): Plan {
   return {
     ...plan,
     organisers: plan.organisers.map((l) => (l.key === organiserKey ? { ...l, accessCode: code } : l)),
+  };
+}
+
+/**
+ * The codes a mail about to leave needs, 2026-10-24: one per bénévole or orga of `people` who has
+ * none, keyed `kind|key`. A Staff typed into Réglages has no code (see `addOrganiser`), and their
+ * validation mail said « ton code : » followed by nothing.
+ *
+ * DRAWN WHEN THE WINDOW OPENS, GIVEN WHEN THE MAIL GOES. The preview shows the very code the mail
+ * carries, and `giveDrawnCodes` stores it only with a mail that leaves: validating without a mail
+ * still invents no credential.
+ */
+export function drawMissingCodes(plan: Plan, people: readonly { kind: string; key: string }[]): Map<string, string> {
+  const taken = new Set([...plan.volunteers, ...plan.organisers].map((p) => p.accessCode).filter((c) => c !== ''));
+  const codes = new Map<string, string>();
+  for (const { kind, key } of people) {
+    if (kind === 'orga' && plan.organisers.some((o) => o.key === key && o.accessCode === '')) {
+      codes.set(`orga|${key}`, newAccessCode(taken, ORGANISER_CODE_LENGTH));
+    }
+    if (kind === 'benevole' && plan.volunteers.some((v) => v.key === key && v.accessCode === '')) {
+      codes.set(`benevole|${key}`, newAccessCode(taken, VOLUNTEER_CODE_LENGTH));
+    }
+  }
+  return codes;
+}
+
+/** Stores the codes of `drawMissingCodes`, only where the person still has none. */
+export function giveDrawnCodes(plan: Plan, codes: ReadonlyMap<string, string>): Plan {
+  if (codes.size === 0) return plan;
+  return {
+    ...plan,
+    volunteers: plan.volunteers.map((v) => {
+      const code = codes.get(`benevole|${v.key}`);
+      return code !== undefined && v.accessCode === '' ? { ...v, accessCode: code } : v;
+    }),
+    organisers: plan.organisers.map((o) => {
+      const code = codes.get(`orga|${o.key}`);
+      return code !== undefined && o.accessCode === '' ? { ...o, accessCode: code } : o;
+    }),
   };
 }
 
