@@ -40,6 +40,7 @@ import { poleColours } from '../components/poleColours.ts';
 import { organiserName, preferenceLabel, slotLabel } from '../components/labels.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { markersIn } from '../store/markerEdits.ts';
+import { printOnly } from '../components/printOnly.ts';
 
 interface PrintOptions {
   poles: boolean;
@@ -176,7 +177,7 @@ export function PrintScreen() {
             <input type="checkbox" checked={options.phones} onChange={() => toggle('phones')} />
             Téléphones des bénévoles
           </label>
-          <button className="btn is-primary" disabled={nothing} onClick={() => window.print()}>
+          <button className="btn is-primary" disabled={nothing} onClick={() => printOnly('export')}>
             Imprimer
           </button>
           <span className="toolbar-note">

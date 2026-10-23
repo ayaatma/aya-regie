@@ -24,6 +24,7 @@ import { MailsScreen } from './screens/MailsScreen.tsx';
 import { NavigationContext, type Navigation, type PersonRef } from './components/personNav.ts';
 import { ImportScreen } from './screens/ImportScreen.tsx';
 import { PrintScreen } from './screens/PrintScreen.tsx';
+import { TrombinoscopeScreen } from './screens/TrombinoscopeScreen.tsx';
 import { HistoryScreen } from './screens/HistoryScreen.tsx';
 import { ScreenBoundary } from './components/ScreenBoundary.tsx';
 import { NightView } from './screens/NightView.tsx';
@@ -530,7 +531,10 @@ export function App({
         )}
         {screen === 'export' && (
           <StackedScreen
-            sections={[{ id: 'export', title: 'Export', children: <PrintScreen />, printable: true }]}
+            sections={[
+              { id: 'export', title: 'Export', children: <PrintScreen />, printable: true },
+              { id: 'trombinoscope', title: 'Trombinoscope', children: <TrombinoscopeScreen />, printable: true, foldable: true },
+            ]}
           />
         )}
         {screen === 'historique' && (

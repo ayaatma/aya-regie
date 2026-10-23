@@ -6141,3 +6141,97 @@ textarea.select,
 .photo-crop-zoom input {
   flex: 1 1 auto;
 }
+
+/* --------------------------------------------------------------------------
+   Trombinoscope (2026-10-24)
+
+   A grid of squares, four across on A4. Each group starts a new row; with
+   « un pôle par page » each pole is a .print-page.
+   -------------------------------------------------------------------------- */
+
+@media print {
+  html[data-print-only] .stack-section {
+    display: none !important;
+  }
+
+  html[data-print-only='export'] #stack-export,
+  html[data-print-only='trombinoscope'] #stack-trombinoscope {
+    display: block !important;
+  }
+
+  html[data-print-only] .stack-head {
+    display: none;
+  }
+}
+
+.trombi-section + .trombi-section {
+  margin-top: 8mm;
+}
+
+.trombi-section.is-own-page + .trombi-section.is-own-page {
+  margin-top: 0;
+}
+
+.trombi-section h2 {
+  font-size: 16px;
+  margin: 0 0 3mm;
+  border-bottom: 1px solid #111111;
+  padding-bottom: 1mm;
+}
+
+.trombi-group + .trombi-group {
+  margin-top: 5mm;
+}
+
+.trombi-group h3 {
+  font-size: 13px;
+  margin: 0 0 2mm;
+}
+
+.trombi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4mm 3mm;
+}
+
+.trombi-card {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  text-align: center;
+}
+
+.trombi-photo {
+  aspect-ratio: 1;
+  width: 100%;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #f2f2f2;
+  color: #777777;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.trombi-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.trombi-name {
+  margin-top: 1mm;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.trombi-caption {
+  font-size: 10px;
+  color: #555555;
+}
+
+.trombi-empty {
+  color: #555555;
+}

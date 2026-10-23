@@ -200,6 +200,9 @@ export type {
 export { MAX_PHOTO_ZOOM, clampFraming, driveFileIds, framedSquare, needsDriveFetch, parsePhotoObjectName, photoObjectName, squareCrop } from '@engine/photos.ts';
 export type { PhotoFraming } from '@engine/photos.ts';
 export type { PhotoSource } from '@engine/photos.ts';
+/** Who is who, in the order the régie reads an event: Responsables, then Staff and bénévoles by pole. */
+export { trombiPoles, trombinoscope } from '@engine/trombinoscope.ts';
+export type { TrombiDocument, TrombiGroup, TrombiPerson, TrombiSection } from '@engine/trombinoscope.ts';
 
 /**
  * The montage and the démontage: two grids that no rule and no solver touches.

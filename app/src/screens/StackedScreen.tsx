@@ -28,8 +28,9 @@ export interface StackSection {
   /** Folded until opened. Off means the section is always open and carries no caret. */
   foldable?: boolean;
   /**
-   * The only section that goes to paper. With two screens on one tab, printing the tab would
-   * print both; the stylesheet keeps the others off the page.
+   * A section that may go to paper. With two screens on one tab, printing the tab would print
+   * both; the stylesheet keeps the others off the page. When two are printable (Export and
+   * Trombinoscope), `printOnly` names the one whose button was clicked.
    */
   printable?: boolean;
 }

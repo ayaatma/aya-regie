@@ -47,6 +47,7 @@ import { PeopleScreen } from './PeopleScreen.tsx';
 import { TicketingCard } from './TicketingCard.tsx';
 import { ImportScreen } from './ImportScreen.tsx';
 import { PrintScreen } from './PrintScreen.tsx';
+import { TrombinoscopeScreen } from './TrombinoscopeScreen.tsx';
 import { NightView } from './NightView.tsx';
 import { HistoryScreen, HistoryTable } from './HistoryScreen.tsx';
 import { StoreContext } from '../storeContext.ts';
@@ -580,6 +581,7 @@ test('no screen shows an em dash to the régisseur', () => {
     render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>),
     render(<ImportScreen />),
     render(<PrintScreen />),
+    render(<TrombinoscopeScreen />),
     render(<NightView onLeave={noop} />),
   ];
   for (const html of screens) {
@@ -984,6 +986,14 @@ test('a slot removed from the form leaves the answers that named it alone', () =
   const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, shorter);
   assert.ok(!shows(html, gone.label), 'la tranche retirée ne figure plus dans les réglages');
   assert.ok(shows(html, 'Tranches horaires du formulaire'), 'et le reste de la page tient');
+});
+
+test('the trombinoscope shows every placed bénévole, under the Bénévoles part', () => {
+  const html = render(<TrombinoscopeScreen />);
+  assert.ok(shows(html, 'Bénévoles'));
+  const placed = plan.volunteers.filter((v) => plan.assignments.some((a) => a.volunteerKey === v.key));
+  assert.ok(placed.length > 0);
+  for (const v of placed) assert.ok(shows(html, `${v.firstName} ${v.lastName}`.trim()), `absent du trombinoscope: ${v.firstName} ${v.lastName}`);
 });
 
 test('the printable page carries one sheet per pole, plus the volunteers and the reserve', () => {
