@@ -358,6 +358,7 @@ export type { SetupChoice, SetupProposal } from '@engine/setup-inference.ts';
 export type { SkillTag } from '@engine/model.ts';
 // Teams, 2026-09-15.
 export type { Team } from '@engine/model.ts';
+export type { MarkerMoment, TimelineMarker } from '@engine/model.ts';
 // Side activities, 2026-09-15.
 export type { SideActivity } from '@engine/model.ts';
 // Le Magasin, 2026-09-15.

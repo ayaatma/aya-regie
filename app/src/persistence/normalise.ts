@@ -89,6 +89,8 @@ import {
   type BuddyPair,
   type Plan,
   type Volunteer,
+  type MarkerMoment,
+  type TimelineMarker,
 } from '../engine.ts';
 
 /** Whatever JSON came back. Assuming it is a `Plan` is what caused the bug in the first place. */
@@ -788,6 +790,22 @@ function formMapping(value: unknown): FormMapping {
   return { columns, ...(choices === undefined ? {} : { choices }), answers };
 }
 
+/** The repères of the timelines; one with no usable start, or an end before it, is dropped. */
+function markers(value: unknown): TimelineMarker[] {
+  const moments: readonly string[] = ['exploit', 'montage', 'demontage'];
+  return array<Record<string, unknown>>(value)
+    .filter((m) => m !== null && typeof m === 'object')
+    .map((m) => ({
+      key: text(m.key),
+      label: text(m.label),
+      moment: (moments.includes(text(m.moment)) ? text(m.moment) : 'exploit') as MarkerMoment,
+      start: typeof m.start === 'number' && Number.isFinite(m.start) ? m.start : NaN,
+      end: typeof m.end === 'number' && Number.isFinite(m.end) ? m.end : null,
+    }))
+    .filter((m) => m.key !== '' && Number.isFinite(m.start))
+    .map((m) => (m.end !== null && m.end <= m.start ? { ...m, end: null } : m));
+}
+
 /** The raw form answers by correctable field, absent when there are none (imported before 2026-10-23). */
 function formAnswers(value: unknown): { formAnswers?: Partial<Record<EditableField, string>> } {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -1151,6 +1169,8 @@ export function normalisePlan(raw: unknown): Plan {
       const hours = (loose as Record<string, unknown>).defaultShiftHours;
       return typeof hours === 'number' && Number.isFinite(hours) && hours > 0 ? hours : 2;
     })(),
+    // Absent from anything written before 2026-10-23: no repère.
+    markers: markers((loose as Record<string, unknown>).markers),
     // Absent from anything written before 2026-09-15: no team, and the mode off.
     teamsEnabled: (loose as Record<string, unknown>).teamsEnabled === true,
     teams: array<Record<string, unknown>>((loose as Record<string, unknown>).teams)

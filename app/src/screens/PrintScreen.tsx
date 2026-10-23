@@ -39,6 +39,7 @@ import { downloadText, fileSlug, today } from '../components/download.ts';
 import { poleColours } from '../components/poleColours.ts';
 import { organiserName, preferenceLabel, slotLabel } from '../components/labels.ts';
 import { useLoadedPlan } from '../store/store.tsx';
+import { markersIn } from '../store/markerEdits.ts';
 
 interface PrintOptions {
   poles: boolean;
@@ -195,6 +196,14 @@ export function PrintScreen() {
                 {fmtHours(report.summary.assignedHours)} couvertes sur{' '}
                 {fmtHours(report.summary.demandHours)}
               </p>
+              {markersIn(plan, 'exploit').length > 0 && (
+                <p className="print-markers">
+                  Repères:{' '}
+                  {markersIn(plan, 'exploit')
+                    .map((m) => (m.end === null ? `${m.label} à ${toClock(plan.startISO, m.start)}` : `${m.label} de ${toClock(plan.startISO, m.start)} à ${toClock(plan.startISO, m.end)}`))
+                    .join(' · ')}
+                </p>
+              )}
               <p className="print-meta">
                 Imprimé le {new Date().toLocaleDateString('fr-FR')} à{' '}
                 {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.

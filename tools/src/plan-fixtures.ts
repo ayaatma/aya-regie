@@ -457,6 +457,12 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
   return {
     ...plan,
     address: '12 rue de la Salle des fêtes, 74000 Annecy',
+    // The repères of 2026-10-23: a pause between the two halves, an instant, one on the montage.
+    markers: [
+      { key: 'portes', label: 'Ouverture des portes', moment: 'exploit', start: 1, end: null },
+      { key: 'pause', label: 'Pause entre Loto et Concerts', moment: 'exploit', start: 5, end: 6 },
+      { key: 'livraison', label: 'Livraison scène', moment: 'montage', start: 2, end: 4 },
+    ],
     organisers,
     artists,
     montage,

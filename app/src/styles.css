@@ -6077,3 +6077,35 @@ textarea.select,
 .dialog-test {
   margin: 8px 0 0;
 }
+
+/*
+ * Les repères de la timeline, since 2026-10-23: a row under the line-up, neutral grey so it never
+ * reads as a set or a créneau. A band has a start and an end; an instant is a mark with its name.
+ */
+.ruler-markers {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.marker-band {
+  border: 1px solid var(--line);
+  position: absolute;
+  background: var(--surface-sunken);
+  border-left: 2px solid var(--ink-soft);
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 17px;
+  color: var(--ink-soft);
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.marker-band.is-instant {
+  background: none;
+  border-left: 2px dashed var(--ink-soft);
+  max-width: 140px;
+}

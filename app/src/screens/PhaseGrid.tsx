@@ -58,6 +58,7 @@ import {
   addPhaseEventWithMirror,
   phaseEventHours,
 } from '../store/phaseEdits.ts';
+import { markersIn } from '../store/markerEdits.ts';
 import {
   EditModeButton,
   MIN_WINDOW_HOURS,
@@ -321,6 +322,24 @@ export function PhaseGrid({
     [plan.startISO, plan.artists, phase, axis],
   );
   const artistRows = useMemo(() => packRows(artistMoments), [artistMoments]);
+  // The repères of this phase, since 2026-10-23: one lane under the line-up, a band cut at each
+  // night like everything else, an instant a mark given room for its name.
+  const markerPieces = useMemo(
+    () =>
+      markersIn(plan, id).flatMap((marker) => {
+        const end = marker.end ?? marker.start + 0.01;
+        const pieces = piecesOf(axis, { start: marker.start, end });
+        return pieces.map((piece, i) => ({
+          key: `${marker.key}-${i}`,
+          marker,
+          x: piece.x,
+          width: marker.end === null ? null : piece.width,
+          room: { start: piece.start, end: Math.max(piece.end, piece.start + 1.5) },
+        }));
+      }),
+    [plan, id, axis],
+  );
+  const markerRows = useMemo(() => packRows(markerPieces.map((m) => m.room)), [markerPieces]);
   const colours = useMemo(
     () => phasePoleColours(plan.poles, [plan.montage, plan.demontage]),
     [plan.poles, plan.montage, plan.demontage],
@@ -1270,6 +1289,47 @@ export function PhaseGrid({
                       </div>
                     )),
                   )}
+                </div>
+              </div>
+            )}
+
+            {markerPieces.length > 0 && (
+              <div className="lane is-artists is-markers">
+                <div className="lane-label">
+                  <span className="lane-label-name">Repères</span>
+                  <span className="lane-label-stat">informatif</span>
+                </div>
+                <div
+                  className="lane-track is-phase"
+                  style={
+                    {
+                      width: axis.width,
+                      height: (Math.max(...markerRows.values()) + 1) * ARTIST_ROW_H + LANE_PAD,
+                      '--hour-w': `${axis.pxPerHour}px`,
+                    } as React.CSSProperties
+                  }
+                >
+                  {markerPieces.map((m) => (
+                    <div
+                      key={m.key}
+                      className={`marker-band${m.width === null ? ' is-instant' : ''}`}
+                      style={{
+                        left: m.x,
+                        width: m.width === null ? undefined : Math.max(4, m.width - 2),
+                        top: LANE_PAD / 2 + (markerRows.get(m.room) ?? 0) * ARTIST_ROW_H,
+                        height: ARTIST_ROW_H,
+                      }}
+                      title={
+                        m.marker.end === null
+                          ? `${m.marker.label}
+Repère, ${toClock(phase.startISO, m.marker.start)}`
+                          : `${m.marker.label}
+Repère, ${toClock(phase.startISO, m.marker.start)} à ${toClock(phase.startISO, m.marker.end)}`
+                      }
+                    >
+                      {m.marker.label}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

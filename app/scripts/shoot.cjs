@@ -530,6 +530,10 @@ async function main() {
         await clickButton(/^▸Billetterie/);
         await sleep(300);
         await tall('78-reglages-billetterie');
+        await clickButton(/^▸Repères de la timeline/);
+        await sleep(300);
+        await page.evaluate(() => [...document.querySelectorAll('.setup-group-title, button')].find((b) => /Repères de la timeline/.test(b.textContent || ''))?.scrollIntoView());
+        await shot('79-reglages-reperes');
       }
       if (want('personnes') || want('billetterie')) {
         await tab('Personnes');

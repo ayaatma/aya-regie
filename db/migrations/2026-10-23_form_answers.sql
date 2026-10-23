@@ -9,7 +9,9 @@
 -- WHAT CHANGES.
 --   volunteer.form_answers (jsonb object): for each correctable field, the raw cells of the form
 --   behind it at the last import, keyed by field name. Written by the import, never edited.
---   load_plan and write_plan_body replaced whole, from db/schema.sql.
+--   event.markers (jsonb array): the repères drawn on the timelines, informative only.
+--   load_plan and write_plan_body replaced whole, from db/schema.sql; get_volunteer_schedule
+--   replaced whole, returning the repères too.
 --
 -- APPLY AFTER 38. min_plan_format GOES TO 30: a tab built before this would write every
 -- volunteer's form answers away.
@@ -23,6 +25,11 @@
 alter table volunteer add column if not exists form_answers jsonb not null default '{}'::jsonb;
 alter table volunteer drop constraint if exists volunteer_form_answers_check;
 alter table volunteer add constraint volunteer_form_answers_check check (jsonb_typeof(form_answers) = 'object');
+
+-- The repères of the timelines, [{key, label, moment, start, end}]. Informative only.
+alter table event add column if not exists markers jsonb not null default '[]'::jsonb;
+alter table event drop constraint if exists event_markers_check;
+alter table event add constraint event_markers_check check (jsonb_typeof(markers) = 'array');
 
 -- ---------------------------------------------------------------------------
 -- 2. The functions, copied whole from db/schema.sql
@@ -574,6 +581,7 @@ as $fn$
       'defaultShiftHours', e.default_shift_hours,
       'teamsEnabled', e.teams_enabled,
       'teams', e.teams,
+      'markers', e.markers,
       'dismissedBuddies', dismissed_buddies.j))
   from event e, slots, preference_slots, poles, shifts, artists, organisers, leader_roles, volunteers, buddies,
        dismissed_buddies, assignments, reserve, organiser_shifts, catering, ticketing, travel
@@ -674,7 +682,9 @@ begin
                                  then (p_plan->>'defaultShiftHours')::numeric else 2 end,
     teams_enabled         = coalesce((p_plan->>'teamsEnabled')::boolean, false),
     teams                 = case when jsonb_typeof(p_plan->'teams') = 'array'
-                                 then p_plan->'teams' else '[]'::jsonb end
+                                 then p_plan->'teams' else '[]'::jsonb end,
+    markers               = case when jsonb_typeof(p_plan->'markers') = 'array'
+                                 then p_plan->'markers' else '[]'::jsonb end
   where id = p_event_id;
 
   insert into ticket_type (event_id, key, label, start_hours, end_hours, bracelet, sort_order)
@@ -1253,6 +1263,141 @@ begin
       n_expected, n_written;
   end if;
 end;
+$fn$;
+
+create or replace function public.get_volunteer_schedule(p_code text)
+returns jsonb
+language sql
+security definer
+set search_path = public
+stable
+as $fn$
+  select jsonb_build_object(
+    'benevole', jsonb_build_object(
+      'prenom', me.first_name,
+      'nom',    me.last_name,
+      'heures_demandees', me.requested_hours
+    ),
+    'creneaux', coalesce((
+      select jsonb_agg(to_jsonb(c) order by c.debut)
+      from (
+        select ev.starts_at + make_interval(secs => (s.start_hours * 3600)::float8) as debut,
+               ev.starts_at + make_interval(secs => (s.end_hours   * 3600)::float8) as fin,
+               coalesce(parent.name || ' / ', '') || p.name as pole,
+               -- One entry per PERSON, not per role: a responsable holding two windows on this
+               -- pole is still one name and one number to the volunteer reading their schedule.
+               coalesce((
+                 select jsonb_agg(distinct jsonb_build_object(
+                   'nom', btrim(l.first_name || ' ' || l.last_name),
+                   'telephone', l.phone,
+                   'email', l.email))
+                 from leader_role r
+                 join organiser l on l.id = r.organiser_id
+                 where r.pole_id = p.id or r.pole_id = parent.id
+               ), '[]'::jsonb) as responsables,
+               -- The short label and nothing else. Read from the column rather than assembled
+               -- here: whether one letter of a surname is enough is a question about the whole
+               -- roster, and this query looks at one person at a time. See volunteer.display_name.
+               coalesce((
+                 select jsonb_agg(o.display_name order by o.display_name)
+                 from assignment a2
+                 join volunteer o on o.id = a2.volunteer_id
+                 where a2.shift_id = s.id and o.id <> me.id
+               ), '[]'::jsonb) as avec
+        from assignment a
+        join shift s  on s.id = a.shift_id
+        join pole  p  on p.id = s.pole_id
+        join event ev on ev.id = p.event_id
+        left join pole parent on parent.id = p.parent_id
+        where a.volunteer_id = me.id
+      ) c
+    ), '[]'::jsonb),
+    -- The two phases, in the same call: a bénévole who comes to the montage needs their whole
+    -- event on one page, not one page per phase. Derived boxes are not here, only decisions,
+    -- because the default placement is computed from the phase's settings by whoever draws it.
+    'phases', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'phase',  ph.phase_key,
+               'debut',  ph.starts_at + make_interval(secs => (pa.start_hours * 3600)::float8),
+               'fin',    ph.starts_at + make_interval(secs => (pa.end_hours   * 3600)::float8),
+               'pole',   coalesce(pp.name, ''),
+               'evenement', coalesce(pe.label, ''))
+             order by ph.starts_at + make_interval(secs => (pa.start_hours * 3600)::float8))
+      from phase_assignment pa
+      join phase ph on ph.id = pa.phase_id and ph.enabled
+      left join phase_pole  pp on pp.id = pa.phase_pole_id
+      left join phase_event pe on pe.id = pa.phase_event_id
+      where pa.volunteer_id = me.id
+    ), '[]'::jsonb),
+    -- The repères of the timelines, since 2026-10-23: every one of the exploit, and those of a
+    -- phase this person is placed on. Informative, as on the grid; an instant has no end.
+    'reperes', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'label',  m.x->>'label',
+               'moment', m.x->>'moment',
+               'debut',  base.starts_at + make_interval(secs => ((m.x->>'start')::numeric * 3600)::float8),
+               'fin',    case when jsonb_typeof(m.x->'end') = 'number'
+                              then base.starts_at + make_interval(secs => ((m.x->>'end')::numeric * 3600)::float8) end)
+             order by base.starts_at + make_interval(secs => ((m.x->>'start')::numeric * 3600)::float8))
+      from event e
+      cross join lateral jsonb_array_elements(e.markers) as m(x)
+      cross join lateral (
+        select case when m.x->>'moment' = 'exploit' then e.starts_at
+                    else (select ph.starts_at from phase ph
+                          where ph.event_id = e.id and ph.phase_key = m.x->>'moment' and ph.enabled)
+               end as starts_at
+      ) base
+      where e.id = me.event_id
+        and base.starts_at is not null
+        and jsonb_typeof(m.x->'start') = 'number'
+        and (m.x->>'moment' = 'exploit' or exists (
+              select 1 from phase_assignment pa join phase ph on ph.id = pa.phase_id
+              where pa.volunteer_id = me.id and ph.phase_key = m.x->>'moment'))
+    ), '[]'::jsonb),
+    -- The questions of the follow-up this person was sent, since 2026-10-22: one per step asking
+    -- for a reply whose mail the server accepted, with the answer already given if any. An answer
+    -- older than the last mail of a step carrying {planning} answered an older planning and is not
+    -- returned: the question is asked again. Same rule as tools/src/followup.ts.
+    'questions', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'key',        st.s->>'key',
+               'label',      coalesce(st.s->>'label', ''),
+               'question',   coalesce(st.s->'mail'->>'question', ''),
+               'reply',      st.s->'mail'->>'reply',
+               'sentAt',     m.sent_at,
+               'answer',     r.answer,
+               'answeredAt', r.answered_at,
+               'comment',    r.comment)
+             order by st.ord)
+      from event e
+      cross join lateral jsonb_array_elements(e.application_steps) with ordinality as st(s, ord)
+      join lateral (
+        select ml.sent_at
+        from mail_log ml
+        where ml.event_id = e.id and ml.person_kind = 'benevole' and ml.person_key = me.key
+          and ml.step_key = st.s->>'key' and ml.outcome = 'envoye'
+        order by ml.id desc
+        limit 1
+      ) m on true
+      left join lateral (
+        -- Since 2026-10-22 an answer carrying the planning it confirmed holds while that is still
+        -- the planning; a « souci » always shows; an older answer is read by its date, as before.
+        select sr.answer, sr.answered_at, sr.comment
+        from step_reply sr
+        where sr.event_id = e.id and sr.volunteer_key = me.key and sr.step_key = st.s->>'key'
+          and (sr.answer = 'souci'
+               or position('{planning}' in coalesce(st.s->'mail'->>'subject', '') || coalesce(st.s->'mail'->>'body', '')) = 0
+               or (sr.planning <> '' and sr.planning = private.planning_fingerprint(me.id))
+               or (sr.planning = '' and sr.answered_at >= m.sent_at))
+        order by sr.id desc
+        limit 1
+      ) r on true
+      where e.id = me.event_id
+        and coalesce(st.s->'mail'->>'reply', 'aucune') in ('confirmer', 'oui-non')
+    ), '[]'::jsonb)
+  )
+  from volunteer me
+  where me.access_code = upper(trim(p_code));
 $fn$;
 
 -- ---------------------------------------------------------------------------

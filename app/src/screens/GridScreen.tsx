@@ -79,6 +79,7 @@ import {
   setShiftWindow,
 } from '../store/setupEdits.ts';
 import type { SolveMode } from '../solver/solver.worker.ts';
+import { markersIn } from '../store/markerEdits.ts';
 
 interface DragSession {
   payload: DragPayload;
@@ -396,6 +397,8 @@ export function GridScreen({
   const buddyKeys = useMemo(() => buddiesOf(plan, selected), [plan, selected]);
   const teammateKeys = useMemo(() => teammatesOf(plan, selected), [plan, selected]);
   const pendingKeys = useMemo(() => pendingPeople(plan), [plan]);
+
+  const exploitMarkers = useMemo(() => markersIn(plan, 'exploit'), [plan]);
 
   const namedArtistKeys = useMemo(() => {
     const volunteer = selected ? index.volunteerByKey.get(selected) : undefined;
@@ -1224,6 +1227,7 @@ export function GridScreen({
                 pxPerHour={pxPerHour}
                 artists={plan.artists}
                 namedArtistKeys={namedArtistKeys}
+                markers={exploitMarkers}
               />
             </div>
 

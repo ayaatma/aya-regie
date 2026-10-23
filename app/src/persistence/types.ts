@@ -152,6 +152,11 @@ export interface VolunteerSchedule {
    * with the answer already given. Absent from a database that predates migration 36.
    */
   questions?: VolunteerQuestion[];
+  /**
+   * The repères of the timelines, since 2026-10-23: every one of the exploit, and those of a phase
+   * this person is placed on. `fin` null is an instant. Absent from a database before migration 39.
+   */
+  reperes?: Array<{ label: string; moment: 'exploit' | 'montage' | 'demontage'; debut: string; fin: string | null }>;
 }
 
 /** One question of the follow-up, as `get_volunteer_schedule` returns it. */

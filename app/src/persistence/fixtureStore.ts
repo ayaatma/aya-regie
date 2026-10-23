@@ -368,6 +368,16 @@ export class FixtureStore implements PlanStore {
               evenement: phase.events.find((e) => e.key === a.eventKey)?.label ?? '',
             }));
         }),
+        // The same reading as `get_volunteer_schedule`: the exploit's repères, and a phase's only
+        // for somebody placed on it.
+        reperes: (plan.markers ?? [])
+          .filter((m) => m.moment === 'exploit' || (plan[m.moment].enabled && plan[m.moment].assignments.some((a) => a.personKind === 'benevole' && a.personKey === me.key)))
+          .map((m) => {
+            const origin = new Date(m.moment === 'exploit' ? plan.startISO : plan[m.moment].startISO).getTime();
+            const iso = (hours: number): string => new Date(origin + hours * 3600_000).toISOString();
+            return { label: m.label, moment: m.moment, debut: iso(m.start), fin: m.end === null ? null : iso(m.end) };
+          })
+          .sort((a, b) => a.debut.localeCompare(b.debut)),
         // NOT THE DATABASE'S RULE: with no mail log here, every step asking for a reply counts
         // as sent, so the page can be worked on and photographed. Postgres only returns the
         // questions whose mail the server accepted.

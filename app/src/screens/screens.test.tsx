@@ -2545,7 +2545,11 @@ test('a fiche puts the field data where it is found in a hurry, and hides nothin
   assert.ok(shows(html, 'Dominique, 06 00 00 00 00'));
   assert.ok(shows(html, 'Pas de port de charges'));
   assert.ok(shows(html, 'Mineur·e'));
-  assert.ok(!shows(infoOf(plan, { kind: 'benevole', volunteerKey: key }), 'Sur le terrain'), 'rien à montrer, rien de dessiné');
+  const bare: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, emergencyContact: '', healthNote: '', minor: null } : v)),
+  };
+  assert.ok(!shows(infoOf(bare, { kind: 'benevole', volunteerKey: key }), 'Sur le terrain'), 'rien à montrer, rien de dessiné');
 });
 
 test('a fiche names the pole a responsable imposed, and lets the régisseur change it', () => {

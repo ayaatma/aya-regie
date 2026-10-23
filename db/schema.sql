@@ -146,6 +146,9 @@ create table event (
   teams_enabled         boolean not null default false,
   teams                 jsonb not null default '[]'::jsonb
     check (jsonb_typeof(teams) = 'array'),
+  -- Repères on the timelines, [{key, label, moment, start, end}], informative only. 2026-10-23.
+  markers               jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(markers) = 'array'),
   -- The competences this event names, [{key, label}] in order. Since 2026-09-15.
   skills                jsonb not null default '[]'::jsonb
     check (jsonb_typeof(skills) = 'array'),
@@ -1768,6 +1771,7 @@ as $fn$
       'defaultShiftHours', e.default_shift_hours,
       'teamsEnabled', e.teams_enabled,
       'teams', e.teams,
+      'markers', e.markers,
       'dismissedBuddies', dismissed_buddies.j))
   from event e, slots, preference_slots, poles, shifts, artists, organisers, leader_roles, volunteers, buddies,
        dismissed_buddies, assignments, reserve, organiser_shifts, catering, ticketing, travel
@@ -1874,7 +1878,9 @@ begin
                                  then (p_plan->>'defaultShiftHours')::numeric else 2 end,
     teams_enabled         = coalesce((p_plan->>'teamsEnabled')::boolean, false),
     teams                 = case when jsonb_typeof(p_plan->'teams') = 'array'
-                                 then p_plan->'teams' else '[]'::jsonb end
+                                 then p_plan->'teams' else '[]'::jsonb end,
+    markers               = case when jsonb_typeof(p_plan->'markers') = 'array'
+                                 then p_plan->'markers' else '[]'::jsonb end
   where id = p_event_id;
 
   insert into ticket_type (event_id, key, label, start_hours, end_hours, bracelet, sort_order)
@@ -3120,6 +3126,31 @@ as $fn$
       left join phase_pole  pp on pp.id = pa.phase_pole_id
       left join phase_event pe on pe.id = pa.phase_event_id
       where pa.volunteer_id = me.id
+    ), '[]'::jsonb),
+    -- The repères of the timelines, since 2026-10-23: every one of the exploit, and those of a
+    -- phase this person is placed on. Informative, as on the grid; an instant has no end.
+    'reperes', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'label',  m.x->>'label',
+               'moment', m.x->>'moment',
+               'debut',  base.starts_at + make_interval(secs => ((m.x->>'start')::numeric * 3600)::float8),
+               'fin',    case when jsonb_typeof(m.x->'end') = 'number'
+                              then base.starts_at + make_interval(secs => ((m.x->>'end')::numeric * 3600)::float8) end)
+             order by base.starts_at + make_interval(secs => ((m.x->>'start')::numeric * 3600)::float8))
+      from event e
+      cross join lateral jsonb_array_elements(e.markers) as m(x)
+      cross join lateral (
+        select case when m.x->>'moment' = 'exploit' then e.starts_at
+                    else (select ph.starts_at from phase ph
+                          where ph.event_id = e.id and ph.phase_key = m.x->>'moment' and ph.enabled)
+               end as starts_at
+      ) base
+      where e.id = me.event_id
+        and base.starts_at is not null
+        and jsonb_typeof(m.x->'start') = 'number'
+        and (m.x->>'moment' = 'exploit' or exists (
+              select 1 from phase_assignment pa join phase ph on ph.id = pa.phase_id
+              where pa.volunteer_id = me.id and ph.phase_key = m.x->>'moment'))
     ), '[]'::jsonb),
     -- The questions of the follow-up this person was sent, since 2026-10-22: one per step asking
     -- for a reply whose mail the server accepted, with the answer already given if any. An answer

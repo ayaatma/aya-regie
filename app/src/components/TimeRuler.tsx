@@ -33,6 +33,7 @@ import {
   type Artist,
   type EventSlot,
   type LeaderOnPole,
+  type TimelineMarker,
 } from '../engine.ts';
 import { organiserName } from './labels.ts';
 import { packRows } from './phaseAxis.ts';
@@ -48,6 +49,8 @@ export interface TimeRulerProps {
   artists: readonly Artist[];
   /** Sets the selected volunteer asked not to miss. Drawn in bold. */
   namedArtistKeys: ReadonlySet<string>;
+  /** The repères of this timeline, since 2026-10-23: a row of their own under the line-up. */
+  markers?: readonly TimelineMarker[];
 }
 
 /** Where a slot begins, drawn as a stronger tick. Read off the plan, not off a constant. */
@@ -103,6 +106,7 @@ export function TimeRuler({
   pxPerHour,
   artists,
   namedArtistKeys,
+  markers = [],
 }: TimeRulerProps) {
   const slotStarts = startsOf(slots);
   const every = labelStep(pxPerHour);
@@ -113,11 +117,14 @@ export function TimeRuler({
   // acts whose balances and set collide each get a row of their own.
   const rows = packRows(moments);
   const lines = moments.length === 0 ? 1 : Math.max(...rows.values()) + 1;
+  const marks = markerBands(markers, hours);
+  const markRows = packRows(marks.map((m) => m.room));
+  const markLines = marks.length === 0 ? 0 : Math.max(...markRows.values()) + 1;
 
   return (
     <div
       className="ruler"
-      style={{ width: hours * pxPerHour, height: RULER_HEAD_H + lines * ARTIST_ROW_H }}
+      style={{ width: hours * pxPerHour, height: RULER_HEAD_H + (lines + markLines) * ARTIST_ROW_H }}
     >
       {days.map((day) => (
         <div key={day.hour} className="ruler-day" style={{ left: day.hour * pxPerHour }}>
@@ -138,7 +145,7 @@ export function TimeRuler({
         );
       })}
 
-      <div className="ruler-artists" style={{ height: lines * ARTIST_ROW_H }}>
+      <div className="ruler-artists" style={{ top: RULER_HEAD_H, bottom: 'auto', height: lines * ARTIST_ROW_H }}>
         {moments.map((moment, i) => {
           const named = moment.kind === 'set' && namedArtistKeys.has(moment.artistKey);
           const width = Math.max(4, (moment.end - moment.start) * pxPerHour - 2);
@@ -165,6 +172,73 @@ export function TimeRuler({
           );
         })}
       </div>
+
+      {markLines > 0 && (
+        <MarkerRow marks={marks} rows={markRows} startISO={startISO} pxPerHour={pxPerHour} top={RULER_HEAD_H + lines * ARTIST_ROW_H} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The repères of a timeline as drawn: a band, or an instant given room for its name so two
+ * instants close together take two rows instead of writing over each other. Clipped to the axis.
+ */
+export function markerBands(
+  markers: readonly TimelineMarker[],
+  hours: number,
+): Array<{ marker: TimelineMarker; start: number; end: number | null; room: { start: number; end: number } }> {
+  return markers
+    .filter((m) => m.start < hours && (m.end ?? m.start) >= 0)
+    .map((m) => {
+      const start = Math.max(0, m.start);
+      const end = m.end === null ? null : Math.min(hours, m.end);
+      return { marker: m, start, end, room: { start, end: Math.max(end ?? start, start + 1.5) } };
+    });
+}
+
+/** One row of repères, on the exploit's ruler or above a phase grid. */
+export function MarkerRow({
+  marks,
+  rows,
+  startISO,
+  pxPerHour,
+  top,
+  xOf = (hours) => hours * pxPerHour,
+}: {
+  marks: ReturnType<typeof markerBands>;
+  rows: Map<{ start: number; end: number }, number>;
+  startISO: string;
+  pxPerHour: number;
+  top: number;
+  /** Where an hour sits on this axis; a phase axis skips its nights. */
+  xOf?(hours: number): number;
+}) {
+  return (
+    <div className="ruler-markers" style={{ top }}>
+      {marks.map(({ marker, start, end, room }) => {
+        const title =
+          end === null
+            ? `${marker.label}
+Repère, ${toClock(startISO, start)}`
+            : `${marker.label}
+Repère, ${toClock(startISO, start)} à ${toClock(startISO, end)}`;
+        return (
+          <div
+            key={marker.key}
+            className={`marker-band${end === null ? ' is-instant' : ''}`}
+            style={{
+              left: xOf(start),
+              width: end === null ? undefined : Math.max(4, xOf(end) - xOf(start) - 2),
+              top: (rows.get(room) ?? 0) * ARTIST_ROW_H,
+              height: ARTIST_ROW_H,
+            }}
+            title={title}
+          >
+            {marker.label}
+          </div>
+        );
+      })}
     </div>
   );
 }

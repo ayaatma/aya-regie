@@ -391,6 +391,25 @@ export interface SideActivity {
  * six bénévoles as one crew on a pole's roulement. `poleKey` is where the team usually works, for
  * the régisseur's reading only; nothing forces a member there.
  */
+/** The moment a timeline marker sits on, each with its own clock. */
+export type MarkerMoment = 'exploit' | 'montage' | 'demontage';
+
+/**
+ * A repère on a timeline, since 2026-10-23: something worth seeing above the grid that nobody is
+ * placed on, « Pause entre le loto et les concerts », « Ouverture des portes ». Informative only:
+ * no rule, no solver term, no créneau reads it.
+ *
+ * `start` and `end` are hours from the start of its own moment (the exploit's, or the phase's),
+ * like everything else drawn there. `end` null is an instant, drawn as a mark rather than a band.
+ */
+export interface TimelineMarker {
+  key: string;
+  label: string;
+  moment: MarkerMoment;
+  start: number;
+  end: number | null;
+}
+
 export interface Team {
   key: string;
   name: string;

@@ -345,6 +345,26 @@ export function VolunteerShifts({
           </ol>
         </>
       )}
+
+      {/* The repères of the régie, since 2026-10-23: informative, never a créneau. */}
+      {(schedule.reperes ?? []).length > 0 && (
+        <>
+          <h2 className="benevole-h2">À savoir</h2>
+          <ul className="benevole-list benevole-reperes">
+            {(schedule.reperes ?? []).map((repere) => {
+              const start = when(repere.debut);
+              const end = repere.fin === null ? null : when(repere.fin);
+              return (
+                <li key={`${repere.moment}-${repere.debut}-${repere.label}`} className="benevole-repere">
+                  <span className="benevole-day">{start.day}</span>{' '}
+                  <span className="benevole-clock">{end === null ? start.clock : `${start.clock} à ${end.clock}`}</span>{' '}
+                  <span className="benevole-pole">{repere.label}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

@@ -59,6 +59,7 @@ import { SlotsCard } from './SlotsCard.tsx';
 import { PhaseCard, PhasesSharedCard } from './PhaseCard.tsx';
 import { CateringCard } from './CateringCard.tsx';
 import { TicketingCard, TravelCard } from './TicketingCard.tsx';
+import { MarkersCard } from './MarkersCard.tsx';
 import { ApplicationStepsCard } from './ApplicationStepsCard.tsx';
 import { MailTemplatesCard } from './MailTemplatesCard.tsx';
 import { TestMailCard } from './TestMailCard.tsx';
@@ -186,6 +187,8 @@ export function SetupScreen({ part = 'reglages' }: { part?: SetupPart }) {
           <EventCard />
 
           <SlotsCard />
+
+          <MarkersCard />
 
           {/*
             No Orgas, Équipes or Activités annexes card since 2026-09-16: an orga's code is on their

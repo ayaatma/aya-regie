@@ -29,6 +29,7 @@ import {
   type ApplicationStep,
   type SkillTag,
   type Team,
+  type TimelineMarker,
   type SideActivity,
   type EquipmentItem,
   type MailSet,
@@ -158,8 +159,8 @@ import {
  *    `CateringRules.organiserDrinksFixed`, `TicketingSettings.guestTypes`, `TicketType.bracelet`,
  *    `TicketingChoice.braceletKeys`. A build that predates this writes every one of them away.
  * 30: 2026-10-23, `Volunteer.formAnswers`: the raw form answers behind each correctable field, so
- *    a hand correction comes back « à relire » only when the person changed their answer. A build
- *    that predates this writes them away.
+ *    a hand correction comes back « à relire » only when the person changed their answer; and
+ *    `Plan.markers`, the repères of the timelines. A build that predates this writes both away.
  */
 export const PLAN_FORMAT = 30;
 
@@ -316,6 +317,8 @@ export interface Plan {
    */
   teamsEnabled: boolean;
   teams: readonly Team[];
+  /** Repères drawn on the timelines, informative only. Since 2026-10-23; absent means none. */
+  markers?: readonly TimelineMarker[];
   /** Pré-montage, weekends: activities with a list of volunteers and no grid. Since 2026-09-15. */
   sideActivities: readonly SideActivity[];
   /** « Magasin »: the equipment, lent or owned, and where each piece is. Since 2026-09-15. */
