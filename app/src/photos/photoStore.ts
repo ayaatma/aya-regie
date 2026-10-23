@@ -235,6 +235,28 @@ async function storeSquare(eventId: string, personKey: string, blob: Blob, exten
   changed(book);
 }
 
+/**
+ * Carries a photo over to somebody's new key, 2026-10-24: a bénévole passed Staff or Responsable
+ * gets a new key (`resp-...`), and the photo, filed under the hash of the old one, vanished from
+ * the fiche. Nothing is done when the new key already has a photo, or the old one none.
+ */
+export async function movePhoto(eventId: string, fromKey: string, toKey: string): Promise<void> {
+  await loadBook(eventId);
+  const book = bookOf(eventId);
+  const from = await personHash(fromKey);
+  const to = await personHash(toKey);
+  const held = book.byHash.get(from);
+  if (!held || book.byHash.has(to)) return;
+  const name = held.name.replace(from, to);
+  const storage = getSupabase().storage.from(BUCKET);
+  const { error } = await storage.move(`${eventId}/${held.name}`, `${eventId}/${name}`);
+  if (error) throw new Error(`La photo n'a pas pu suivre le changement de statut: ${error.message}`);
+  const { data } = await storage.createSignedUrl(`${eventId}/${name}`, SIGNED_SECONDS);
+  book.byHash.delete(from);
+  book.byHash.set(to, { name, source: held.source, url: data?.signedUrl ?? null });
+  changed(book);
+}
+
 /** Forgets somebody's photo. The form's comes back at the next import that carries it. */
 export async function removePhoto(eventId: string, personKey: string): Promise<void> {
   await loadBook(eventId);

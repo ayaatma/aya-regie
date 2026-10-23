@@ -62,3 +62,9 @@ no photo said nothing. Now: an unbound photo column is a « colonne-non-reliee �
 where no answer holds a Drive link is « colonne-mal-associee », and the import always shows the
 « Photos du formulaire » notice, « aucune réponse n'en contient » included. Cause on the real
 form still unknown when this was written.
+Then « 34 déjà là » yet no photo on the developer's own fiche: they are Responsable. A row of
+somebody already Staff / Responsable (`reconciliation.alreadyOrga`) still sent its photo link
+under the BÉNÉVOLE key, so the photo landed under a hash no fiche reads; and `convertPerson`
+gives a new key (`resp-...`), stranding a photo too. Now `startPhotoSync` redirects such links
+to the organiser's key (by `organiserIdentity`), and the « Passer Staff / Responsable / bénévole »
+button calls `movePhoto`. The stranded objects under the old hashes stay in the bucket.

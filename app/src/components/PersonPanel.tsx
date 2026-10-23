@@ -48,6 +48,7 @@ import { PersonMark } from './PersonMark.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
 import { useNavigation, type PersonRef } from './personNav.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
+import { movePhoto, photosAvailable } from '../photos/photoStore.ts';
 
 export function PersonPanel({
   person,
@@ -242,7 +243,7 @@ function StatusSection({
   who: string;
   onFocus(person: PersonRef): void;
 }) {
-  const { plan, edit } = useLoadedPlan();
+  const { plan, edit, id: eventId } = useLoadedPlan();
   const [target, setTarget] = useState<StatusTarget | null>(null);
   const organiser = kind === 'orga' ? plan.organisers.find((o) => o.key === personKey) : undefined;
   const current: StatusTarget = organiser ? organiserRoleOf(organiser) : 'benevole';
@@ -315,6 +316,8 @@ function StatusSection({
                 edit((p) => setOrganiserRole(p, personKey, target as OrganiserRole).plan, `${who} passé·e ${label}`);
               } else {
                 edit((p) => convertPerson(p, kind, personKey, target === 'benevole' ? 'staff' : target).plan, `${who} passé·e ${label}`);
+                // The photo is a file filed under the key, not part of the plan: it follows by hand.
+                if (photosAvailable && eventId !== null) void movePhoto(eventId, personKey, preview!.newKey).catch(() => undefined);
                 onFocus({ kind: preview!.toKind, key: preview!.newKey });
               }
               setTarget(null);

@@ -35,6 +35,7 @@ import {
   type Reconciliation,
   type Plan,
   type Volunteer,
+  organiserIdentity,
 } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { VolunteerEdit } from '../components/VolunteerEdit.tsx';
@@ -390,14 +391,25 @@ export function ImportScreen() {
    * Drive file, or chosen by hand, is not fetched again.
    */
   const startPhotoSync = (result: ImportResult): void => {
-    const links = result.photos ?? [];
+    // A row of somebody already Staff or Responsable is not a bénévole of the plan: their photo
+    // goes to their organiser fiche, under its key (2026-10-24, it was filed under a bénévole key
+    // nobody reads, and counted « déjà là » ever after).
+    const organiserOf = new Map(plan.organisers.map((o) => [organiserIdentity(o.firstName, o.lastName, o.email), o.key]));
+    const links = (result.photos ?? []).map((link) => {
+      const v = result.volunteers.find((x) => x.key === link.volunteerKey);
+      const orga = v ? organiserOf.get(organiserIdentity(v.firstName, v.lastName, v.email)) : undefined;
+      return orga === undefined ? link : { ...link, volunteerKey: orga };
+    });
     if (!photosAvailable || eventId === null) return;
     // Said out loud since 2026-10-24: an import that brought no photo used to show nothing at all.
     if (links.length === 0) {
       setPhotoSync({ running: false, report: { fetched: 0, kept: 0, failed: [], unavailable: null }, names: new Map() });
       return;
     }
-    const names = new Map(result.volunteers.map((v) => [v.key, `${v.firstName} ${v.lastName}`.trim()]));
+    const names = new Map([
+      ...result.volunteers.map((v) => [v.key, `${v.firstName} ${v.lastName}`.trim()] as const),
+      ...plan.organisers.map((o) => [o.key, `${o.firstName} ${o.lastName}`.trim()] as const),
+    ]);
     setPhotoSync({ running: true, done: 0, total: links.length });
     void syncFormPhotos(eventId, links, (done, total) => setPhotoSync({ running: true, done, total })).then((report) =>
       setPhotoSync({ running: false, report, names }),
