@@ -89,7 +89,7 @@ function makePlan(ticketing: Partial<TicketingSettings> = {}): Plan {
         extraGuests: [{ key: 'd-g1', firstName: 'Ismaël', lastName: 'Dray' }],
       }),
     ],
-    organisers: [orga('cam', 'Camille', 'Dubois'), orga('sam', 'Sam', 'Aubert')],
+    organisers: [{ ...orga('cam', 'Camille', 'Dubois'), role: 'staff' }, orga('sam', 'Sam', 'Aubert')],
     leaderRoles: [{ key: 'r1', organiserKey: 'sam', poleKey: 'bar', start: 0, end: 4 }],
     volunteers: [volunteer('v1', 'Anne', 'Zed'), volunteer('v2', 'Bob', 'Aubert')],
     buddies: [],
@@ -144,18 +144,20 @@ test('everybody the tool knows is one line, sorted by name then first name, with
     'Zed Anne',
   ]);
   const camille = report.rows.find((r) => r.key === 'cam')!;
-  assert.deepEqual(camille.statuses.map((s) => s.label), ['Orga', 'Artiste: Doline']);
+  assert.deepEqual(camille.statuses.map((s) => s.label), ['Staff', 'Artiste: Doline']);
   assert.equal(camille.kind, 'orga', 'the member row is folded into the orga');
   assert.ok(!report.rows.some((r) => r.key === 'd-2'));
   const sam = report.rows.find((r) => r.key === 'sam')!;
-  assert.deepEqual(sam.statuses.map((s) => s.status), ['orga', 'responsable']);
+  assert.deepEqual(sam.statuses.map((s) => s.status), ['responsable']);
+  // A Responsable is a Staff: the Staff's backstage bracelet comes with its own, unless switched off.
+  assert.deepEqual(ticketingReport({ ...plan, ticketing: { ...plan.ticketing, responsablesGetStaffBracelets: false } }, new PlanIndex(plan)).rows.find((r) => r.key === 'sam')!.braceletKeys, ['all']);
   assert.deepEqual(sam.braceletKeys, ['backstage', 'all']);
   const noa = report.rows.find((r) => r.key === 'd-1-g1')!;
   assert.deepEqual(noa.statuses.map((s) => s.label), ['Invité de Doline']);
   assert.deepEqual(noa.braceletKeys, ['backstage']);
   assert.equal(noa.ticketTypeKey, 'full');
   assert.equal(noa.drinks, 0);
-  assert.deepEqual(report.byStatus, { orga: 2, responsable: 1, artiste: 2, benevole: 2, 'invite-artiste': 3 });
+  assert.deepEqual(report.byStatus, { orga: 1, responsable: 1, artiste: 2, benevole: 2, 'invite-artiste': 3 });
 });
 
 test("the tickets are the catering's figures, and a member with more guests than allowed is flagged", () => {

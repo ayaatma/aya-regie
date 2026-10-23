@@ -38,7 +38,7 @@ export function OrganiserFiche({ organiserKey }: { organiserKey: string }) {
   const person = plan.organisers.find((o) => o.key === organiserKey);
   if (!person) return null;
 
-  const who = organiserName(person) || 'cet orga';
+  const who = organiserName(person) || 'cette personne';
   const roles = index.polesLedBy(person.key);
 
   const field = (
@@ -168,7 +168,7 @@ export function PhasePresenceRow({
   const at = id === 'montage' ? person.montageFrom : person.demontageUntil;
   const poleKeys = id === 'montage' ? person.montagePoleKeys : person.demontagePoleKeys;
   const label = phase.label || (id === 'montage' ? 'Montage' : 'Démontage');
-  const who = organiserName(person) || 'cet orga';
+  const who = organiserName(person) || 'cette personne';
 
   /*
    * The moment is matched to the half-day it falls in rather than to an exact equality: an

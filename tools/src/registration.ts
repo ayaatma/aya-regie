@@ -25,6 +25,7 @@ import {
   type MailKind,
   type MailSet,
   type MailTemplate,
+  organiserRoleOf,
 } from './model.js';
 import type { Plan } from './plan.js';
 import { planningText } from './followup.js';
@@ -50,7 +51,7 @@ export interface Registrant {
 
 export const MAIL_AUDIENCE_LABEL: Record<string, string> = {
   benevole: 'Bénévole',
-  orga: 'Orga',
+  orga: 'Staff',
   responsable: 'Responsable de pôle',
   artiste: 'Artiste',
   prestataire: 'Prestataire',
@@ -73,7 +74,6 @@ export const audienceLabel = (plan: Pick<Plan, 'ticketing'>, audience: MailAudie
 
 /** Everybody who can be validated, in the order the Personnes tab lists them. */
 export function registrants(plan: Plan): Registrant[] {
-  const leaders = new Set(plan.leaderRoles.map((r) => r.organiserKey));
   const out: Registrant[] = [];
   for (const v of plan.volunteers) {
     out.push({
@@ -85,7 +85,7 @@ export function registrants(plan: Plan): Registrant[] {
   for (const o of plan.organisers) {
     out.push({
       kind: 'orga', key: o.key, firstName: o.firstName, lastName: o.lastName, email: o.email,
-      status: applicationStatusOf(o), audience: leaders.has(o.key) ? 'responsable' : 'orga',
+      status: applicationStatusOf(o), audience: organiserRoleOf(o) === 'responsable' ? 'responsable' : 'orga',
       accessCode: o.accessCode, actName: '', requestedHours: 0,
     });
   }
@@ -153,10 +153,10 @@ export const MAIL_PLACEHOLDERS: readonly { token: string; label: string }[] = [
   { token: '{date}', label: "Date de l'événement" },
   { token: '{lieu}', label: 'Adresse du lieu' },
   { token: '{groupe}', label: 'Nom du groupe (artistes)' },
-  { token: '{code}', label: "Code d'accès (bénévoles et orgas)" },
-  { token: '{lien}', label: 'Lien personnel: planning et réponses (bénévoles), planning (orgas)' },
+  { token: '{code}', label: "Code d'accès (bénévoles et Staff)" },
+  { token: '{lien}', label: 'Lien personnel: planning et réponses (bénévoles), planning (Staff)' },
   { token: '{heures}', label: 'Heures demandées (bénévoles)' },
-  { token: '{planning}', label: 'Ses créneaux, un par ligne (bénévoles et orgas)' },
+  { token: '{planning}', label: 'Ses créneaux, un par ligne (bénévoles et Staff)' },
 ];
 
 /*
@@ -178,7 +178,7 @@ export const DEFAULT_MAIL_TEMPLATES: Record<string, MailTemplate> = {
       "L'équipe d'organisation",
   },
   orga: {
-    subject: "{evenement} : bienvenue dans l'orga",
+    subject: "{evenement} : bienvenue dans l'équipe",
     body:
       'Bonjour {prenom},\n\n' +
       "Ta participation à l'organisation de {evenement} ({date}) est confirmée. Merci !\n\n" +

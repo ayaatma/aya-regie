@@ -22,7 +22,7 @@ import {
 import { DEFAULT_CONSTRAINTS } from './constraints.js';
 import { PlanIndex, type Plan } from './plan.js';
 import { defaultPhase } from './phase.js';
-import { convertPerson } from './convert.js';
+import { convertPerson, setOrganiserRole } from './convert.js';
 import { validate } from './validate.js';
 import { ticketingReport } from './ticketing.js';
 import { cateringReport } from './catering.js';
@@ -241,4 +241,33 @@ test('the proposal says what the catering will hand the person afterwards, in it
   }
   // Off, nothing to say.
   assert.ok(!convertPerson(base, 'orga', 'resp-sam').lost.some((l) => l.startsWith('Selon les règles du catering')));
+});
+
+test('Staff and Responsable, 2026-10-23: a bénévole becomes the one chosen, a Staff holds no pole', () => {
+  const plan = makePlan();
+  const someone = plan.volunteers[0]!.key;
+  const staff = convertPerson(plan, 'benevole', someone, 'staff');
+  assert.equal(staff.plan.organisers.find((o) => o.key === staff.newKey)?.role, 'staff');
+  const resp = convertPerson(plan, 'benevole', someone, 'responsable');
+  assert.equal(resp.plan.organisers.find((o) => o.key === resp.newKey)?.role, 'responsable');
+
+  const demoted = setOrganiserRole(plan, 'resp-sam', 'staff');
+  assert.equal(demoted.plan.organisers.find((o) => o.key === 'resp-sam')?.role, 'staff');
+  assert.deepEqual(demoted.plan.leaderRoles.filter((r) => r.organiserKey === 'resp-sam'), []);
+  assert.equal(demoted.lost.length, 1, 'le pôle tenu est annoncé');
+  assert.equal(setOrganiserRole(demoted.plan, 'resp-sam', 'staff').plan, demoted.plan, 'déjà Staff: rien ne change');
+});
+
+test('the Staff may be handed a fixed number of the exploit meals rather than a floor', () => {
+  const plan = makePlan();
+  const exploitMeals = (p: Plan): number => {
+    const report = cateringReport(p, new PlanIndex(p));
+    const exploit = new Set(report.services.filter((s) => s.inMoment.exploit !== undefined).map((s) => s.key));
+    return report.people.find((x) => x.kind === 'orga' && x.key === 'resp-sam')!.serviceKeys.filter((k) => exploit.has(k)).length;
+  };
+  const rules = { ...plan.catering.rules, enabled: true, organiserMeals: 0 };
+  const fixed = { ...plan, catering: { ...plan.catering, rules: { ...rules, organiserMealsFixed: true } } };
+  assert.equal(exploitMeals(fixed), 0, 'fixé à 0: aucun repas, quelles que soient les heures');
+  const two = { ...plan, catering: { ...plan.catering, rules: { ...rules, organiserMeals: 2, organiserMealsFixed: true } } };
+  assert.equal(exploitMeals(two), Math.min(2, cateringReport(two, new PlanIndex(two)).services.filter((s) => s.inMoment.exploit !== undefined).length));
 });

@@ -291,7 +291,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           // reads as one. Never locked: a place held by an orga carries no padlock.
           draggable={!readOnly && !editing}
           title={
-            `${orga.name}\nOrga, placé·e à la main. Ne compte dans aucune règle d'heures.` +
+            `${orga.name}\nStaff, placé·e à la main. Ne compte dans aucune règle d'heures.` +
             (inSupport
               ? "\nCe pôle attend son responsable en support, sans créneau. Rien n'a été retiré."
               : '') +
@@ -325,7 +325,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
               className="box-lock is-button"
               role="button"
               tabIndex={-1}
-              title="Retirer cet orga du créneau"
+              title="Retirer cette personne du créneau"
               onClick={(event) => {
                 event.stopPropagation();
                 onRemoveOrga(orga.key, shift.key);
@@ -347,7 +347,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
               // A place to fill is also the place an orga is put: one click, on the hole itself.
               // Empty boxes are not drop targets, so the click costs nothing that existed before.
               role={readOnly ? undefined : 'button'}
-              title={readOnly ? undefined : 'À pourvoir. Cliquer pour y mettre un orga.'}
+              title={readOnly ? undefined : "À pourvoir. Cliquer pour y mettre quelqu'un du Staff."}
               onClick={
                 readOnly
                   ? undefined

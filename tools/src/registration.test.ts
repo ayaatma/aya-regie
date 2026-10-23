@@ -31,14 +31,14 @@ const plan = {
   volunteers: [{ key: 'v1', firstName: 'Léa', lastName: 'Martin', email: 'lea@example.org', accessCode: 'ABCD1234', status: 'valide' }],
   organisers: [
     { key: 'o1', firstName: 'Sam', lastName: 'Roux', email: 'sam@example.org', accessCode: 'ORGA-0001' },
-    { key: 'o2', firstName: 'Noa', lastName: 'Petit', email: '', accessCode: '' },
+    { key: 'o2', firstName: 'Noa', lastName: 'Petit', email: '', accessCode: '', role: 'staff' },
   ],
   leaderRoles: [{ key: 'r1', organiserKey: 'o1', poleKey: 'bar', start: null, end: null }],
   artists: [makeArtist({ key: 'a1', name: 'Les Tests', start: 6, end: 7, members: [makeArtistMember({ key: 'm1', firstName: 'Kim', email: 'kim@example.org' })] })],
   ticketing: { ...DEFAULT_TICKETING, extras: [{ key: 'x1', firstName: 'Pat', lastName: 'Son', status: 'prestataire', phone: '', drinkTickets: 0, mealTickets: 0 }] },
 } as unknown as Plan;
 
-test('everybody but the guests can be validated, and an orga holding a pole is a responsable', () => {
+test('everybody but the guests can be validated, and a Responsable and a Staff each get their own mails', () => {
   const all = registrants(plan);
   assert.deepEqual(all.map((r) => `${r.kind}:${r.key}:${r.audience}:${r.status}`), [
     'benevole:v1:benevole:valide',

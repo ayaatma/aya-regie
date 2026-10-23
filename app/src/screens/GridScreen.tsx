@@ -16,6 +16,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  ORGANISER_ROLE_LABEL,
+  organiserRoleOf,
   PlanIndex,
   blockersFor,
   costsFor,
@@ -307,7 +309,7 @@ export function GridScreen({
   const orgaNames = useMemo(
     () =>
       [...plan.organisers]
-        .map((o) => ({ key: o.key, label: `${organiserName(o)} (orga)` }))
+        .map((o) => ({ key: o.key, label: `${organiserName(o)} (${ORGANISER_ROLE_LABEL[organiserRoleOf(o)]})` }))
         .sort((a, b) => a.label.localeCompare(b.label, 'fr')),
     [plan.organisers],
   );
@@ -1098,7 +1100,7 @@ export function GridScreen({
           <input
             className="select"
             list="benevoles-liste"
-            placeholder="Chercher un bénévole ou un orga"
+            placeholder="Chercher un bénévole ou quelqu'un du Staff"
             onChange={(event) => {
               const typed = event.target.value;
               const orga = orgaNames.find((o) => o.label === typed);

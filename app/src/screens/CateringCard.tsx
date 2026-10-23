@@ -223,40 +223,39 @@ export function CateringCard() {
               </span>
             </label>
 
+            {/* The Staff, Responsables included, since 2026-10-23: « orga » left the tool. */}
             <label className="rule">
-              <span className="rule-label">Repas garantis à un·e orga</span>
+              <span className="rule-label">
+                {rules.organiserMealsFixed ? "Repas de l'exploit remis au Staff" : "Repas de l'exploit garantis au Staff"}
+              </span>
               <span className="rule-input">
                 <NumberField
                   value={rules.organiserMeals}
-                  ariaLabel="Repas garantis à une personne de l'organisation"
+                  ariaLabel="Repas de l'exploit d'une personne du Staff"
                   name="organiser-meals"
                   onCommit={(value) =>
-                    edit((p) => setCateringRules(p, { organiserMeals: value ?? 0 }), 'repas des orgas')
+                    edit((p) => setCateringRules(p, { organiserMeals: value ?? 0 }), 'repas du Staff')
                   }
                 />
               </span>
               <span className="rule-hint">
-                Un plancher, jamais un plafond: une personne de l'organisation y a droit même
-                sans créneau pendant l'exploit, et garde davantage si les paliers lui en donnent
-                davantage.
+                {rules.organiserMealsFixed
+                  ? "Ce nombre exactement, responsables compris, quelles que soient les heures. Le montage et le démontage suivent la présence, comme pour tout le monde."
+                  : "Un plancher, jamais un plafond: une personne du Staff y a droit même sans créneau pendant l'exploit, et garde davantage si les paliers lui en donnent davantage."}
               </span>
             </label>
 
             <label className="rule">
               <span className="rule-label">
-                {rules.organiserDrinksFixed ? 'Tickets boisson remis à un·e orga' : 'Tickets boisson garantis à un·e orga'}
+                {rules.organiserDrinksFixed ? 'Tickets boisson remis au Staff' : 'Tickets boisson garantis au Staff'}
               </span>
               <span className="rule-input">
                 <NumberField
                   value={rules.organiserDrinks}
-                  ariaLabel={
-                    rules.organiserDrinksFixed
-                      ? "Tickets boisson remis à une personne de l'organisation"
-                      : "Tickets boisson garantis à une personne de l'organisation"
-                  }
+                  ariaLabel="Tickets boisson d'une personne du Staff"
                   name="organiser-drinks"
                   onCommit={(value) =>
-                    edit((p) => setCateringRules(p, { organiserDrinks: value ?? 0 }), 'boissons des orgas')
+                    edit((p) => setCateringRules(p, { organiserDrinks: value ?? 0 }), 'boissons du Staff')
                   }
                 />
               </span>
@@ -268,7 +267,21 @@ export function CateringCard() {
             </label>
 
             <label className="rule">
-              <span className="rule-label">Règle des orgas</span>
+              <span className="rule-label">Règle du Staff</span>
+              <span className="rule-input">
+                <input
+                  type="checkbox"
+                  name="organiser-meals-fixed"
+                  checked={rules.organiserMealsFixed === true}
+                  onChange={(event) =>
+                    edit(
+                      (p) => setCateringRules(p, { organiserMealsFixed: event.target.checked }),
+                      'règle des repas du Staff',
+                    )
+                  }
+                />
+                <span>Un nombre fixe de repas sur l'exploit, sans compter les heures</span>
+              </span>
               <span className="rule-input">
                 <input
                   type="checkbox"
@@ -277,15 +290,15 @@ export function CateringCard() {
                   onChange={(event) =>
                     edit(
                       (p) => setCateringRules(p, { organiserDrinksFixed: event.target.checked }),
-                      'règle des tickets boisson des orgas',
+                      'règle des tickets boisson du Staff',
                     )
                   }
                 />
                 <span>Un nombre fixe de tickets boisson, sans compter les heures</span>
               </span>
               <span className="rule-hint">
-                Décoché, un·e orga suit la règle des bénévoles, avec le nombre ci-dessus comme
-                minimum. Coché, chaque orga et chaque responsable reçoit ce nombre, et un nombre
+                Décoché, le Staff suit la règle des bénévoles, avec les nombres ci-dessus comme
+                minimum. Coché, chaque Staff et chaque Responsable reçoit ce nombre, et un nombre
                 différent se règle personne par personne dans l'onglet Personnes.
               </span>
             </label>
@@ -310,7 +323,7 @@ export function CateringCard() {
             </label>
 
             <label className="rule">
-              <span className="rule-label">Artiste et aussi bénévole ou orga</span>
+              <span className="rule-label">Artiste et aussi bénévole ou Staff</span>
               <span className="rule-input">
                 <input
                   type="checkbox"

@@ -31,7 +31,7 @@ export const ARTIST_MARK = '🎤';
 export function PersonMark({ kind }: { kind: MealPersonKind }) {
   if (kind === 'benevole') return null;
   return (
-    <span className="person-mark" aria-hidden="true" title={kind === 'orga' ? 'Orga' : 'Artiste'}>
+    <span className="person-mark" aria-hidden="true" title={kind === 'orga' ? 'Staff' : 'Artiste'}>
       {kind === 'orga' ? ORGA_MARK : ARTIST_MARK}
     </span>
   );

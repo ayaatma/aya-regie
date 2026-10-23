@@ -34,7 +34,7 @@ export function SideActivitiesScreen() {
     const people = sideActivityPeople(plan, activity.key);
     const csv = toCsv(
       ['Nom', 'Prénom', 'Statut', 'Téléphone', 'E-mail'],
-      people.map((p) => [p.lastName, p.firstName, p.kind === 'orga' ? 'Orga' : 'Bénévole', p.phone, p.email]),
+      people.map((p) => [p.lastName, p.firstName, p.kind === 'orga' ? 'Staff' : 'Bénévole', p.phone, p.email]),
     );
     const slug = activity.label.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     downloadText(`${slug || 'activite'}-${today()}.csv`, csv);
@@ -143,7 +143,7 @@ export function SideActivitiesScreen() {
                                   name
                                 )}
                               </td>
-                              <td>{p.kind === 'orga' ? 'Orga' : 'Bénévole'}</td>
+                              <td>{p.kind === 'orga' ? 'Staff' : 'Bénévole'}</td>
                               <td>{p.phone !== '' ? <a href={`tel:${p.phone}`}>{p.phone}</a> : ''}</td>
                               <td>{p.email !== '' ? <a href={`mailto:${p.email}`}>{p.email}</a> : ''}</td>
                             </tr>

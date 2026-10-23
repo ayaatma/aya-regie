@@ -915,7 +915,7 @@ export function PhaseGrid({
 
         {people.length === 0 && (
           <p className="panel-sub" style={{ padding: '8px 16px' }}>
-            Personne n'a déclaré être là sur cette phase. Un orga apparaît dès que sa date
+            Personne n'a déclaré être là sur cette phase. Le Staff apparaît dès que sa date
             d'arrivée est renseignée sur sa fiche, un bénévole dès que la phase lui est ouverte et
             qu'il a répondu oui.
           </p>

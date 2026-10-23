@@ -639,7 +639,7 @@ export function assignOrganiserToPole(plan: Plan, organiserKey: string, poleKey:
     start: null,
     end: null,
   };
-  return { ...plan, leaderRoles: [...plan.leaderRoles, created] };
+  return withLeaderRole(plan, organiserKey, created);
 }
 
 /**
@@ -670,7 +670,19 @@ export function assignOrganiserToPoleAt(
     start,
     end,
   };
-  return { ...plan, leaderRoles: [...plan.leaderRoles, created] };
+  return withLeaderRole(plan, organiserKey, created);
+}
+
+/**
+ * A role added, and its holder a Responsable: since 2026-10-23 only a Responsable holds a pole, so
+ * giving one to a Staff is the régisseur making them Responsable, said in the journal by the caller.
+ */
+function withLeaderRole(plan: Plan, organiserKey: string, created: LeaderRole): Plan {
+  return {
+    ...plan,
+    organisers: plan.organisers.map((o) => (o.key === organiserKey && o.role === 'staff' ? { ...o, role: 'responsable' } : o)),
+    leaderRoles: [...plan.leaderRoles, created],
+  };
 }
 
 /** Takes one pole off somebody, leaving the person and their other poles alone. */

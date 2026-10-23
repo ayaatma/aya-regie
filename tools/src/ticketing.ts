@@ -28,6 +28,7 @@ import {
   type TicketPersonKind,
   type TicketType,
   type TicketingChoice,
+  organiserRoleOf,
 } from './model.js';
 import { type Plan, PlanIndex } from './plan.js';
 import { artistGuests, artistMemberName, memberIsLinked } from './artists.js';
@@ -166,7 +167,11 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
   for (const choice of settings.choices) choices.set(choiceKey(choice.personKind, choice.personKey), choice);
 
   const fallbackTicket = defaultTicketType(settings.ticketTypes);
-  const leaders = new Set(plan.leaderRoles.map((r) => r.organiserKey));
+  // A Responsable is a Staff: the Staff's bracelets too, unless the event says otherwise.
+  const braceletStatuses = (statuses: string[]): string[] =>
+    statuses.includes('responsable') && settings.responsablesGetStaffBracelets !== false && !statuses.includes('orga')
+      ? [...statuses, 'orga']
+      : statuses;
 
   const rows: TicketingRow[] = [];
   const push = (
@@ -185,7 +190,7 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
     const known = new Set(settings.bracelets.map((b) => b.key));
     const braceletKeys = choice?.braceletKeys
       ? choice.braceletKeys.filter((key) => known.has(key))
-      : defaultBracelets(settings.bracelets, statuses.map((s) => s.status)).map((b) => b.key);
+      : defaultBracelets(settings.bracelets, braceletStatuses(statuses.map((s) => s.status))).map((b) => b.key);
     rows.push({
       kind,
       key,
@@ -231,8 +236,8 @@ export function ticketingReport(plan: Plan, index: PlanIndex = new PlanIndex(pla
       .map((a) => ({ status: 'artiste' as const, label: `Artiste: ${a.name}` }));
 
   for (const o of plan.organisers) {
-    const statuses: StatusTag[] = [{ status: 'orga', label: PERSON_STATUS_LABEL.orga }];
-    if (leaders.has(o.key)) statuses.push({ status: 'responsable', label: PERSON_STATUS_LABEL.responsable });
+    const status = organiserRoleOf(o) === 'responsable' ? 'responsable' : 'orga';
+    const statuses: StatusTag[] = [{ status, label: PERSON_STATUS_LABEL[status] }];
     statuses.push(...actTags('orga', o.key));
     push('orga', o.key, o, statuses, fed('orga', o.key), [], applicationStatusOf(o));
   }

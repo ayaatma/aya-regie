@@ -10,6 +10,8 @@
 --   volunteer.form_answers (jsonb object): for each correctable field, the raw cells of the form
 --   behind it at the last import, keyed by field name. Written by the import, never edited.
 --   event.markers (jsonb array): the repères drawn on the timelines, informative only.
+--   organiser.role ('responsable' | 'staff', everybody here a Responsable), event.organiser_meals_fixed,
+--   event.responsables_get_staff_bracelets.
 --   load_plan and write_plan_body replaced whole, from db/schema.sql; get_volunteer_schedule
 --   replaced whole, returning the repères too.
 --
@@ -30,6 +32,16 @@ alter table volunteer add constraint volunteer_form_answers_check check (jsonb_t
 alter table event add column if not exists markers jsonb not null default '[]'::jsonb;
 alter table event drop constraint if exists event_markers_check;
 alter table event add constraint event_markers_check check (jsonb_typeof(markers) = 'array');
+
+-- Staff and Responsable, since 2026-10-23: what was an « orga » is one of the two. Everybody
+-- already here is a Responsable, as the régisseur decided; the Staff are set from the fiche.
+alter table organiser add column if not exists role text not null default 'responsable';
+alter table organiser drop constraint if exists organiser_role_check;
+alter table organiser add constraint organiser_role_check check (role in ('responsable', 'staff'));
+-- The Staff's meals of the exploit: a fixed number rather than a floor under the tiers.
+alter table event add column if not exists organiser_meals_fixed boolean not null default false;
+-- Whether a Responsable also gets the bracelets given to the Staff (on: a Responsable is a Staff).
+alter table event add column if not exists responsables_get_staff_bracelets boolean not null default true;
 
 -- ---------------------------------------------------------------------------
 -- 2. The functions, copied whole from db/schema.sql
@@ -196,6 +208,7 @@ as $fn$
              'healthNote',     l.health_note,
              'sideActivityKeys', to_jsonb(l.side_activity_keys),
              'applicationStatus', l.application_status,
+             'role',           l.role,
              'montagePoleKeys', coalesce((
                                   select jsonb_agg(pp.key order by opp.sort_order, pp.key)
                                   from organiser_phase_pole opp
@@ -430,6 +443,7 @@ as $fn$
         'organiserMeals',    e.organiser_meals,
         'organiserDrinks',   e.organiser_drinks,
         'organiserDrinksFixed', e.organiser_drinks_fixed,
+        'organiserMealsFixed', e.organiser_meals_fixed,
         'artistDrinks',      e.artist_drinks,
         'artistDrinksCumulative', e.artist_drinks_cumulative,
         'services', coalesce((
@@ -468,6 +482,7 @@ as $fn$
     select jsonb_build_object(
       'guestsPerArtist', e.guests_per_artist,
       'reserveOnDoorList', e.reserve_on_door_list,
+      'responsablesGetStaffBracelets', e.responsables_get_staff_bracelets,
       'ticketTypes', coalesce((
         select jsonb_agg(jsonb_build_object(
                  'key',   t.key,
@@ -637,10 +652,12 @@ begin
     organiser_meals       = coalesce((p_plan#>>'{catering,rules,organiserMeals}')::int, 2),
     organiser_drinks      = coalesce((p_plan#>>'{catering,rules,organiserDrinks}')::int, 2),
     organiser_drinks_fixed = coalesce((p_plan#>>'{catering,rules,organiserDrinksFixed}')::boolean, false),
+    organiser_meals_fixed = coalesce((p_plan#>>'{catering,rules,organiserMealsFixed}')::boolean, false),
     artist_drinks         = coalesce((p_plan#>>'{catering,rules,artistDrinks}')::int, 2),
     artist_drinks_cumulative = coalesce((p_plan#>>'{catering,rules,artistDrinksCumulative}')::boolean, false),
     guests_per_artist     = coalesce((p_plan#>>'{ticketing,guestsPerArtist}')::int, 1),
     reserve_on_door_list  = coalesce((p_plan#>>'{ticketing,reserveOnDoorList}')::boolean, false),
+    responsables_get_staff_bracelets = coalesce((p_plan#>>'{ticketing,responsablesGetStaffBracelets}')::boolean, true),
     -- Absent from anything written before PLAN_FORMAT 29: the column keeps what it holds.
     guest_types           = case when jsonb_typeof(p_plan#>'{ticketing,guestTypes}') = 'array'
                                  then p_plan#>'{ticketing,guestTypes}' else guest_types end,
@@ -822,7 +839,7 @@ begin
   insert into organiser (event_id, key, first_name, last_name, email, phone, access_code,
                          diet, allergies, note, montage_from, demontage_until, skills,
                          emergency_contact, health_note, side_activity_keys, application_status,
-                         sort_order)
+                         role, sort_order)
   select p_event_id, x->>'key',
          coalesce(x->>'firstName', ''), coalesce(x->>'lastName', ''),
          coalesce(x->>'email', ''), coalesce(x->>'phone', ''),
@@ -840,6 +857,7 @@ begin
                   '{}'::text[]),
          case when x->>'applicationStatus' in ('candidature', 'valide', 'annule')
               then x->>'applicationStatus' else 'candidature' end,
+         case when x->>'role' = 'staff' then 'staff' else 'responsable' end,
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'organisers', '[]'::jsonb)) with ordinality as t(x, ord);
 

@@ -55,7 +55,7 @@ export function CateringScreen({ onGoToSetup }: { onGoToSetup(): void }) {
               <p>
                 Le catering n'est pas activé sur cet événement. Les règles se trouvent dans
                 Réglages: les services d'une journée, ce à quoi les heures travaillées donnent
-                droit, et ce qui est garanti aux orgas.
+                droit, et ce qui est garanti au Staff.
               </p>
               <div className="card-actions">
                 <button className="btn is-primary" onClick={onGoToSetup}>

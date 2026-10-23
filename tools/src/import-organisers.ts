@@ -331,7 +331,7 @@ export function importOrganisers(
         row: rowNumber,
         person,
         message:
-          "Cette personne est bénévole dans le planning: elle n'est pas ajoutée aux orgas. Pour en faire un orga, utiliser sa fiche dans l'onglet Personnes.",
+          "Cette personne est bénévole dans le planning: elle n'est pas ajoutée au Staff. Pour la passer Staff ou Responsable, utiliser sa fiche dans l'onglet Personnes.",
       });
       return;
     }

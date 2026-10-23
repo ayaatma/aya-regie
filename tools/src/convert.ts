@@ -30,7 +30,18 @@
 
 import { newAccessCode, volunteerIdentity, VOLUNTEER_CODE_LENGTH } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
-import { absentFromPhase, applicationStatusOf, choicePoleLabel, statusOf, type Organiser, type PersonKind, type Volunteer } from './model.js';
+import {
+  ORGANISER_ROLE_LABEL,
+  absentFromPhase,
+  applicationStatusOf,
+  choicePoleLabel,
+  organiserRoleOf,
+  statusOf,
+  type Organiser,
+  type OrganiserRole,
+  type PersonKind,
+  type Volunteer,
+} from './model.js';
 import { PlanIndex, type Assignment, type Plan } from './plan.js';
 import { cateringReport } from './catering.js';
 import type { PhaseAssignment } from './phase.js';
@@ -137,7 +148,7 @@ function feedingChange(before: Plan, kind: PersonKind, key: string, after: Plan,
   const drinks = [was?.drinks ?? 0, will?.drinks ?? 0] as const;
   if (meals[0] === meals[1] && drinks[0] === drinks[1]) return [];
   return [
-    `Selon les règles du catering pour ${newKind === 'orga' ? 'les orgas' : 'les bénévoles'}: repas ${meals[0]} → ${meals[1]}, tickets boisson ${drinks[0]} → ${drinks[1]}.`,
+    `Selon les règles du catering pour ${newKind === 'orga' ? 'le Staff' : 'les bénévoles'}: repas ${meals[0]} → ${meals[1]}, tickets boisson ${drinks[0]} → ${drinks[1]}.`,
   ];
 }
 
@@ -148,15 +159,34 @@ function feedingChange(before: Plan, kind: PersonKind, key: string, after: Plan,
  * An unknown person, or somebody who already exists in the other list under the same identity,
  * comes back `blocked` with the plan untouched.
  */
-export function convertPerson(plan: Plan, kind: PersonKind, key: string): Conversion {
-  return kind === 'benevole' ? volunteerToOrganiser(plan, key) : organiserToVolunteer(plan, key);
+export function convertPerson(plan: Plan, kind: PersonKind, key: string, role: OrganiserRole = 'staff'): Conversion {
+  return kind === 'benevole' ? volunteerToOrganiser(plan, key, role) : organiserToVolunteer(plan, key);
+}
+
+/**
+ * Staff ↔ Responsable, since 2026-10-23. Becoming Staff gives up the poles held (`LeaderRole`),
+ * which only a Responsable holds: listed in `lost` first, so the screen can say it before.
+ */
+export function setOrganiserRole(plan: Plan, key: string, role: OrganiserRole): { plan: Plan; lost: string[] } {
+  const o = plan.organisers.find((x) => x.key === key);
+  if (!o || organiserRoleOf(o) === role) return { plan, lost: [] };
+  const roles = role === 'staff' ? plan.leaderRoles.filter((r) => r.organiserKey === key) : [];
+  const names = [...new Set(roles.map((r) => plan.poles.find((p) => p.key === r.poleKey)?.path ?? r.poleKey))];
+  return {
+    plan: {
+      ...plan,
+      organisers: plan.organisers.map((x) => (x.key === key ? { ...x, role } : x)),
+      leaderRoles: role === 'staff' ? plan.leaderRoles.filter((r) => r.organiserKey !== key) : plan.leaderRoles,
+    },
+    lost: names.length > 0 ? [`Ne tient plus: ${names.join(', ')}.`] : [],
+  };
 }
 
 function refused(plan: Plan, toKind: PersonKind, name: string, why: string): Conversion {
   return { toKind, newKey: '', name, carried: [], lost: [], blocked: why, plan };
 }
 
-function volunteerToOrganiser(plan: Plan, key: string): Conversion {
+function volunteerToOrganiser(plan: Plan, key: string, role: OrganiserRole): Conversion {
   const v = plan.volunteers.find((x) => x.key === key);
   if (!v) return refused(plan, 'orga', '', "Ce bénévole n'est plus dans le plan.");
   const name = fullName(v) || 'Sans nom';
@@ -168,7 +198,7 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
       plan,
       'orga',
       name,
-      `${fullName(twin)} est déjà orga avec ${v.email.trim() !== '' ? 'la même adresse' : 'le même nom'}: il y aurait deux fiches pour une personne. Retirer l'une des deux d'abord.`,
+      `${fullName(twin)} est déjà ${ORGANISER_ROLE_LABEL[organiserRoleOf(twin)]} avec ${v.email.trim() !== '' ? 'la même adresse' : 'le même nom'}: il y aurait deux fiches pour une personne. Retirer l'une des deux d'abord.`,
     );
   }
 
@@ -213,6 +243,7 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
     demontagePoleKeys: [],
     // Validated or not, the person stays where they stood: changing kind decides nothing.
     applicationStatus: statusOf(v),
+    role,
   };
 
   const mine = plan.assignments.filter((a) => a.volunteerKey === key);
@@ -237,9 +268,9 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
 
   const carried = [
     'Nom, adresse e-mail, téléphone, régime et allergies.',
-    ...(answers.length > 0 ? ['Ses réponses au formulaire, recopiées dans les remarques de l\'orga.'] : []),
+    ...(answers.length > 0 ? ['Ses réponses au formulaire, recopiées dans ses remarques.'] : []),
     ...(mine.length > 0
-      ? [`${mine.length} ${plural(mine.length, "créneau de l'exploit, gardé", "créneaux de l'exploit, gardés")} comme ${plural(mine.length, 'place', 'places')} d'orga.`]
+      ? [`${mine.length} ${plural(mine.length, "créneau de l'exploit, gardé", "créneaux de l'exploit, gardés")} comme ${plural(mine.length, 'place', 'places')} de ${ORGANISER_ROLE_LABEL[role]}.`]
       : []),
     ...(montageFrom !== null || demontageUntil !== null
       ? ['Sa présence au montage et au démontage, en arrivée et en départ.']
@@ -271,7 +302,7 @@ function volunteerToOrganiser(plan: Plan, key: string): Conversion {
 
 function organiserToVolunteer(plan: Plan, key: string): Conversion {
   const o = plan.organisers.find((x) => x.key === key);
-  if (!o) return refused(plan, 'benevole', '', "Cet orga n'est plus dans le plan.");
+  if (!o) return refused(plan, 'benevole', '', "Cette personne n'est plus dans le plan.");
   const name = fullName(o) || 'Sans nom';
 
   const identity = volunteerIdentity(o.firstName, o.lastName, o.email);
@@ -334,7 +365,7 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
     manualFields: [],
     needsReview: true,
     reviewReasons: [
-      `Passé·e d'orga à bénévole à la main: le volume (${requestedHours} h), les tranches refusées et les choix de pôles sont à renseigner.`,
+      `Passé·e de ${ORGANISER_ROLE_LABEL[organiserRoleOf(o)]} à bénévole à la main: le volume (${requestedHours} h), les tranches refusées et les choix de pôles sont à renseigner.`,
     ],
     montage,
     demontage,
@@ -360,10 +391,10 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
     ...commonCarried(plan, 'orga', key),
   ];
   const lost = [
-    "Son code d'accès orga ne fonctionnera plus. Un code bénévole est créé: à lui envoyer.",
+    `Son code d'accès de ${ORGANISER_ROLE_LABEL[organiserRoleOf(o)]} ne fonctionnera plus. Un code bénévole est créé: à lui envoyer.`,
     `Les règles des bénévoles s'appliquent désormais. La fiche part « À relire »: volume fixé à ${requestedHours} h, tranches refusées et choix de pôles à renseigner.`,
     ...(roleNames.length > 0 ? [`N'est plus ${plural(roleNames.length, 'responsable du pôle', 'responsable des pôles')}: ${roleNames.join(', ')}.`] : []),
-    ...(o.note.trim() !== '' ? [`Ses remarques d'orga ne sont pas reprises: « ${o.note.trim()} ».`] : []),
+    ...(o.note.trim() !== '' ? [`Ses remarques ne sont pas reprises: « ${o.note.trim()} ».`] : []),
     ...(closedPhases.length > 0
       ? [`${closedPhases.join(' et ')} ${plural(closedPhases.length, "n'est pas ouvert", "ne sont pas ouverts")} aux bénévoles: ses cases y seront signalées.`]
       : []),

@@ -26,6 +26,8 @@
 import { useState } from 'react';
 
 import {
+  ORGANISER_ROLE_LABEL,
+  organiserRoleOf,
   allPlacements,
   eventFills,
   fmtHours,
@@ -268,17 +270,17 @@ function OrgaBody({
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const person = plan.organisers.find((o) => o.key === organiserKey);
-  if (!person) return <p className="pool-empty">Cet orga n'est plus dans le plan.</p>;
+  if (!person) return <p className="pool-empty">Cette personne n'est plus dans le plan.</p>;
 
   const shifts = plan.organiserShifts.filter((s) => s.organiserKey === organiserKey);
   const roles = index.polesLedBy(organiserKey);
 
   return (
     <>
-      <Head what="Orga" name={organiserName(person)} kind="orga" />
+      <Head what={ORGANISER_ROLE_LABEL[organiserRoleOf(person)]} name={organiserName(person)} kind="orga" />
       {!readOnly && <OpenInPeople kind="orga" personKey={organiserKey} />}
       <p className="panel-sub">
-        Un orga n'est soumis à aucune règle d'heures et le solveur ne le place jamais. Tout ce qui
+        Le Staff et les responsables ne sont soumis à aucune règle d'heures et le solveur ne les place jamais. Tout ce qui
         est ici se corrige: ce que le formulaire a dit n'est qu'un point de départ.
       </p>
 
@@ -305,7 +307,7 @@ function OrgaBody({
               {!readOnly && (
                 <button
                   className="btn is-small"
-                  title="Cette personne n'est plus responsable de ce pôle. Elle reste orga."
+                  title="Cette personne ne tient plus ce pôle. Elle reste Responsable."
                   onClick={() =>
                     edit(
                       (p) => removeLeaderRole(p, role.key),
@@ -578,20 +580,20 @@ function CreneauBody({
       {!readOnly && (
         <div className="panel-section">
           <p className="panel-section-title">
-            {fill ? 'Mettre un orga à cette place' : 'Ajouter un orga à ce créneau'}
+            {fill ? "Mettre quelqu'un du Staff à cette place" : "Ajouter quelqu'un du Staff à ce créneau"}
           </p>
           <p className="panel-sub">
-            Un orga placé ici tient une place comme un bénévole et ne compte dans aucune règle
-            d'heures. Un bénévole se glisse depuis la liste des disponibles; un orga se glisse de
-            la même façon, ou se choisit ci-dessous.
+            Une personne du Staff placée ici tient une place comme un bénévole et ne compte dans
+            aucune règle d'heures. Un bénévole se glisse depuis la liste des disponibles; le Staff
+            se glisse de la même façon, ou se choisit ci-dessous.
             {detail.missing === 0 &&
               ' Ce créneau est déjà complet: une personne de plus y sera dessinée en sureffectif.'}
           </p>
           {plan.organisers.length === 0 && (
-            <p className="pool-empty">Aucun orga dans le plan. Ils s'ajoutent dans Réglages.</p>
+            <p className="pool-empty">Personne du Staff dans le plan. On y passe depuis la fiche d'une personne.</p>
           )}
           {plan.organisers.length > 0 && plan.organisers.filter((o) => !here.has(o.key)).length === 0 && (
-            <p className="pool-empty">Tous les orgas sont déjà sur ce créneau.</p>
+            <p className="pool-empty">Tout le Staff est déjà sur ce créneau.</p>
           )}
           {plan.organisers
             .filter((o) => !here.has(o.key))
@@ -665,7 +667,7 @@ function CaseBody({
         kind={box.personKind}
       />
       <p className="panel-sub">
-        {box.personKind === 'orga' ? 'Orga' : 'Bénévole'} · {where} ·{' '}
+        {box.personKind === 'orga' ? 'Staff' : 'Bénévole'} · {where} ·{' '}
         {toLabel(phase.startISO, box.start)} → {toClock(phase.startISO, box.end)} ·{' '}
         {fmtHours(box.end - box.start)}
       </p>

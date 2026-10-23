@@ -618,7 +618,7 @@ export function summariseReconciliation(r: Reconciliation): string {
     );
   }
   if (r.alreadyOrga.length > 0) {
-    parts.push(`${r.alreadyOrga.length} déjà orga${r.alreadyOrga.length > 1 ? 's' : ''}, non ajouté${r.alreadyOrga.length > 1 ? 's' : ''}`);
+    parts.push(`${r.alreadyOrga.length} déjà Staff ou responsable${r.alreadyOrga.length > 1 ? 's' : ''}, non ajouté${r.alreadyOrga.length > 1 ? 's' : ''}`);
   }
   if (parts.length === 0) return 'Rien à changer: le planning correspond déjà à cet export.';
   return parts.join(', ');

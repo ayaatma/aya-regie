@@ -532,7 +532,7 @@ test('a binôme added by hand survives the next export, and one removed by hand 
 // Bénévole ↔ orga, 2026-09-15
 // ---------------------------------------------------------------------------
 
-test('a row naming somebody the plan holds as an orga is listed, never added as a second person', () => {
+test('a row naming somebody the plan holds as Staff or responsable is listed, never added as a second person', () => {
   const plan = planWith(BASE.slice(1));
   const withOrga: Plan = {
     ...plan,
@@ -545,7 +545,7 @@ test('a row naming somebody the plan holds as an orga is listed, never added as 
   const r = reconcileVolunteers(withOrga, imported);
   strictEqual(r.added.length, 0);
   deepStrictEqual(r.alreadyOrga.map((v) => v.firstName), ['Alice']);
-  ok(summariseReconciliation(r).includes('1 déjà orga, non ajouté'));
+  ok(summariseReconciliation(r).includes('1 déjà Staff ou responsable, non ajouté'), summariseReconciliation(r));
   const next = applyReconciliation(withOrga, imported, r);
   ok(!next.volunteers.some((v) => v.firstName === 'Alice'), 'still one fiche for Alice: the orga');
   strictEqual(next.volunteers.length, 2);

@@ -302,7 +302,7 @@ export function PhaseCard({ id }: { id: PhaseId }) {
           <div className="setup-lineup">
             <span className="panel-section-title">Bénévoles</span>
             <p className="panel-sub">
-              Les orgas sont là dès qu'ils l'ont dit. Les bénévoles, eux, ne viennent que sur les
+              Le Staff et les responsables sont là dès qu'ils l'ont dit. Les bénévoles, eux, ne viennent que sur les
               jours ouverts ici, et celui qui a répondu « oui » sans donner d'horaire est placé
               sur toute cette fenêtre.
             </p>

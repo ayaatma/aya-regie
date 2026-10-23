@@ -305,7 +305,7 @@ function PhaseCards() {
             <section key={id} className="board-card">
               <h2>{phase.label || (id === 'montage' ? 'Montage' : 'Démontage')}</h2>
               <p className="board-note">
-                {people.length} personne(s) sur place, dont {orgas} orga(s).{' '}
+                {people.length} personne(s) sur place, dont {orgas} du Staff.{' '}
                 {phase.volunteersAllowed
                   ? 'Les bénévoles y sont admis sur la fenêtre ouverte dans Réglages.'
                   : "Aucun bénévole n'y est admis."}

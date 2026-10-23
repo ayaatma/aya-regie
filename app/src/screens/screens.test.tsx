@@ -395,7 +395,7 @@ test('the catering settings card states the rule in the régisseur own words', (
   const html = render(<><SetupScreen /><SetupScreen part="poles" /><SetupScreen part="phases" /></>, setCateringRules(plan, { enabled: true }));
   assert.ok(shows(html, 'Repas et tickets boisson'));
   assert.ok(shows(html, 'Un ticket boisson toutes les'));
-  assert.ok(shows(html, 'Repas garantis à un·e orga'));
+  assert.ok(shows(html, "Repas de l'exploit garantis au Staff"));
 });
 
 test('the proposals screen renders a real batch, one line per proposal', () => {
@@ -793,7 +793,7 @@ test('the info pane names what it is describing, orga or bénévole', () => {
   const asOrga = infoOf(planWithMontage(), { kind: 'orga', organiserKey: 'o1' });
   assert.ok(shows(asOrga, 'Info sélection'), 'le volet porte un titre');
   assert.ok(asOrga.includes('aria-label="Replier le volet Info sélection"'), 'et se replie');
-  assert.ok(shows(asOrga, 'Orga'), "et dit qu'il s'agit d'un orga");
+  assert.ok(shows(asOrga, 'Responsable'), "et dit qu'il s'agit d'un responsable");
   assert.ok(shows(asOrga, 'Camille Dubois'), 'sous son nom');
 
   const someone = validate(plan).volunteers[0]!;
@@ -1658,7 +1658,7 @@ test('clicking somebody in an événement opens their fiche instead of removing 
   // And removing is a named button, in the pane that describes the box.
   const panel = infoOf(inEvent, { kind: 'case', phaseId: 'montage', assignmentKey: 'a1' });
   assert.ok(shows(panel, 'Camille Dubois'), 'le volet nomme la personne');
-  assert.ok(shows(panel, 'Orga'), "et dit de quel fichier elle vient");
+  assert.ok(shows(panel, 'Staff'), "et dit de quel fichier elle vient");
   assert.ok(shows(panel, 'Déchargement camion'), "et où elle est");
   assert.ok(shows(panel, 'Retirer cette case'), 'le retrait est un bouton qui dit ce qu\'il fait');
 });
@@ -1691,8 +1691,8 @@ test('the grid offers the orgas in the same search box as the bénévoles', () =
     <GridScreen onSolve={noop} solving={false} solveMode={null} />,
     planWithMontage(),
   );
-  assert.ok(shows(html, 'Chercher un bénévole ou un orga'));
-  assert.ok(shows(html, 'Camille Dubois (orga)'), "l'orga est proposé, marqué comme tel");
+  assert.ok(shows(html, "Chercher un bénévole ou quelqu'un du Staff"));
+  assert.ok(shows(html, 'Camille Dubois (Responsable)'), 'le responsable est proposé, marqué comme tel');
 });
 
 test('a phase that is off puts nothing about it on the fiche', () => {
@@ -1795,7 +1795,7 @@ test("the exploit's Disponibles carries the orgas, draggable, beside the bénév
   assert.ok(shows(html, `Disponibles (${benevoles.length + 1})`), "l'orga compte dans la liste");
   assert.ok(shows(html, 'Camille Dubois'));
   // The kind filter used to be phase-only, and a list of two kinds of person needs it.
-  assert.ok(shows(html, 'Orgas'), 'le filtre par type est là sur l’exploit aussi');
+  assert.ok(shows(html, 'Staff'), 'le filtre par type est là sur l’exploit aussi');
   // Every row of this tab is a drag source, the orga's included: that is the whole point of
   // putting them here rather than in a list of their own.
   assert.equal(
@@ -1915,7 +1915,7 @@ test('an orga can be put on a créneau from the pane, full or not', () => {
   const full = validate(withOrga).shifts.find((s) => s.missing === 0)!;
 
   const html = infoOf(withOrga, { kind: 'creneau', shiftKey: full.key, fill: false });
-  assert.ok(shows(html, 'Ajouter un orga à ce créneau'));
+  assert.ok(shows(html, "Ajouter quelqu'un du Staff à ce créneau"));
   assert.ok(shows(html, 'Camille Dubois'), "et l'orga est proposé");
   // A créneau already at its headcount takes one all the same, and says what that costs: the
   // grid draws the overflow in red rather than refusing the edit.
@@ -1925,13 +1925,13 @@ test('an orga can be put on a créneau from the pane, full or not', () => {
   const hole = validate(withOrga).shifts.find((s) => s.missing > 0);
   if (hole) {
     const onHole = infoOf(withOrga, { kind: 'creneau', shiftKey: hole.key, fill: true });
-    assert.ok(shows(onHole, 'Mettre un orga à cette place'));
+    assert.ok(shows(onHole, "Mettre quelqu'un du Staff à cette place"));
   }
 
   // A reader is offered nothing: their session cannot write at all.
   const reader = infoOf(withOrga, { kind: 'creneau', shiftKey: full.key, fill: true }, true);
-  assert.ok(!shows(reader, 'Ajouter un orga à ce créneau'));
-  assert.ok(!shows(reader, 'Mettre un orga à cette place'));
+  assert.ok(!shows(reader, "Ajouter quelqu'un du Staff à ce créneau"));
+  assert.ok(!shows(reader, "Mettre quelqu'un du Staff à cette place"));
 });
 
 test("a responsable's band says the three gestures it takes", () => {
@@ -2410,9 +2410,9 @@ test('clicking a person opens a fiche beside the list, whatever kind of person i
   assert.ok(guest.includes('name="fiche-guest-first-nk-m1-g1"') && guest.includes('value="Noa"'));
 
   // The change of status is offered on the two kinds that have one, and on nobody else.
-  assert.ok(shows(benevole, 'Passer en orga…'));
-  assert.ok(shows(orgaHtml, 'Passer en bénévole…'));
-  assert.ok(!shows(extra, 'Passer en') && !shows(member, 'Passer en'));
+  assert.ok(shows(benevole, 'Passer Staff…') && shows(benevole, 'Passer Responsable…'));
+  assert.ok(shows(orgaHtml, 'Passer bénévole…') && shows(orgaHtml, 'Passer Staff…'));
+  assert.ok(!shows(extra, 'Passer ') && !shows(member, 'Passer '));
 
   const gone = peopleOf(current, { kind: 'benevole', key: 'personne' });
   assert.ok(shows(gone, "Cette personne n'est plus dans le plan."));

@@ -173,7 +173,7 @@ export {
 } from '@engine/reconcile.ts';
 
 /** Bénévole ↔ orga, as one pure function with its consequences listed. See `@engine/convert.ts`. */
-export { convertPerson } from '@engine/convert.ts';
+export { convertPerson, setOrganiserRole } from '@engine/convert.ts';
 export type { Conversion } from '@engine/convert.ts';
 export type {
   FieldChange,
@@ -359,6 +359,8 @@ export type { SetupChoice, SetupProposal } from '@engine/setup-inference.ts';
 export type { SkillTag } from '@engine/model.ts';
 // Teams, 2026-09-15.
 export type { Team } from '@engine/model.ts';
+export { ORGANISER_ROLE_LABEL, organiserRoleOf } from '@engine/model.ts';
+export type { OrganiserRole } from '@engine/model.ts';
 export type { MarkerMoment, TimelineMarker } from '@engine/model.ts';
 // Side activities, 2026-09-15.
 export type { SideActivity } from '@engine/model.ts';

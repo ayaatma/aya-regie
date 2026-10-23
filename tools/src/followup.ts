@@ -28,6 +28,7 @@ import {
   type MailTemplate,
   type StepMail,
   type Volunteer,
+  organiserRoleOf,
 } from './model.js';
 import type { Plan } from './plan.js';
 
@@ -174,10 +175,9 @@ const asPerson = (who: Volunteer | StepPerson): StepPerson =>
 
 /** Everybody a step could go to: bénévoles, orgas (responsables apart), members of an act, guests. */
 export function stepPersons(plan: Plan): StepPerson[] {
-  const leaders = new Set((plan.leaderRoles ?? []).map((r) => r.organiserKey));
   const out: StepPerson[] = (plan.volunteers ?? []).map(volunteerAsStepPerson);
   for (const o of plan.organisers ?? []) {
-    out.push({ kind: 'orga', key: o.key, audience: leaders.has(o.key) ? 'responsable' : 'orga', status: applicationStatusOf(o), requestedHours: 0, statusSteps: [] });
+    out.push({ kind: 'orga', key: o.key, audience: organiserRoleOf(o) === 'responsable' ? 'responsable' : 'orga', status: applicationStatusOf(o), requestedHours: 0, statusSteps: [] });
   }
   for (const a of plan.artists ?? []) {
     for (const m of a.members) {

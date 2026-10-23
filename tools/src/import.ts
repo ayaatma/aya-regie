@@ -1491,7 +1491,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     if (/je suis respo|responsable d une equipe|respo d une equipe/.test(assignedBy)) {
       const team = cell(row, 'leadsTeam');
       reviewReasons.push(
-        `Se déclare responsable${team === '' ? '' : ` de « ${team} »`}: à passer en orga depuis la fiche si c'est le cas.`,
+        `Se déclare responsable${team === '' ? '' : ` de « ${team} »`}: à passer Responsable depuis la fiche si c'est le cas.`,
       );
     } else if (/envoye/.test(assignedBy)) {
       reviewReasons.push("Envoyé·e par un·e responsable sur un poste précis: fixer le pôle imposé sur la fiche.");

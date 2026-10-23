@@ -21,6 +21,9 @@ import {
   statusLabel,
   artistGuests,
   convertPerson,
+  organiserRoleOf,
+  setOrganiserRole,
+  type OrganiserRole,
   type PersonKind,
   type ArtistMember,
   type ExtraPerson,
@@ -220,12 +223,13 @@ function AccessSection({ organiserKey, who, onDeleted }: { organiserKey: string;
 }
 
 /**
- * Bénévole ↔ orga, as a proposal the régisseur reads before it happens.
+ * Bénévole, Staff or Responsable, as a proposal the régisseur reads before it happens. Since
+ * 2026-10-23 the « orga » is a Staff or a Responsable, chosen here.
  *
- * TWO CLICKS, AND THE SECOND ONE IS INFORMED. The first computes the conversion and shows what
+ * TWO CLICKS, AND THE SECOND ONE IS INFORMED. The first computes the change and shows what
  * follows the person and what does not; nothing has changed yet. The second applies it as one edit,
- * so one Ctrl+Z puts everything back. The lists are `convertPerson`'s own, so what is shown is what
- * is applied. See `@engine/convert.ts`.
+ * so one Ctrl+Z puts everything back. The lists are `convertPerson`'s and `setOrganiserRole`'s own,
+ * so what is shown is what is applied. See `@engine/convert.ts`.
  */
 function StatusSection({
   kind,
@@ -239,69 +243,110 @@ function StatusSection({
   onFocus(person: PersonRef): void;
 }) {
   const { plan, edit } = useLoadedPlan();
-  const [open, setOpen] = useState(false);
-  const target = kind === 'benevole' ? 'orga' : 'bénévole';
+  const [target, setTarget] = useState<StatusTarget | null>(null);
+  const organiser = kind === 'orga' ? plan.organisers.find((o) => o.key === personKey) : undefined;
+  const current: StatusTarget = organiser ? organiserRoleOf(organiser) : 'benevole';
+  const others = (['benevole', 'staff', 'responsable'] as const).filter((t) => t !== current);
 
-  if (!open) {
+  if (target === null) {
     return (
       <div className="panel-section panel-divider">
         <p className="panel-section-title">Statut</p>
-        <p className="people-meta">
-          {kind === 'benevole'
-            ? "Bénévole: placé·e sous les règles d'heures, par le solveur ou à la main."
-            : "Orga: aucune règle d'heures, jamais placé·e par le solveur."}
-        </p>
-        <button className="btn" onClick={() => setOpen(true)}>
-          Passer en {target}…
-        </button>
+        <p className="people-meta">{STATUS_TEXT[current]}</p>
+        <span className="setup-confirm">
+          {others.map((t) => (
+            <button key={t} className="btn" onClick={() => setTarget(t)}>
+              Passer {STATUS_WORD[t]}…
+            </button>
+          ))}
+        </span>
       </div>
     );
   }
 
-  const preview = convertPerson(plan, kind, personKey);
+  // Staff ↔ Responsable is the same person on the same fiche; anything else changes the kind.
+  const sameKind = current !== 'benevole' && target !== 'benevole';
+  const roleChange = sameKind ? setOrganiserRole(plan, personKey, target as OrganiserRole) : null;
+  const preview = sameKind ? null : convertPerson(plan, kind, personKey, target === 'benevole' ? 'staff' : target);
+  const label = STATUS_WORD[target];
 
   return (
-    <div className="panel-section panel-divider convert-box" role="group" aria-label={`Passer ${who} en ${target}`}>
-      <p className="panel-section-title">Passer en {target}</p>
-      {preview.blocked !== null ? (
+    <div className="panel-section panel-divider convert-box" role="group" aria-label={`Passer ${who} ${label}`}>
+      <p className="panel-section-title">Passer {label}</p>
+      {preview?.blocked ? (
         <p className="issue">{preview.blocked}</p>
+      ) : roleChange ? (
+        <>
+          <p className="panel-sub">Rien n'est encore modifié. {STATUS_TEXT[target]}</p>
+          {roleChange.lost.length > 0 && (
+            <>
+              <p className="convert-heading is-warn">Change ou se perd</p>
+              <ul className="convert-list is-warn">
+                {roleChange.lost.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
       ) : (
         <>
           <p className="panel-sub">Rien n'est encore modifié. Voici ce que le changement ferait.</p>
           <p className="convert-heading">Suit la personne</p>
           <ul className="convert-list">
-            {preview.carried.map((line) => (
+            {preview!.carried.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           <p className="convert-heading is-warn">Change ou se perd</p>
           <ul className="convert-list is-warn">
-            {preview.lost.map((line) => (
+            {preview!.lost.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
         </>
       )}
       <div className="fiche-actions">
-        {preview.blocked === null && (
+        {!preview?.blocked && (
           <button
             className="btn is-primary"
             onClick={() => {
-              edit((p) => convertPerson(p, kind, personKey).plan, `${who} passé·e en ${target}`);
-              setOpen(false);
-              onFocus({ kind: preview.toKind, key: preview.newKey });
+              if (roleChange) {
+                edit((p) => setOrganiserRole(p, personKey, target as OrganiserRole).plan, `${who} passé·e ${label}`);
+              } else {
+                edit((p) => convertPerson(p, kind, personKey, target === 'benevole' ? 'staff' : target).plan, `${who} passé·e ${label}`);
+                onFocus({ kind: preview!.toKind, key: preview!.newKey });
+              }
+              setTarget(null);
             }}
           >
-            Confirmer le passage en {target}
+            Confirmer le passage {label}
           </button>
         )}
-        <button className="btn" onClick={() => setOpen(false)}>
+        <button className="btn" onClick={() => setTarget(null)}>
           Annuler
         </button>
       </div>
     </div>
   );
 }
+
+type StatusTarget = 'benevole' | OrganiserRole;
+
+/** « Passer … »: the status as the sentence names it. */
+const STATUS_WORD: Record<StatusTarget, string> = {
+  benevole: 'bénévole',
+  staff: 'Staff',
+  responsable: 'Responsable',
+};
+
+const STATUS_TEXT: Record<StatusTarget, string> = {
+  benevole: "Bénévole: placé·e sous les règles d'heures, par le solveur ou à la main.",
+  staff:
+    "Staff: aucune règle d'heures et aucun créneau dû sur l'exploit, mais peut en prendre; présent·e sur le montage et le démontage; tickets boisson et repas du Staff.",
+  responsable:
+    'Responsable: tout ce qu\'a le Staff, plus des pôles tenus avec leurs horaires (Général par défaut) et ses propres bracelets.',
+};
 
 /** The door's four fields, the same ones the row carries, with a way back to the defaults. */
 function DoorSection({ row, report, who }: { row: TicketingRow; report: TicketingReport; who: string }) {

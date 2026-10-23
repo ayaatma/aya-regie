@@ -17,6 +17,8 @@
  */
 
 import {
+  ORGANISER_ROLE_LABEL,
+  organiserRoleOf,
   choicePoleLabel,
   phaseDays,
   phasePeople,
@@ -92,7 +94,7 @@ export function exploitPoolRows(index: PlanIndex, report: ValidationResult): Poo
         zero: mine.length === 0 && roles.length === 0,
         review: false,
         title:
-          `${name}\nOrga: aucune règle d'heures, jamais placé·e par le solveur.\n` +
+          `${name}\n${ORGANISER_ROLE_LABEL[organiserRoleOf(orga)]}: aucune règle d'heures, jamais placé·e par le solveur.\n` +
           `${mine.length} créneau(x) pour ${fmt(hours)}, responsable de ${roles.length} pôle(s)\n` +
           "Glisser sur un créneau pour y tenir une place, ou sur la frise d'un pôle pour en être responsable 2 h",
       };

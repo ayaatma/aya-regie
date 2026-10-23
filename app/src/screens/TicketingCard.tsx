@@ -31,6 +31,7 @@ import {
   setBraceletDefault,
   setGuestsPerArtist,
   setReserveOnDoorList,
+  setResponsablesGetStaffBracelets,
   setTicketType,
   setTravelRate,
   ticketTypeHolders,
@@ -101,6 +102,27 @@ export function TicketingCard() {
             décoché, elle n'est pas dans la liste des entrées exportée. Cochez si elle peut
             tout de même venir, au montage par exemple. L'onglet Personnes la liste à part dans
             les deux cas.
+          </span>
+        </label>
+        <label className="rule">
+          <span className="rule-label">Bracelets des responsables</span>
+          <span className="rule-input">
+            <input
+              type="checkbox"
+              name="responsables-get-staff-bracelets"
+              checked={ticketing.responsablesGetStaffBracelets !== false}
+              onChange={(event) =>
+                edit(
+                  (p) => setResponsablesGetStaffBracelets(p, event.target.checked),
+                  event.target.checked ? 'bracelets du Staff donnés aux responsables' : 'bracelets du Staff retirés aux responsables',
+                )
+              }
+            />
+            <span>Un responsable reçoit aussi les bracelets du Staff</span>
+          </span>
+          <span className="rule-hint">
+            Coché, un responsable a ses propres bracelets et ceux cochés pour le Staff. Décoché,
+            seulement les siens.
           </span>
         </label>
       </div>

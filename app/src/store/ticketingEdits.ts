@@ -71,6 +71,11 @@ export function setReserveOnDoorList(plan: Plan, on: boolean): Plan {
   return withTicketing(plan, { reserveOnDoorList: on });
 }
 
+/** Whether a Responsable is also given the Staff's bracelets by default. Since 2026-10-23. */
+export function setResponsablesGetStaffBracelets(plan: Plan, on: boolean): Plan {
+  return withTicketing(plan, { responsablesGetStaffBracelets: on });
+}
+
 // ---------------------------------------------------------------------------
 // Ticket types
 // ---------------------------------------------------------------------------

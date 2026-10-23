@@ -734,13 +734,13 @@ export function ImportScreen() {
                 <section className="setup-group">
                   <div className="setup-group-head">
                     <span className="setup-group-title">
-                      Déjà orgas dans le planning ({reconciliation.alreadyOrga.length})
+                      Déjà Staff ou responsables dans le planning ({reconciliation.alreadyOrga.length})
                     </span>
                     <span className="people-meta">Non ajoutés comme bénévoles</span>
                   </div>
                   <p className="panel-sub import-note">
-                    Ces lignes nomment une personne qui est orga dans le planning, souvent un·e
-                    bénévole passé·e orga depuis l'onglet Personnes. Une personne n'a qu'une fiche:
+                    Ces lignes nomment une personne qui est Staff ou responsable dans le planning,
+                    souvent un·e bénévole passé·e Staff depuis l'onglet Personnes. Une personne n'a qu'une fiche:
                     pour la refaire bénévole, utiliser sa fiche.
                   </p>
                   {reconciliation.alreadyOrga.map((volunteer) => (

@@ -182,7 +182,7 @@ export function MailsScreen() {
         <section className="card mails-step">
           <header className="mails-step-head">
             <h2>Validation</h2>
-            <span className="people-meta">Bénévoles et orgas, un mail par type de personne (Réglages, Mails de validation)</span>
+            <span className="people-meta">Bénévoles et Staff, un mail par type de personne (Réglages, Mails de validation)</span>
           </header>
           <div className="registration-actions">
             <BulkValidateButton className="btn is-primary" />

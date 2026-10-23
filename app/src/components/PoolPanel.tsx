@@ -202,7 +202,7 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
           title={
             isPhase
               ? "Les heures que ces personnes ont déclarées et que personne ne leur a encore attribuées. Glissez un nom sur un pôle: il prend les heures déclarées pour le jour visé. Déposez ici une case de la grille pour la retirer."
-              : "Tout le monde à qui il reste des heures à donner. Glissez un bénévole dans un créneau, ou déposez ici une case pour la retirer de son créneau. Un orga se glisse dans un créneau pour y tenir une place, ou sur la frise d'un pôle pour en devenir responsable pendant 2 h."
+              : "Tout le monde à qui il reste des heures à donner. Glissez un bénévole dans un créneau, ou déposez ici une case pour la retirer de son créneau. Le Staff se glisse dans un créneau pour y tenir une place, ou sur la frise d'un pôle pour en devenir responsable pendant 2 h."
           }
         >
           Disponibles ({available.length})
@@ -256,14 +256,14 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
               onChange={(event) => setKind(event.target.value as PersonKind | typeof ALL_KINDS)}
             >
               <option value={ALL_KINDS}>Tout le monde</option>
-              <option value="orga">Orgas</option>
+              <option value="orga">Staff</option>
               <option value="benevole">Bénévoles</option>
             </select>
             <select
               className="select"
               value={poleKey}
               aria-label="Filtrer par pôle demandé"
-              title="Pôle demandé: les bénévoles dont c'est le choix 1 ou le choix 2, et les orgas qui en sont responsables"
+              title="Pôle demandé: les bénévoles dont c'est le choix 1 ou le choix 2, et les responsables qui le tiennent"
               onChange={(event) => setPoleKey(event.target.value)}
             >
               <option value={ALL_POLES}>Tous les pôles</option>

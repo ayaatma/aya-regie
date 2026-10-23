@@ -45,6 +45,7 @@ test('a plan from before the billetterie opens with an empty one, and a stored o
   assert.deepEqual(plan.ticketing, {
     guestsPerArtist: 1,
     reserveOnDoorList: false,
+    responsablesGetStaffBracelets: true,
     ticketTypes: [],
     bracelets: [],
     guestTypes: DEFAULT_GUEST_TYPES,

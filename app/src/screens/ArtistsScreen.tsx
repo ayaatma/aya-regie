@@ -858,7 +858,7 @@ function MembersSection({
               <th>Prénom</th>
               <th>Nom</th>
               <th>Rôle</th>
-              <th title="Cette personne est aussi bénévole ou orga sur l'événement">Aussi</th>
+              <th title="Cette personne est aussi bénévole, Staff ou responsable sur l'événement">Aussi</th>
               <th>Régime</th>
               <th>Allergies</th>
               {services.map((service) => (
@@ -942,7 +942,7 @@ function MembersSection({
                       title={
                         linked
                           ? 'Une seule ligne au catering, jamais deux repas. Les tickets boisson suivent le réglage « se cumulent » de Réglages.'
-                          : 'Si cette personne est aussi bénévole ou orga, la nommer ici évite de la compter deux fois.'
+                          : 'Si cette personne est aussi bénévole, Staff ou responsable, la nommer ici évite de la compter deux fois.'
                       }
                       onChange={(event) => {
                         const [kind, key] = event.target.value.split('|');
@@ -960,7 +960,7 @@ function MembersSection({
                       }}
                     >
                       <option value="">personne d'autre</option>
-                      <optgroup label="Orgas">
+                      <optgroup label="Staff et responsables">
                         {plan.organisers.map((o) => (
                           <option key={o.key} value={`orga|${o.key}`}>
                             {organiserName(o) || o.key}

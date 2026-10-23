@@ -139,6 +139,8 @@ const organiser = (value: unknown): Organiser => {
     sideActivityKeys: keys(loose.sideActivityKeys),
     // Absent from anything written before 2026-10-22: nobody had validated an orga yet.
     applicationStatus: applicationStatus(loose.applicationStatus),
+    // Absent from anything written before 2026-10-23: a Responsable, as the régisseur decided.
+    role: loose.role === 'staff' ? 'staff' : 'responsable',
   };
 };
 
@@ -383,6 +385,8 @@ const catering = (value: unknown): CateringSettings => {
       artistDrinksCumulative: rules.artistDrinksCumulative === true,
       // Absent from anything written before 2026-10-22: the floor, as before.
       organiserDrinksFixed: rules.organiserDrinksFixed === true,
+      // Absent from anything written before 2026-10-23: the floor, as before.
+      organiserMealsFixed: rules.organiserMealsFixed === true,
     },
     choices: (Array.isArray(loose.choices) ? loose.choices : [])
       .map(mealChoice)
@@ -920,6 +924,8 @@ const ticketing = (value: unknown): TicketingSettings => {
   return {
     guestsPerArtist: count(loose.guestsPerArtist, DEFAULT_TICKETING.guestsPerArtist),
     reserveOnDoorList: loose.reserveOnDoorList === true,
+    // Absent from anything written before 2026-10-23: on, a Responsable being a Staff.
+    responsablesGetStaffBracelets: loose.responsablesGetStaffBracelets !== false,
     ticketTypes: array<unknown>(loose.ticketTypes)
       .map((v) => {
         const t = (v ?? {}) as Record<string, unknown>;

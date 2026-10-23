@@ -263,6 +263,12 @@ export interface CateringRules {
    */
   organiserDrinksFixed: boolean;
   /**
+   * Since 2026-10-23, off by default: the Staff (Responsables included) are given exactly
+   * `organiserMeals` services of the exploit, whatever the hours, rather than that as a floor.
+   * Absent reads as off.
+   */
+  organiserMealsFixed?: boolean;
+  /**
    * What a member of an act is handed, whatever the hours: an act works no créneau and earns
    * nothing by the hour. A member's own `drinkTickets` overrides this for that one person.
    */
@@ -589,7 +595,26 @@ export interface Organiser {
    * means « inscription ». Informs and marks, never blocks: an orga is subject to no rule.
    */
   applicationStatus?: ApplicationStatus;
+  /**
+   * Staff or Responsable, since 2026-10-23: what the screens called an « orga » is one of the
+   * two, and the word « orga » left the tool. Absent means Responsable, which is what everybody
+   * imported before became. Both are on site without a créneau being owed, both are handed the
+   * Staff's fixed tickets; a Responsable may hold poles (`LeaderRole`) and has bracelets of its
+   * own. See `organiserRoleOf`.
+   */
+  role?: OrganiserRole;
 }
+
+/** Staff or Responsable. See `Organiser.role`. */
+export type OrganiserRole = 'responsable' | 'staff';
+
+export const ORGANISER_ROLE_LABEL: Record<OrganiserRole, string> = {
+  responsable: 'Responsable',
+  staff: 'Staff',
+};
+
+/** An organiser's role, absent read as Responsable. */
+export const organiserRoleOf = (o: Pick<Organiser, 'role'>): OrganiserRole => o.role ?? 'responsable';
 
 /**
  * An orga standing in a créneau of the exploit.
@@ -1491,7 +1516,8 @@ export type PersonStatus =
 
 export const PERSON_STATUS_LABEL: Record<PersonStatus, string> = {
   benevole: 'Bénévole',
-  orga: 'Orga',
+  // The key stays « orga » in stored bracelets and mails; what it names is the Staff (2026-10-23).
+  orga: 'Staff',
   responsable: 'Responsable',
   artiste: 'Artiste',
   'invite-artiste': "Invité d'artiste",
@@ -1643,6 +1669,11 @@ export interface TicketingSettings {
    * tab lists them apart either way.
    */
   reserveOnDoorList: boolean;
+  /**
+   * Whether a Responsable is also given, by default, the bracelets given to the Staff, since
+   * 2026-10-23 (« un responsable est un Staff »). Absent reads as on.
+   */
+  responsablesGetStaffBracelets?: boolean;
   ticketTypes: readonly TicketType[];
   bracelets: readonly BraceletType[];
   /** Since 2026-10-22. See `GuestType`. */

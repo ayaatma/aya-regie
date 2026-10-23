@@ -1048,7 +1048,7 @@ export function validate(plan: Plan): ValidationResult {
      */
     const wanted = index.headcountOf(shift);
     const orgas = index.orgasOn(shift.key);
-    const withOrgas = orgas.length === 0 ? '' : ` (${orgas.length} orga(s) sur place)`;
+    const withOrgas = orgas.length === 0 ? '' : ` (${orgas.length} du Staff sur place)`;
 
     if (assignees.length > wanted) {
       add(1, TIER1.sureffectif,

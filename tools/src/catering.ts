@@ -507,7 +507,9 @@ function exploitMealsFor(
   presence: readonly Window[],
 ): number {
   const earned = mealsForHours(windowHours(presence), rules.exploitTiers);
-  return kind === 'orga' ? Math.max(earned, Math.max(0, Math.round(rules.organiserMeals))) : earned;
+  if (kind !== 'orga') return earned;
+  const staffMeals = Math.max(0, Math.round(rules.organiserMeals));
+  return rules.organiserMealsFixed ? staffMeals : Math.max(earned, staffMeals);
 }
 
 // ---------------------------------------------------------------------------
@@ -759,7 +761,7 @@ export function cateringCsv(plan: Plan, index: PlanIndex = new PlanIndex(plan)):
     .map((person) => [
       person.name,
       person.kind === 'orga'
-        ? 'Orga'
+        ? 'Staff'
         : person.kind === 'artiste'
           ? `Artiste (${person.group})`
           : 'Bénévole',
