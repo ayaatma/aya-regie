@@ -70,6 +70,7 @@ import {
 import { useLoadedPlan } from '../store/store.tsx';
 import { organiserName } from '../components/labels.ts';
 import { InfoPanel } from '../components/InfoPanel.tsx';
+import { DragReadout } from '../components/DragReadout.tsx';
 import { PendingMark, PersonMark, pendingPeople } from '../components/PersonMark.tsx';
 import { PoolPanel, type PanelTab } from '../components/PoolPanel.tsx';
 import { DRAG_MIME } from '../components/drag.ts';
@@ -1027,15 +1028,30 @@ export function PhaseGrid({
                      * reported either way, which is what it is for.
                      */
                     const over = event.headcount > 0 && taken > event.headcount;
-                    return piecesOf(axis, event).map((piece, i) => (
+                    const pieces = piecesOf(axis, event);
+                    const top = LANE_PAD / 2 + (eventLineByKey.get(stored.key) ?? 0) * (eventBlockH + EVENT_LINE_GAP);
+                    // While an edge is pulled, its hours, on the first piece drawn.
+                    const readout = eventRetime?.eventKey === stored.key && pieces[0] && (
+                      <DragReadout
+                        key={`${event.key}-readout`}
+                        startISO={phase.startISO}
+                        start={event.start}
+                        end={event.end}
+                        left={pieces[0].x + 4}
+                        top={top + 2}
+                      />
+                    );
+                    return [readout, ...pieces.map((piece, i) => (
                       <div
                         key={`${event.key}-${piece.x}`}
-                        className={`phase-event-block${missing > 0 || over ? ' is-short' : ''}${editing ? ' is-editing' : ''}`}
+                        className={`phase-event-block${missing > 0 || over ? ' is-short' : ''}${editing ? ' is-editing' : ''}${
+                          selection?.kind === 'evenement' && selection.eventKey === event.key ? ' is-picked' : ''
+                        }`}
                         style={{
                           left: piece.x,
                           width: Math.max(56, piece.width - 2),
                           height: eventBlockH,
-                          top: LANE_PAD / 2 + (eventLineByKey.get(stored.key) ?? 0) * (eventBlockH + EVENT_LINE_GAP),
+                          top,
                         }}
                         onDragOver={(e) => {
                           if (drag && !readOnly && !editing) e.preventDefault();
@@ -1236,7 +1252,7 @@ export function PhaseGrid({
                           </>
                         )}
                       </div>
-                    ));
+                    ))];
                   })}
                 </div>
               </div>
@@ -1729,6 +1745,15 @@ function Bars({
           )}
         </div>
       ))}
+      {resize && pieces[0] && (
+        <DragReadout
+          startISO={phase.startISO}
+          start={shown.start}
+          end={shown.end}
+          left={pieces[0].x + 4}
+          top={row * (ROW_H + ROW_GAP) + LANE_PAD / 2 + 1}
+        />
+      )}
     </>
   );
 }

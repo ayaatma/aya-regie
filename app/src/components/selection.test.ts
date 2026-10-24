@@ -64,3 +64,9 @@ test('the exploit still reads only a bénévole out of a selection', () => {
   assert.equal(selectedVolunteerKey({ kind: 'orga', organiserKey: 'o1' }), null);
   assert.equal(sameSelection({ kind: 'orga', organiserKey: 'o1' }, { kind: 'orga', organiserKey: 'o1' }), true);
 });
+
+test("a responsable's window is selected by its role, not by its person", () => {
+  assert.equal(sameSelection({ kind: 'role', roleKey: 'bar--o1' }, { kind: 'role', roleKey: 'bar--o1' }), true);
+  assert.equal(sameSelection({ kind: 'role', roleKey: 'bar--o1' }, { kind: 'role', roleKey: 'bar--o1-2' }), false);
+  assert.equal(sameSelection({ kind: 'role', roleKey: 'bar--o1' }, { kind: 'orga', organiserKey: 'o1' }), false);
+});

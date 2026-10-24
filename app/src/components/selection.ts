@@ -31,7 +31,13 @@ export type Selection =
   /** One box of a phase grid: this person, in this pole, for these hours. */
   | { kind: 'case'; phaseId: PhaseId; assignmentKey: string }
   /** An événement of a phase. `fill` as above. */
-  | { kind: 'evenement'; phaseId: PhaseId; eventKey: string; fill: boolean };
+  | { kind: 'evenement'; phaseId: PhaseId; eventKey: string; fill: boolean }
+  /**
+   * One responsable's window on one pole, from the band on the pole's frise. Since 2026-10-24: a
+   * click on the band used to open the person's fiche, and the régisseur asked to select the
+   * window itself, as a créneau is. The fiche is one button away in the panel.
+   */
+  | { kind: 'role'; roleKey: string };
 
 /** The person a selection is about, when it is about one. Drives the grid's own highlighting. */
 export function selectedVolunteerKey(selection: Selection | null): string | null {
@@ -75,5 +81,7 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
       return a.phaseId === (b as typeof a).phaseId && a.assignmentKey === (b as typeof a).assignmentKey;
     case 'evenement':
       return a.phaseId === (b as typeof a).phaseId && a.eventKey === (b as typeof a).eventKey;
+    case 'role':
+      return a.roleKey === (b as typeof a).roleKey;
   }
 }

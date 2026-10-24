@@ -53,6 +53,7 @@ import { ShiftBlock, type VolumeBand } from '../components/ShiftBlock.tsx';
 import { LaneRuler, OrganiserBand, TimeRuler } from '../components/TimeRuler.tsx';
 import { PoolPanel, type PanelTab } from '../components/PoolPanel.tsx';
 import { InfoPanel } from '../components/InfoPanel.tsx';
+import { DragReadout } from '../components/DragReadout.tsx';
 import { selectedVolunteerKey, type Selection } from '../components/selection.ts';
 import { organiserName } from '../components/labels.ts';
 import { DRAG_MIME, DRAG_MIME_ORGA, type DragPayload } from '../components/drag.ts';
@@ -1409,7 +1410,8 @@ export function GridScreen({
                         readOnly={readOnly}
                         snap={RESPONSABLE_SNAP}
                         onResize={onResizeRole}
-                        onSelect={(organiserKey) => setSelection({ kind: 'orga', organiserKey })}
+                        onSelect={(roleKey) => setSelection({ kind: 'role', roleKey })}
+                        pickedRoleKey={selection?.kind === 'role' ? selection.roleKey : null}
                       />
                     </div>
                   </div>
@@ -1513,7 +1515,8 @@ export function GridScreen({
                                 dropBoxKey && dropBoxKey.endsWith(`|${shift.key}`)
                                   ? dropBoxKey.slice(0, dropBoxKey.length - shift.key.length - 1)
                                   : null;
-                              return (
+                              // The créneau, and while one of its edges is pulled, its hours.
+                              return [
                                 <ShiftBlock
                                   key={shift.key}
                                   shift={shift}
@@ -1562,8 +1565,18 @@ export function GridScreen({
                                   onRemovePlace={removePlace}
                                   onAddStaffPlace={addStaffPlace}
                                   onRemoveStaffPlace={removeStaffPlace}
-                                />
-                              );
+                                />,
+                                retime?.shiftKey === stored.key && (
+                                  <DragReadout
+                                    key={`${shift.key}-readout`}
+                                    startISO={plan.startISO}
+                                    start={shift.start}
+                                    end={shift.end}
+                                    left={shift.start * pxPerHour + 4}
+                                    top={5}
+                                  />
+                                ),
+                              ];
                               });
                             })()}
                           </div>

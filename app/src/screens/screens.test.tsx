@@ -1950,7 +1950,7 @@ test("a responsable's band says the three gestures it takes", () => {
   const html = render(<GridScreen onSolve={noop} solving={false} solveMode={null} />, planWithOrga());
   assert.ok(shows(html, 'Glisser le bandeau le déplace'));
   assert.ok(shows(html, 'glisser un bord change cette heure-là'));
-  assert.ok(shows(html, 'cliquer ouvre la fiche'));
+  assert.ok(shows(html, 'cliquer le sélectionne'));
 });
 
 test('both grids carry one zoom slider and no − / + buttons', () => {

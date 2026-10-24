@@ -141,8 +141,8 @@ export function InfoPanel({
       <div className="panel-body">
         {selection === null ? (
           <p className="pool-empty">
-            Cliquez une case de la grille, un créneau, un événement, ou un nom dans la liste à
-            gauche. Ce qui est sélectionné est décrit ici.
+            Cliquez une case de la grille, un créneau, un événement, un horaire de responsable,
+            ou un nom dans la liste à gauche. Ce qui est sélectionné est décrit ici.
           </p>
         ) : (
           <Body selection={selection} onSelect={onSelect} readOnly={readOnly} />
@@ -184,6 +184,8 @@ function Body({
           readOnly={readOnly}
         />
       );
+    case 'role':
+      return <RoleBody roleKey={selection.roleKey} onSelect={onSelect} readOnly={readOnly} />;
     case 'evenement':
       return (
         <EvenementBody
@@ -392,6 +394,73 @@ function OrgaBody({
       </div>
 
       <PhaseBoxes personKind="orga" personKey={organiserKey} onSelect={onSelect} />
+    </>
+  );
+}
+
+/**
+ * One responsable's window on one pole, picked on the pole's frise (2026-10-24).
+ *
+ * What the band says, said in full: who, which pole, from when to when and for how long, with the
+ * way to the person's fiche and the way out of the role. The hours are changed on the band itself.
+ */
+function RoleBody({
+  roleKey,
+  onSelect,
+  readOnly,
+}: {
+  roleKey: string;
+  onSelect(selection: Selection | null): void;
+  readOnly: boolean;
+}) {
+  const { plan, index, edit } = useLoadedPlan();
+  const role = plan.leaderRoles.find((r) => r.key === roleKey);
+  const person = role ? plan.organisers.find((o) => o.key === role.organiserKey) : undefined;
+  if (!role || !person) return <p className="pool-empty">Cet horaire de responsable n'est plus dans le plan.</p>;
+
+  const pole = index.poleByKey.get(role.poleKey)?.path ?? role.poleKey;
+  const timed = role.start !== null && role.end !== null;
+
+  return (
+    <>
+      <Head what="Horaire de responsable" name={organiserName(person)} kind="orga" />
+      <dl className="kv is-near">
+        <dt>Pôle</dt>
+        <dd>{pole}</dd>
+        <dt>Horaires</dt>
+        <dd>{timed ? `${index.label(role.start!)} → ${index.label(role.end!)}` : 'non réglés'}</dd>
+        {timed && (
+          <>
+            <dt>Durée</dt>
+            <dd>{fmtHours(role.end! - role.start!)}</dd>
+          </>
+        )}
+      </dl>
+      <p className="panel-sub">
+        {readOnly
+          ? 'Les horaires se lisent sur la frise du pôle.'
+          : "Les horaires se changent sur la frise du pôle: glisser le bandeau le déplace, tirer un bord change cette heure-là."}
+      </p>
+      <p>
+        <button
+          className="btn is-small"
+          onClick={() => onSelect({ kind: 'orga', organiserKey: person.key })}
+        >
+          Voir la fiche
+        </button>{' '}
+        {!readOnly && (
+          <button
+            className="btn is-small"
+            title="Cette personne ne tient plus ce pôle sur cet horaire. Elle reste Responsable."
+            onClick={() => {
+              edit((p) => removeLeaderRole(p, role.key), `${organiserName(person)} n'est plus responsable de ${pole}`);
+              onSelect({ kind: 'orga', organiserKey: person.key });
+            }}
+          >
+            Retirer cet horaire
+          </button>
+        )}
+      </p>
     </>
   );
 }

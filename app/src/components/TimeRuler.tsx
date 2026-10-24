@@ -35,6 +35,7 @@ import {
   type LeaderOnPole,
   type TimelineMarker,
 } from '../engine.ts';
+import { DragReadout } from './DragReadout.tsx';
 import { organiserName } from './labels.ts';
 import { packRows } from './phaseAxis.ts';
 
@@ -312,6 +313,7 @@ export const OrganiserBand = memo(function OrganiserBand({
   snap = 0.25,
   onResize,
   onSelect,
+  pickedRoleKey = null,
 }: {
   startISO: string;
   organisers: readonly LeaderOnPole[];
@@ -322,8 +324,13 @@ export const OrganiserBand = memo(function OrganiserBand({
   snap?: number;
   /** An edge let go. Absent means the band is drawn without grips. */
   onResize?(roleKey: string, start: number, end: number): void;
-  /** A click on the band: it selects the person, it never changes anything. */
-  onSelect?(organiserKey: string): void;
+  /**
+   * A click on the band: it selects that window (the role), never the person and never a change.
+   * The person's fiche is one button away in the panel. Since 2026-10-24.
+   */
+  onSelect?(roleKey: string): void;
+  /** The window that is selected, filled so it can be told from the others at a glance. */
+  pickedRoleKey?: string | null;
 }) {
   const placed = organisers.filter(
     ({ role }) => role.start !== null && role.end !== null && role.end > role.start,
@@ -369,6 +376,7 @@ export const OrganiserBand = memo(function OrganiserBand({
           snap={snap}
           onResize={onResize}
           onSelect={onSelect}
+          picked={entry.role.key === pickedRoleKey}
         />
       ))}
     </div>
@@ -404,6 +412,7 @@ function BandItem({
   snap,
   onResize,
   onSelect,
+  picked,
 }: {
   startISO: string;
   organiser: LeaderOnPole['organiser'];
@@ -415,7 +424,8 @@ function BandItem({
   readOnly: boolean;
   snap: number;
   onResize?(roleKey: string, start: number, end: number): void;
-  onSelect?(organiserKey: string): void;
+  onSelect?(roleKey: string): void;
+  picked: boolean;
 }) {
   /** What the band would become if the pointer were let go now. Null when nothing is in flight. */
   const [shown, setShown] = useState<{ start: number; end: number } | null>(null);
@@ -472,9 +482,9 @@ function BandItem({
       globalThis.removeEventListener('pointerup', up);
       globalThis.removeEventListener('pointercancel', up);
       setShown(null);
-      // A press that went nowhere is a click, and a click opens the fiche.
+      // A press that went nowhere is a click, and a click selects the window.
       if (travelled < 3) {
-        onSelect?.(organiser.key);
+        onSelect?.(role.key);
         return;
       }
       if (last && (last.start !== role.start || last.end !== role.end)) {
@@ -488,9 +498,10 @@ function BandItem({
   };
 
   return (
+    <>
     <div
       ref={element}
-      className={'organiser-band-item' + (shown ? ' is-moving' : '')}
+      className={'organiser-band-item' + (shown ? ' is-moving' : '') + (picked ? ' is-picked' : '')}
       style={{
         left: window_.start * pxPerHour,
         width: Math.max(10, (window_.end - window_.start) * pxPerHour - 2),
@@ -504,11 +515,11 @@ function BandItem({
         (organiser.email ? `\n${organiser.email}` : '') +
         (readOnly
           ? ''
-          : "\nGlisser le bandeau le déplace, glisser un bord change cette heure-là, cliquer ouvre la fiche")
+          : "\nGlisser le bandeau le déplace, glisser un bord change cette heure-là, cliquer le sélectionne")
       }
       onPointerDown={readOnly || !onResize ? undefined : begin('move')}
       // With no way to drag, a click still has to select: that is the reader's only gesture.
-      onClick={readOnly || !onResize ? () => onSelect?.(organiser.key) : undefined}
+      onClick={readOnly || !onResize ? () => onSelect?.(role.key) : undefined}
     >
       {name}
       {!readOnly && onResize && (
@@ -526,5 +537,15 @@ function BandItem({
         </>
       )}
     </div>
+    {shown && (
+      <DragReadout
+        startISO={startISO}
+        start={shown.start}
+        end={shown.end}
+        left={shown.start * pxPerHour + 4}
+        top={row * BAND_ROW_H + 1}
+      />
+    )}
+    </>
   );
 }

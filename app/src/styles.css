@@ -6270,3 +6270,49 @@ textarea.select,
 .box.is-add.is-staff-hole:not(.is-remove):hover {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
+
+/*
+ * Ce qui est sélectionné sur une grille, depuis le 2026-10-24: un créneau, un événement, un
+ * horaire de responsable. Le créneau avait sa classe `is-picked` sans aucune règle, si bien que
+ * le cliquer ne se voyait pas, surtout vide. Un cadre bleu épais, posé à l'extérieur (`outline`
+ * n'est pas rogné par l'`overflow: hidden` du bloc), et le fond bleu pâle: le même bleu que la
+ * case choisie, qui veut dire « c'est ce que décrit le volet Info sélection ».
+ */
+.shift.is-picked,
+.phase-event-block.is-picked,
+.organiser-band-item.is-picked {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: var(--shadow);
+  z-index: 3;
+}
+
+.shift.is-picked {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+
+.organiser-band-item.is-picked {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/*
+ * Les heures d'un étirement en cours, tant que la souris n'est pas lâchée. Posées sur le coin
+ * haut du bloc, à côté de lui et non dedans: le bloc rogne ce qui dépasse, et l'étiquette est
+ * souvent plus large qu'un créneau court. Elle ne prend jamais le pointeur.
+ */
+.drag-readout {
+  position: absolute;
+  z-index: 20;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+}
