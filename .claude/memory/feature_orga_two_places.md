@@ -19,6 +19,4 @@ see `LeaderRole` comment). `organiserBlockersFor(orga, shift, fromShiftKey)` is 
 **UI.** Same as bénévoles: no edit is refused (edits.ts rule), the drag greys the créneaux and
 `DragReason` says « Placement interdit. » with the reason; afterwards the orga box is
 `.is-illegal`, the band `.organiser-band-item.is-illegal`, and InfoPanel (orga fiche, role,
-créneau) shows a « chevauchement » signalement. Not covered: no pre-drop warning when dropping
-on a pole's frise or pulling a band (it goes red after). Not counted in `validate()` /
-Suivi tier counts. Fixture `balanced+phases` has one conflict; `npm run shots -- conflit`.
+créneau) shows a « chevauchement » signalement. Same day, round 2: `validate()` adds tier 1 `orga-chevauchement` (créneaux named, no volunteer) so the Suivi « affectations illégales » and the Grille badge count them; the créneau panel shows it through `detail.issues`. `roleBlockersFor` warns BEFORE letting go: the bottom « Placement interdit » banner over a pole frise, and a red `DragReadout` (`warning`) while a band is pulled (`OrganiserBand.checkWindow`). Fixture `balanced+phases` has one conflict; `npm run shots -- conflit`.

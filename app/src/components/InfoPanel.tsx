@@ -580,9 +580,6 @@ function CreneauBody({
    * `Pole.leaderSupportOnly`.
    */
   const inSupport = index.supportOnlyBreaches().filter((b) => b.shift.key === shiftKey);
-  const clashes = index
-    .organiserConflicts()
-    .filter((c) => c.shift.key === shiftKey || (c.other.kind === 'shift' && c.other.shift.key === shiftKey));
 
   return (
     <>
@@ -593,8 +590,6 @@ function CreneauBody({
         {detail.staffHeadcount > 0 &&
           ` · Staff ${detail.staffHeadcount - detail.staffMissing} sur ${detail.staffHeadcount}`}
       </p>
-
-      <ConflictList conflicts={clashes} />
 
       {inSupport.length > 0 && (
         <div className="panel-section">

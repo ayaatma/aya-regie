@@ -315,6 +315,7 @@ export const OrganiserBand = memo(function OrganiserBand({
   onSelect,
   pickedRoleKey = null,
   clashes,
+  checkWindow,
 }: {
   startISO: string;
   organisers: readonly LeaderOnPole[];
@@ -323,6 +324,11 @@ export const OrganiserBand = memo(function OrganiserBand({
    * naming it. Red. From `PlanIndex.organiserConflictNotes`, keyed on the role.
    */
   clashes?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * What a window being pulled would collide with, asked at every quarter of an hour so the band
+   * goes red and says why BEFORE the pointer is let go. See `PlanIndex.roleBlockersFor`.
+   */
+  checkWindow?(roleKey: string, start: number, end: number): readonly string[];
   hours: number;
   pxPerHour: number;
   readOnly?: boolean;
@@ -384,6 +390,7 @@ export const OrganiserBand = memo(function OrganiserBand({
           onSelect={onSelect}
           picked={entry.role.key === pickedRoleKey}
           clash={clashes?.get(entry.role.key)}
+          checkWindow={checkWindow}
         />
       ))}
     </div>
@@ -421,6 +428,7 @@ function BandItem({
   onSelect,
   picked,
   clash,
+  checkWindow,
 }: {
   startISO: string;
   organiser: LeaderOnPole['organiser'];
@@ -435,6 +443,7 @@ function BandItem({
   onSelect?(roleKey: string): void;
   picked: boolean;
   clash?: readonly string[];
+  checkWindow?(roleKey: string, start: number, end: number): readonly string[];
 }) {
   /** What the band would become if the pointer were let go now. Null when nothing is in flight. */
   const [shown, setShown] = useState<{ start: number; end: number } | null>(null);
@@ -443,6 +452,9 @@ function BandItem({
   const window_ = shown ?? { start: role.start!, end: role.end! };
   const name = organiserName(organiser);
   const length = role.end! - role.start!;
+  // While pulled, the window in flight is what is judged; at rest, the one stored.
+  const flagged = shown ? (checkWindow?.(role.key, shown.start, shown.end) ?? clash) : clash;
+  const warning = flagged && flagged.length > 0 ? flagged.join(' ') : undefined;
 
   /**
    * One gesture, whichever part of the band was pressed.
@@ -512,7 +524,7 @@ function BandItem({
       ref={element}
       className={
         'organiser-band-item' + (shown ? ' is-moving' : '') + (picked ? ' is-picked' : '') +
-        (clash ? ' is-illegal' : '')
+        (warning ? ' is-illegal' : '')
       }
       style={{
         left: window_.start * pxPerHour,
@@ -557,6 +569,7 @@ function BandItem({
         end={shown.end}
         left={shown.start * pxPerHour + 4}
         top={row * BAND_ROW_H + 1}
+        warning={warning}
       />
     )}
     </>

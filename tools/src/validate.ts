@@ -98,6 +98,12 @@ export const TIER1 = {
   candidatureAnnulee: 'candidature-annulee',
   /** A pole needing a competence the person lacks. Tier 1 only while `missingSkill` blocks. */
   competenceManquante: 'competence-manquante',
+  /**
+   * A Staff or a Responsable in two places at once (2026-10-24): two créneaux, or a créneau on
+   * another pole during a responsable window. Always tier 1, never a Réglages criterion: the one
+   * rule an orga is subject to. Names the créneaux and no volunteer. See `organiserConflicts`.
+   */
+  orgaChevauchement: 'orga-chevauchement',
   /** Placed outside the pole a responsable sent them to. Tier 1 only while `imposedPole` blocks. */
   horsPoleImpose: 'hors-pole-impose',
 } as const;
@@ -885,6 +891,14 @@ export function validate(plan: Plan): ValidationResult {
     add(1, TIER1.doublon,
       `${index.volunteerName(a.volunteerKey)} apparaît deux fois sur le même créneau.`,
       { volunteers: [a.volunteerKey], shifts: [a.shiftKey] });
+  }
+
+  // --- Orgas in two places at once. Counted with the rest so the Suivi and the tab badge see
+  // them; drawn on the grid from `organiserConflictNotes`, since no volunteer box is at fault.
+  for (const conflict of index.organiserConflicts()) {
+    add(1, TIER1.orgaChevauchement, index.describeConflict(conflict), {
+      shifts: [conflict.shift.key, ...(conflict.other.kind === 'shift' ? [conflict.other.shift.key] : [])],
+    });
   }
 
   // --- Reference data. A shift longer than the consecutive cap can never be staffed legally. -

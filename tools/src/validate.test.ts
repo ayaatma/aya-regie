@@ -941,6 +941,15 @@ test('a responsable window on one pole and a créneau on another at the same hou
   const { byBox, byRole } = index.organiserConflictNotes();
   deepStrictEqual([...byBox.keys()].sort(), ['o1|s1', 'o1|s2']);
   deepStrictEqual([...byRole.keys()], ['r1']);
+
+  // Asked before letting go on the frise or while pulling a band: s1 (secu) collides, s2 (bar) not.
+  strictEqual(index.roleBlockersFor('o1', 'bar', 1, 3).length, 1);
+  strictEqual(index.roleBlockersFor('o1', 'bar', 4.5, 5.5).length, 0);
+
+  // Counted by validate, so the Suivi and the tab badge see it: s1/s2 overlap, s1 vs role r1.
+  const result = validate({ ...base, organisers: [orga('o1')], leaderRoles: index.plan.leaderRoles });
+  strictEqual(result.issues.filter((i) => i.code === TIER1.orgaChevauchement).length, 2);
+  ok(result.summary.tier1Count >= 2);
 });
 
 /*

@@ -6323,3 +6323,15 @@ textarea.select,
   box-shadow: var(--shadow);
   font-variant-numeric: tabular-nums;
 }
+
+/* Lâcher ici mettrait quelqu'un à deux endroits: l'étiquette passe au rouge et dit pourquoi. */
+.drag-readout.is-error {
+  background: var(--rouge-bg);
+  color: var(--rouge);
+  outline: 1px solid var(--rouge);
+}
+
+.drag-readout-warning {
+  display: block;
+  font-weight: 500;
+}

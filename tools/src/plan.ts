@@ -693,6 +693,17 @@ export class PlanIndex {
   }
 
   /**
+   * What making this orga responsable of this pole from `start` to `end` would collide with: the
+   * créneaux they hold elsewhere at those hours. The question of a drop on a pole's frise and of
+   * a band being pulled, asked before letting go. Empty means free.
+   */
+  roleBlockersFor(organiserKey: string, poleKey: string, start: number, end: number): string[] {
+    return this.shiftsOfOrganiser(organiserKey)
+      .filter((shift) => !this.isUnder(shift.poleKey, poleKey) && overlaps(shift, { start, end }))
+      .map((shift) => this.describeClash({ kind: 'shift', shift }));
+  }
+
+  /**
    * `organiserConflicts` filed by where it is drawn: on an orga's box (`orgaKey|shiftKey`) and
    * on a responsable's band (the role's key), each place carrying the sentences that name the
    * OTHER place. Both ends of a conflict go red, as both boxes of a bénévole's overlap do.

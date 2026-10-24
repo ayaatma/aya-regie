@@ -25,6 +25,7 @@ export function DragReadout({
   end,
   left,
   top,
+  warning,
 }: {
   startISO: string;
   start: number;
@@ -32,10 +33,13 @@ export function DragReadout({
   /** Where the block pulled begins, in the parent's pixels. */
   left: number;
   top: number;
+  /** Why letting go here puts somebody in two places at once. Said in red, under the hours. */
+  warning?: string;
 }) {
   return (
-    <span className="drag-readout" style={{ left, top }} role="status">
+    <span className={`drag-readout${warning ? ' is-error' : ''}`} style={{ left, top }} role="status">
       {dragReadoutText(startISO, start, end)}
+      {warning && <span className="drag-readout-warning">Placement interdit. {warning}</span>}
     </span>
   );
 }

@@ -204,6 +204,8 @@ export function GridScreen({
   const [dropBoxKey, setDropBoxKey] = useState<string | null>(null);
   /** The pole whose frise the pointer is over while an orga is in flight. */
   const [dropPoleKey, setDropPoleKey] = useState<string | null>(null);
+  /** Why letting go on that frise, at that hour, would put the orga in two places at once. */
+  const [frisePreview, setFrisePreview] = useState<string | null>(null);
   /** The box the arrow keys are standing on: which shift, and which row inside it. */
   const [cursor, setCursor] = useState<{ shiftKey: string; index: number } | null>(null);
   /** What the last key press did, said out loud for a few seconds. */
@@ -505,6 +507,7 @@ export function GridScreen({
     setDropShiftKey(null);
     setDropBoxKey(null);
     setDropPoleKey(null);
+    setFrisePreview(null);
   }, []);
 
   /**
@@ -635,6 +638,36 @@ export function GridScreen({
     [index],
   );
 
+  /** The window a drop at `x` pixels on a frise would create. One rule for the hover and the drop. */
+  const responsableWindowAt = useCallback(
+    (x: number) => {
+      const raw = Math.round(x / pxPerHour / RESPONSABLE_SNAP) * RESPONSABLE_SNAP;
+      const start = Math.min(Math.max(0, raw), Math.max(0, eventHours - RESPONSABLE_HOURS));
+      return { start, end: Math.min(eventHours, start + RESPONSABLE_HOURS) };
+    },
+    [eventHours, pxPerHour],
+  );
+
+  /** Said while hovering a frise: the créneaux elsewhere that window would collide with. */
+  const previewResponsable = useCallback(
+    (poleKey: string, x: number) => {
+      if (!drag) return;
+      const { start, end } = responsableWindowAt(x);
+      const texts = index.roleBlockersFor(drag.payload.personKey, poleKey, start, end);
+      setFrisePreview(texts.length > 0 ? texts.join(' ') : null);
+    },
+    [drag, index, responsableWindowAt],
+  );
+
+  /** A band being pulled, judged at every quarter of an hour. See `OrganiserBand.checkWindow`. */
+  const checkRoleWindow = useCallback(
+    (roleKey: string, start: number, end: number): readonly string[] => {
+      const role = plan.leaderRoles.find((r) => r.key === roleKey);
+      return role ? index.roleBlockersFor(role.organiserKey, role.poleKey, start, end) : [];
+    },
+    [index, plan.leaderRoles],
+  );
+
   const onDropResponsable = useCallback(
     (poleKey: string, x: number) => {
       const session = drag;
@@ -642,9 +675,7 @@ export function GridScreen({
       if (!session || readOnly || !holdsPoles(session)) return;
       const { personKey, personName } = session.payload;
 
-      const raw = Math.round(x / pxPerHour / RESPONSABLE_SNAP) * RESPONSABLE_SNAP;
-      const start = Math.min(Math.max(0, raw), Math.max(0, eventHours - RESPONSABLE_HOURS));
-      const end = Math.min(eventHours, start + RESPONSABLE_HOURS);
+      const { start, end } = responsableWindowAt(x);
       const pole = plan.poles.find((p) => p.key === poleKey);
 
       edit(
@@ -652,7 +683,7 @@ export function GridScreen({
         `${personName} responsable de ${pole?.name ?? poleKey}`,
       );
     },
-    [drag, edit, endDrag, eventHours, holdsPoles, plan.poles, pxPerHour, readOnly],
+    [drag, edit, endDrag, holdsPoles, plan.poles, readOnly, responsableWindowAt],
   );
 
   /** An edge of a responsable's band let go. Not an assignment, so no rule is consulted. */
@@ -1402,8 +1433,14 @@ export function GridScreen({
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'copy';
                         setDropPoleKey(group.key);
+                        // Same banner as a créneau refused to a bénévole, said before letting go.
+                        const box = event.currentTarget.getBoundingClientRect();
+                        previewResponsable(group.key, event.clientX - box.left);
                       }}
-                      onDragLeave={() => setDropPoleKey(null)}
+                      onDragLeave={() => {
+                        setDropPoleKey(null);
+                        setFrisePreview(null);
+                      }}
                       onDrop={(event) => {
                         if (readOnly || !event.dataTransfer.types.includes(DRAG_MIME_ORGA)) return;
                         if (!holdsPoles(drag)) return;
@@ -1434,6 +1471,7 @@ export function GridScreen({
                         onSelect={(roleKey) => setSelection({ kind: 'role', roleKey })}
                         pickedRoleKey={selection?.kind === 'role' ? selection.roleKey : null}
                         clashes={orgaClashes.byRole}
+                        checkWindow={checkRoleWindow}
                       />
                     </div>
                   </div>
@@ -1636,7 +1674,16 @@ export function GridScreen({
       {drag?.payload.fromShiftKey && !drag.payload.locked && (
         <TrashTarget label="Retirer du créneau" onDrop={onDropUnassign} />
       )}
-      {drag && <DragReason drag={drag} dropShiftKey={dropShiftKey} dropBoxKey={dropBoxKey} />}
+      {drag && frisePreview ? (
+        <div
+          className="banner is-error"
+          style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 20, borderTop: '1px solid' }}
+        >
+          <strong>Placement interdit.</strong> {frisePreview}
+        </div>
+      ) : (
+        drag && <DragReason drag={drag} dropShiftKey={dropShiftKey} dropBoxKey={dropBoxKey} />
+      )}
     </div>
   );
 }
