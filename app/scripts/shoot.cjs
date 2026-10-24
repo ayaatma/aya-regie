@@ -584,11 +584,18 @@ async function main() {
         await shot('86-personnes-fiche-benevole');
         await page.keyboard.press('ArrowDown');
         await sleep(400);
-        await clickButton(/^Modifier la fiche$/).catch(() => {});
+        // The 🖍️ at the top right of the fiche (2026-10-24): the same fiche, its fields in place.
+        const pencil = () => page.click('.panel.is-person .fiche-head .btn-emoji');
+        await pencil();
+        await sleep(300);
         await tall('87-personnes-fiche-edition');
+        // The mode follows the arrow keys and the clicks, so the orga opens in it too.
         await page.evaluate(() => document.querySelector('tr[data-person^="orga|"] td:nth-child(2)')?.click());
         await sleep(400);
         await tall('88-personnes-fiche-orga');
+        await pencil();
+        await sleep(300);
+        await tall('88b-personnes-fiche-orga-lecture');
         // Bénévole ↔ orga: the proposal, then the fiche it lands on, then back with Ctrl+Z.
         await clickButton(/^Passer bénévole…$/);
         await page.evaluate(() => document.querySelector('.convert-box')?.scrollIntoView());

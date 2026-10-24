@@ -23,7 +23,7 @@
  * remove them from the événement on the spot.
  */
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import {
   ORGANISER_ROLE_LABEL,
@@ -50,6 +50,7 @@ import { PersonMark } from './PersonMark.tsx';
 import { useNavigation } from './personNav.ts';
 import type { Selection } from './selection.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
+import { FicheEditButton } from './FicheEditButton.tsx';
 
 /** Where the folded state is remembered, per browser. A convenience, so a failure costs nothing. */
 const COLLAPSED_KEY = 'aya-regie.info-panel.collapsed';
@@ -205,32 +206,44 @@ function Head({
   what,
   name,
   kind,
+  action,
 }: {
   what: string;
   name: string;
   kind?: PersonKind;
+  /** At the top right of the head: the fiche's 🖍️ since 2026-10-24. */
+  action?: ReactNode;
 }) {
   return (
-    <>
-      <p className="panel-kind">{what}</p>
-      <h2 className="panel-title">
-        {kind && <PersonMark kind={kind} />}
-        {name}
-      </h2>
-    </>
+    <div className="fiche-head">
+      <div className="fiche-head-name">
+        <p className="panel-kind">{what}</p>
+        <h2 className="panel-title">
+          {kind && <PersonMark kind={kind} />}
+          {name}
+        </h2>
+      </div>
+      {action}
+    </div>
   );
 }
 
 function BenevoleBody({ volunteerKey, readOnly }: { volunteerKey: string; readOnly: boolean }) {
   const { index } = useLoadedPlan();
+  const [editing, setEditing] = useState(false);
   const volunteer = index.volunteerByKey.get(volunteerKey);
   if (!volunteer) return <p className="pool-empty">Ce bénévole n'est plus dans le plan.</p>;
 
   return (
     <>
-      <Head what="Bénévole" name={withNickname(index.volunteerName(volunteerKey), volunteer.nickname)} kind="benevole" />
+      <Head
+        what="Bénévole"
+        name={withNickname(index.volunteerName(volunteerKey), volunteer.nickname)}
+        kind="benevole"
+        action={!readOnly && <FicheEditButton editing={editing} onToggle={() => setEditing(!editing)} />}
+      />
       {!readOnly && <OpenInPeople kind="benevole" personKey={volunteerKey} />}
-      <VolunteerFiche volunteerKey={volunteerKey} readOnly={readOnly} />
+      <VolunteerFiche volunteerKey={volunteerKey} readOnly={readOnly} editing={editing} />
     </>
   );
 }
@@ -272,6 +285,7 @@ function OrgaBody({
   readOnly: boolean;
 }) {
   const { plan, index, edit } = useLoadedPlan();
+  const [editing, setEditing] = useState(false);
   const person = plan.organisers.find((o) => o.key === organiserKey);
   if (!person) return <p className="pool-empty">Cette personne n'est plus dans le plan.</p>;
 
@@ -281,7 +295,12 @@ function OrgaBody({
 
   return (
     <>
-      <Head what={ORGANISER_ROLE_LABEL[organiserRoleOf(person)]} name={organiserName(person)} kind="orga" />
+      <Head
+        what={ORGANISER_ROLE_LABEL[organiserRoleOf(person)]}
+        name={organiserName(person)}
+        kind="orga"
+        action={!readOnly && <FicheEditButton editing={editing} onToggle={() => setEditing(!editing)} />}
+      />
       {!readOnly && <OpenInPeople kind="orga" personKey={organiserKey} />}
       <p className="panel-sub">
         Le Staff et les responsables ne sont soumis à aucune règle d'heures et le solveur ne les place jamais, mais
@@ -332,46 +351,11 @@ function OrgaBody({
       )}
 
       {/*
-        A reader gets the facts, never the fields. A pole organiser reading the montage needs to
-        know who this is and how to reach them; what they must not get is a form that would
-        silently fail, since their session has no write access at all. See `GridScreenProps`.
+        A reader gets the facts, never the fields: `OrganiserFiche` read-only. A pole organiser
+        reading the montage needs to know who this is and how to reach them; what they must not get
+        is a form that would silently fail, since their session has no write access at all.
       */}
-      {readOnly ? (
-        <dl className="kv is-near">
-          {person.phone !== '' && (
-            <>
-              <dt>Téléphone</dt>
-              <dd>{person.phone}</dd>
-            </>
-          )}
-          {person.email !== '' && (
-            <>
-              <dt>E-mail</dt>
-              <dd>{person.email}</dd>
-            </>
-          )}
-          {person.diet !== '' && (
-            <>
-              <dt>Régime</dt>
-              <dd>{person.diet}</dd>
-            </>
-          )}
-          {person.allergies !== '' && (
-            <>
-              <dt>Allergies</dt>
-              <dd>{person.allergies}</dd>
-            </>
-          )}
-          {person.note !== '' && (
-            <>
-              <dt>Remarques</dt>
-              <dd>{person.note}</dd>
-            </>
-          )}
-        </dl>
-      ) : (
-        <OrganiserFiche organiserKey={organiserKey} />
-      )}
+      <OrganiserFiche organiserKey={organiserKey} readOnly={readOnly} editing={editing} />
 
       <div className="panel-section">
         <p className="panel-section-title">Sur l'exploit</p>

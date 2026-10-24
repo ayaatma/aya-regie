@@ -1244,6 +1244,18 @@ button {
   margin: 0 0 2px;
 }
 
+/* La tête d'une fiche: le nom à gauche, le crayon du mode édition en haut à droite. */
+.fiche-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fiche-head-name {
+  min-width: 0;
+}
+
 .panel-sub {
   color: var(--ink-faint);
   font-size: 12px;
@@ -5514,6 +5526,17 @@ textarea.select,
   width: min(240px, 100%);
   height: auto;
   aspect-ratio: 1;
+}
+
+/* Hors mode édition la photo se regarde, elle ne se clique pas; en mode édition un clic la recadre. */
+.person-photo-frame:disabled {
+  cursor: default;
+  color: inherit;
+}
+
+.person-photo.is-editing .person-photo-frame:not(:disabled):hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .person-photo-frame img {

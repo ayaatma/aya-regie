@@ -3,12 +3,17 @@
  *
  * The photo is the form's when the import fetched it from Drive, or one the régie dropped here:
  * drag a file onto the square, or « Choisir une photo » for the file dialog. A photo chosen here is
- * never replaced by the form's at a later import (see `needsDriveFetch`). Clicking the square shows
- * it larger. Not drawn at all where photos cannot be kept (the fixtures) or read (an orga code).
+ * never replaced by the form's at a later import (see `needsDriveFetch`). Not drawn at all where
+ * photos cannot be kept (the fixtures) or read (an orga code).
  *
  * Since 2026-10-23: « Recadrer » frames the face by hand (`PhotoCropper`), from the form's upload
  * asked again at full size; and « Récupérer la photo du formulaire » asks Drive again for a photo
  * the form carries and an import could not bring (`formFileId`, read from the raw answers).
+ *
+ * Since 2026-10-24, LARGE FROM THE START, which is what a click on it used to do: a 72 px thumbnail
+ * did not tell two faces apart. Its tools belong to the fiche's mode édition (`editing`): out of it
+ * the photo is shown and nothing else; in it, a click on the photo opens the cropper (or the file
+ * dialog when there is none yet), a file can be dropped on it, and the buttons are under it.
  *
  * NOT AN EDIT OF THE PLAN. A photo is a file in Storage, so it is not in the undo stack nor the
  * journal, and « Retirer » asks for a second click instead.
@@ -34,19 +39,21 @@ export function PersonPhoto({
   name,
   readOnly = false,
   formFileId = null,
+  editing = true,
 }: {
   personKey: string;
   name: string;
   readOnly?: boolean;
   /** The Drive file of the photo uploaded with the form, when the person sent one. */
   formFileId?: string | null;
+  /** The fiche's mode édition: the buttons, the drop, the click that crops. */
+  editing?: boolean;
 }) {
   const { id: eventId } = usePlan();
   const { url, source, loading, error } = usePhoto(readOnly ? null : eventId, personKey);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [over, setOver] = useState(false);
-  const [large, setLarge] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [cropping, setCropping] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -73,7 +80,7 @@ export function PersonPhoto({
   const onDrop = (event: DragEvent<HTMLElement>): void => {
     event.preventDefault();
     setOver(false);
-    void take(event.dataTransfer.files[0]);
+    if (editing) void take(event.dataTransfer.files[0]);
   };
 
   // The form's photo is missing, or older than the one the form now carries. A photo the régie
@@ -107,11 +114,23 @@ export function PersonPhoto({
     }
   };
 
+  const note = busy
+    ? 'Enregistrement…'
+    : url
+      ? source?.kind === 'drive'
+        ? 'Photo du formulaire'
+        : 'Photo déposée par la régie'
+      : loading
+        ? ''
+        : editing
+          ? 'Pas de photo. Déposez une image sur le carré.'
+          : 'Pas de photo.';
+
   return (
     <div
-      className={`person-photo${over ? ' is-over' : ''}${large ? ' is-large' : ''}`}
+      className={`person-photo${over ? ' is-over' : ''}${url ? ' is-large' : ''}${editing ? ' is-editing' : ''}`}
       onDragOver={(event) => {
-        if (![...event.dataTransfer.types].includes('Files')) return;
+        if (!editing || ![...event.dataTransfer.types].includes('Files')) return;
         event.preventDefault();
         setOver(true);
       }}
@@ -121,46 +140,49 @@ export function PersonPhoto({
       <button
         type="button"
         className="person-photo-frame"
-        onClick={() => url && setLarge(!large)}
-        aria-label={url ? `Photo de ${name}, ${large ? 'réduire' : 'agrandir'}` : `Pas de photo pour ${name}`}
-        title={url ? (large ? 'Réduire' : 'Agrandir') : 'Déposez une image ici'}
+        disabled={!editing || busy}
+        onClick={() => (url ? setCropping(true) : input.current?.click())}
+        aria-label={
+          editing
+            ? url
+              ? `Recadrer la photo de ${name}`
+              : `Choisir une photo pour ${name}`
+            : url
+              ? `Photo de ${name}`
+              : `Pas de photo pour ${name}`
+        }
+        title={editing ? (url ? 'Cliquer pour recadrer' : 'Cliquer pour choisir une image, ou la déposer ici') : undefined}
       >
         {url ? <img src={url} alt="" /> : <span className="person-photo-initials">{loading ? '' : initials(name)}</span>}
       </button>
-      <div className="person-photo-side">
-        <span className="person-photo-note">
-          {busy
-            ? 'Enregistrement…'
-            : url
-              ? source?.kind === 'drive'
-                ? 'Photo du formulaire'
-                : 'Photo déposée par la régie'
-              : loading
-                ? ''
-                : 'Pas de photo. Déposez une image sur le carré.'}
-        </span>
-        <span className="person-photo-actions">
-          <button type="button" className="btn is-small" disabled={busy} onClick={() => input.current?.click()}>
-            {url ? 'Changer la photo' : 'Choisir une photo'}
-          </button>
-          {url && (
-            <button type="button" className="btn is-small" disabled={busy} onClick={() => setCropping(true)}>
-              Recadrer
-            </button>
+      {(editing || !url) && (
+        <div className="person-photo-side">
+          <span className="person-photo-note">{note}</span>
+          {editing && (
+            <span className="person-photo-actions">
+              <button type="button" className="btn is-small" disabled={busy} onClick={() => input.current?.click()}>
+                {url ? 'Changer la photo' : 'Choisir une photo'}
+              </button>
+              {url && (
+                <button type="button" className="btn is-small" disabled={busy} onClick={() => setCropping(true)}>
+                  Recadrer
+                </button>
+              )}
+              {formMissing && (
+                <button type="button" className="btn is-small" disabled={busy} onClick={() => void fetchForm()}>
+                  Récupérer la photo du formulaire
+                </button>
+              )}
+              {url && (
+                <button type="button" className={`btn is-small${confirmRemove ? ' is-danger' : ''}`} disabled={busy} onClick={() => void onRemove()} onBlur={() => setConfirmRemove(false)}>
+                  {confirmRemove ? 'Confirmer le retrait' : 'Retirer'}
+                </button>
+              )}
+            </span>
           )}
-          {formMissing && (
-            <button type="button" className="btn is-small" disabled={busy} onClick={() => void fetchForm()}>
-              Récupérer la photo du formulaire
-            </button>
-          )}
-          {url && (
-            <button type="button" className={`btn is-small${confirmRemove ? ' is-danger' : ''}`} disabled={busy} onClick={() => void onRemove()} onBlur={() => setConfirmRemove(false)}>
-              {confirmRemove ? 'Confirmer le retrait' : 'Retirer'}
-            </button>
-          )}
-        </span>
-        {(problem ?? error) && <span className="person-photo-problem">{problem ?? error}</span>}
-      </div>
+        </div>
+      )}
+      {(problem ?? error) && <span className="person-photo-problem">{problem ?? error}</span>}
       {cropping && (
         <PhotoCropper
           name={name}

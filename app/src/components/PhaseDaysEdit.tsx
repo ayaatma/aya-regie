@@ -15,6 +15,8 @@ export interface PhaseDaysEditProps {
   onChange(presence: Pick<PhasePresence, 'present' | 'windows'>): void;
   /** Distinguishes the inputs when the same phase is drawn twice on a page. */
   namePrefix: string;
+  /** The fiche out of its mode édition: the same reading, as words. */
+  readOnly?: boolean;
 }
 
 /** The phases a bénévole can be asked about: open, and open to bénévoles. */
@@ -25,7 +27,7 @@ export function volunteerPhases(plan: { montage: Phase; demontage: Phase }): Pha
   });
 }
 
-export function PhaseDaysEdit({ id, phase, answer, onChange, namePrefix }: PhaseDaysEditProps) {
+export function PhaseDaysEdit({ id, phase, answer, onChange, namePrefix, readOnly = false }: PhaseDaysEditProps) {
   const label = phase.label || (id === 'montage' ? 'Montage' : 'Démontage');
   // The days the bénévoles may come, ticked from the answer's windows (none = all of them).
   const opening = { start: phase.volunteersFrom, end: phase.volunteersUntil };
@@ -38,6 +40,15 @@ export function PhaseDaysEdit({ id, phase, answer, onChange, namePrefix }: Phase
     const windows = all ? [] : next.filter((t) => t.ticked).flatMap((t) => t.segments);
     onChange({ present: all || windows.length > 0, windows });
   };
+
+  if (readOnly) {
+    const days = ticks.filter((t) => t.ticked);
+    return (
+      <>
+        {label}: {!answer.present ? 'pas là' : days.length === ticks.length ? 'présent·e' : `présent·e, ${days.map((t) => t.label).join(', ')}`}
+      </>
+    );
+  }
 
   return (
     <>

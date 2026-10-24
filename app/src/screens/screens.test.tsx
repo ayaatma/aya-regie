@@ -58,6 +58,7 @@ import { VolunteerShifts } from './VolunteerView.tsx';
 import { MailsScreen } from './MailsScreen.tsx';
 import { PhaseGrid } from './PhaseGrid.tsx';
 import { OrganiserFiche } from '../components/OrganiserFiche.tsx';
+import { VolunteerFiche } from '../components/VolunteerFiche.tsx';
 import { placeDeclared } from '../store/phaseEdits.ts';
 import { assign, setReserve } from '../store/edits.ts';
 import { PlanningScreen } from './PlanningScreen.tsx';
@@ -1683,9 +1684,11 @@ test('the printable sheets include the montage when it is on', () => {
 // The orga fiche: reachable from both screens, and correctable
 // ---------------------------------------------------------------------------
 
-test("an orga's fiche carries every answer as an editable field", () => {
+test("an orga's fiche carries every answer as an editable field, in its mode édition", () => {
   const withOrga = planWithMontage();
-  const html = render(<OrganiserFiche organiserKey="o1" />, withOrga);
+  const html = render(<OrganiserFiche organiserKey="o1" editing />, withOrga);
+  const read = render(<OrganiserFiche organiserKey="o1" />, withOrga);
+  assert.ok(!read.includes('name="orga-firstName-o1"'), 'hors mode édition, la fiche se lit');
 
   for (const label of ['Prénom', 'Nom', 'Adresse e-mail', 'Téléphone', 'Régime alimentaire']) {
     assert.ok(shows(html, label), `${label} manque sur la fiche`);
@@ -1706,7 +1709,7 @@ test('the grid offers the orgas in the same search box as the bénévoles', () =
 });
 
 test('a phase that is off puts nothing about it on the fiche', () => {
-  const html = render(<OrganiserFiche organiserKey="o1" />, {
+  const html = render(<OrganiserFiche organiserKey="o1" editing />, {
     ...planWithMontage(),
     montage: { ...planWithMontage().montage, enabled: false },
   });
@@ -2400,13 +2403,15 @@ test('clicking a person opens a fiche beside the list, whatever kind of person i
   assert.ok(benevole.includes('class="screen has-person"'));
   assert.ok(benevole.includes('aria-label="Fiche de la personne"'));
   assert.ok(benevole.includes(`data-person="benevole|${volunteer.key}"`) && /class="[^"]*\bis-selected\b/.test(benevole));
-  assert.ok(shows(benevole, 'Modifier la fiche'), "the bénévole's own fiche, not a copy");
-  assert.ok(benevole.includes(`name="fiche-ticket-benevole-${volunteer.key}"`), "the door's fields, a second time");
+  assert.ok(shows(benevole, 'Heures affectées'), "the bénévole's own fiche, not a copy");
+  assert.ok(benevole.includes('aria-label="Mode édition"'), 'the fiche is read, with its 🖍️ at the top');
+  assert.ok(!benevole.includes('>Modifier la fiche</button>'), 'no button at the bottom any more');
+  assert.ok(shows(benevole, "Billet d'entrée") && !benevole.includes(`name="fiche-ticket-benevole-${volunteer.key}"`), "the door read on the fiche");
   assert.ok(benevole.includes(`name="ticket-benevole-${volunteer.key}"`), 'and still on the row');
 
   const orga = current.organisers[0]!;
   const orgaHtml = peopleOf(current, { kind: 'orga', key: orga.key });
-  assert.ok(orgaHtml.includes(`name="orga-firstName-${orga.key}"`), "the orga's fiche, editable");
+  assert.ok(orgaHtml.includes('aria-label="Mode édition"'), "the orga's fiche, with its 🖍️");
 
   const extra = peopleOf(current, { kind: 'extra', key: 'x1' });
   assert.ok(extra.includes('name="extra-first-x1"') && extra.includes('value="Pat"'), 'the extra is typed in the fiche');
@@ -2537,7 +2542,8 @@ test('a fiche shows the availability of each day, with the day somebody is away'
     ...plan,
     volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, unavailable: [{ start: 0, end: 4 }] } : v)),
   };
-  const html = infoOf(away, { kind: 'benevole', volunteerKey: key });
+  const html = render(<VolunteerFiche volunteerKey={key} editing />, away);
+  assert.ok(shows(infoOf(away, { kind: 'benevole', volunteerKey: key }), 'Disponibilités par jour'));
   assert.ok(shows(html, 'Disponibilités par jour'));
   assert.ok(shows(html, index.dayLabel(0)));
   assert.ok(html.includes('name="fiche-day-0-from"'), "l'heure d'arrivée se corrige sur le jour");
@@ -2566,7 +2572,8 @@ test('a fiche names the pole a responsable imposed, and lets the régisseur chan
   const key = plan.volunteers[0]!.key;
   const pole = plan.poles[0]!;
   const imposed: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, imposedPoleKey: pole.key } : v)) };
-  assert.ok(infoOf(imposed, { kind: 'benevole', volunteerKey: key }).includes('name="fiche-imposed-pole"'));
+  assert.ok(render(<VolunteerFiche volunteerKey={key} editing />, imposed).includes('name="fiche-imposed-pole"'));
+  assert.ok(shows(infoOf(imposed, { kind: 'benevole', volunteerKey: key }), `Pôle imposé: ${pole.path}`), 'lu hors mode édition');
   assert.ok(shows(infoOf(imposed, { kind: 'benevole', volunteerKey: key }, true), `Pôle imposé: ${pole.path}`));
 });
 
@@ -2961,4 +2968,23 @@ test('a créneau of Staff places draws its posts to find, and the Suivi counts t
   assert.ok(shows(board, 'Responsables manquants'));
   // The whole event in Staff places adds nothing to the bénévoles' gap.
   assert.equal(validate(withStaff).summary.gapHours, validate(plan).summary.gapHours);
+});
+
+/*
+ * The fiche read, or edited in place, 2026-10-24: the fields only in the mode édition, at the
+ * place their values are read; the daily actions in both.
+ */
+test("a bénévole's fiche is read out of its mode édition and edited in place in it", () => {
+  const volunteer = plan.volunteers[0]!;
+  const read = render(<VolunteerFiche volunteerKey={volunteer.key} />);
+  const edited = render(<VolunteerFiche volunteerKey={volunteer.key} editing />);
+  const first = `name="fiche-${volunteer.key}-first"`;
+  assert.ok(!read.includes(first) && edited.includes(first), 'le prénom se corrige en mode édition');
+  assert.ok(!read.includes('Ajouter un choix') && edited.includes('Ajouter un choix'), 'les choix aussi');
+  for (const html of [read, edited]) {
+    assert.ok(shows(html, 'Placer en réserve'), 'la réserve reste à portée');
+    assert.ok(html.includes('name="fiche-regie-note"'), 'la note de la régie aussi');
+    assert.ok(shows(html, "Mettre en liste d'attente"), "et la liste d'attente");
+  }
+  assert.ok(!shows(read, 'Réserve (renfort)') && !shows(edited, 'Réserve (renfort)'));
 });

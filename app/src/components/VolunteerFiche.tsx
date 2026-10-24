@@ -11,6 +11,13 @@
  * through each of them to arrive at the same three `edit` calls would be five chances to pass the
  * wrong one. Everything it needs is in the plan context, exactly as `OrganiserFiche` already did.
  *
+ * READ, OR EDITED IN PLACE, since 2026-10-24. « Modifier la fiche » used to swap the whole fiche
+ * for a form of another shape, where nothing was where the régisseur had just read it. Now the
+ * 🖍️ of the pane's head (`editing`, held by the pane) turns each section into its own fields, at
+ * the same place: the name and contact where they are read, the choices under « Ses choix », the
+ * refusals under « Ne veut pas ». Out of it the fiche is read and only the daily actions stay
+ * live: validating, the réserve, the steps, the note, the waiting list, a status change.
+ *
  * Correcting a fiche and validating it are ordinary edits: they land in the undo stack and in the
  * journal with a sentence naming the person, because a correction can turn one of their boxes red
  * and being able to take it back the same way as a drag is what makes it safe to try.
@@ -47,7 +54,20 @@ import { useLoadedPlan } from '../store/store.tsx';
 import { setVolunteerPhase } from '../store/phaseEdits.ts';
 import { preferenceLabel, slotLabel } from './labels.ts';
 import { choiceRankLabel, levelLabel, volumeText } from './layout.ts';
-import { VolunteerEdit } from './VolunteerEdit.tsx';
+import {
+  ArtistsEdit,
+  AvoidedSlotsEdit,
+  ChoicesEdit,
+  ContactEdit,
+  FieldDataEdit,
+  IdentityEdit,
+  MealsEdit,
+  RefusedPolesEdit,
+  RefusedSlotsEdit,
+  RequestEdit,
+  type SectionProps,
+  type SetField,
+} from './VolunteerEdit.tsx';
 import { ApplicationSection } from './ApplicationSection.tsx';
 import { AvailabilityDays } from './AvailabilityDays.tsx';
 import { PhaseDaysEdit, volunteerPhases } from './PhaseDaysEdit.tsx';
@@ -88,9 +108,12 @@ export function statusChips(
 export function VolunteerFiche({
   volunteerKey,
   readOnly = false,
+  editing = false,
 }: {
   volunteerKey: string;
   readOnly?: boolean;
+  /** The pane's mode édition: every section becomes its fields, in place. Ignored when read-only. */
+  editing?: boolean;
 }) {
   const { index, report, edit } = useLoadedPlan();
 
@@ -128,6 +151,7 @@ export function VolunteerFiche({
       onReviewed={onReviewed}
       onToReview={onToReview}
       readOnly={readOnly}
+      editing={editing && !readOnly}
     />
   );
 }
@@ -145,6 +169,7 @@ interface VolunteerDetailProps {
   /** Sends the fiche back to « à relire », since 2026-09-16: one click, from the fiche itself. */
   onToReview(volunteerKey: string): void;
   readOnly?: boolean;
+  editing: boolean;
 }
 
 function VolunteerDetail({
@@ -156,11 +181,9 @@ function VolunteerDetail({
   onReviewed,
   onToReview,
   readOnly = false,
+  editing,
 }: VolunteerDetailProps) {
   const { edit } = useLoadedPlan();
-  // Above every early return, on purpose: a hook called after one is a hook the next render may
-  // not call at all, which is the rule React breaks loudly and at a distance.
-  const [editing, setEditing] = useState(false);
 
   const detail = report.volunteers.find((v) => v.key === volunteerKey);
   const volunteer: Volunteer | undefined = index.volunteerByKey.get(volunteerKey);
@@ -171,54 +194,78 @@ function VolunteerDetail({
   // pinned place rather than half-applied. The edit layer refuses it too; this says why.
   const pinned = index.plan.assignments.some((a) => a.volunteerKey === volunteerKey && a.locked);
 
-  if (editing) {
-    return (
-      <>
-        {/* No name here either: `InfoPanel`'s own head carries it, three lines above. */}
-        <p className="panel-sub">Correction de la fiche</p>
-        <RawAnswers volunteer={volunteer} />
-        <VolunteerEdit
-          index={index}
-          volunteer={volunteer}
-          onCancel={() => setEditing(false)}
-          onSave={(patch) => {
-            onCorrect(volunteer.key, patch);
-            setEditing(false);
-          }}
-        />
-      </>
-    );
-  }
+  // What the sections of « Corriger la lecture » write through, here straight into the plan: one
+  // field, one correction, one line of journal. See `VolunteerEdit`.
+  const set: SetField = (field, value) => onCorrect(volunteer.key, { [field]: value });
+  const sections: SectionProps = { index, volunteer, set, prefix: `fiche-${volunteer.key}` };
+  const hasFieldData =
+    (volunteer.emergencyContact ?? '').trim() !== '' || (volunteer.healthNote ?? '').trim() !== '' || volunteer.minor === true;
 
   return (
     <>
       {/*
         THE NAME IS NOT WRITTEN HERE, since 2026-09-12, and it was until then.
 
-        This fiche is only ever drawn inside `InfoPanel`, under a `Head` that already says what
-        kind of thing was selected and names it. Writing it again two lines lower put the same
-        "Prénom Nom" twice at the top of the pane, reported word for word as "son nom prénom
-        apparait 2 fois". The head is the one that stays, because it carries the orga / bénévole
-        mark beside the name and this one never did.
+        This fiche is only ever drawn inside a pane whose head already says what kind of thing was
+        selected and names it. Writing it again two lines lower put the same "Prénom Nom" twice at
+        the top of the pane, reported word for word as "son nom prénom apparait 2 fois". In mode
+        édition the name is a field of « Identité et contact », right under the photo.
       */}
       <RegistrationSection kind="benevole" personKey={volunteer.key} readOnly={readOnly} />
       <PersonPhoto
         personKey={volunteer.key}
         name={`${volunteer.firstName} ${volunteer.lastName}`}
         readOnly={readOnly}
+        editing={editing}
         formFileId={driveFileIds(volunteer.formAnswers?.photo ?? '')[0] ?? null}
       />
-      <p className="panel-sub">
-        {preferenceLabel(index.plan.preferenceSlots, volunteer.preferredSlotId)},{' '}
-        {volumeText(volunteer.requestedHours, index.dayMode)} demandées
-      </p>
-      {volunteer.nickname.trim() !== '' && (
-        <p className="panel-sub" title="Se règle dans « Modifier la fiche », champ « Sur le planning »">
-          Sur le planning: {index.volunteerShortName(volunteer.key)}
-        </p>
+
+      {editing ? (
+        <>
+          <div className="panel-section">
+            <p className="panel-section-title">Identité et contact</p>
+            <IdentityEdit {...sections} />
+            <ContactEdit {...sections} />
+          </div>
+          <div className="panel-section">
+            <p className="panel-section-title">Ce qui a été demandé</p>
+            <RequestEdit {...sections} />
+          </div>
+        </>
+      ) : (
+        <>
+          {volunteer.nickname.trim() !== '' && (
+            <p className="panel-sub">Sur le planning: {index.volunteerShortName(volunteer.key)}</p>
+          )}
+          {/*
+            Contact details, for the régisseur, under the name since 2026-10-24: where the fields
+            are in mode édition.
+
+            Who ELSE may see a volunteer's phone number is a separate question and not built: the
+            régisseur is already trusted with every field on the form. See feature_admin_ui.md.
+          */}
+          {(volunteer.phone || volunteer.email) && (
+            <p className="panel-contact">
+              {volunteer.phone && (
+                <a className="chip" href={`tel:${volunteer.phone.replace(/\s+/g, '')}`}>
+                  {volunteer.phone}
+                </a>
+              )}
+              {volunteer.email && (
+                <a className="chip" href={`mailto:${volunteer.email}`}>
+                  {volunteer.email}
+                </a>
+              )}
+            </p>
+          )}
+          <p className="panel-sub">
+            {preferenceLabel(index.plan.preferenceSlots, volunteer.preferredSlotId)},{' '}
+            {volumeText(volunteer.requestedHours, index.dayMode)} demandées
+          </p>
+        </>
       )}
 
-      <ApplicationSection volunteer={volunteer} detail={detail} readOnly={readOnly} />
+      <ApplicationSection volunteer={volunteer} detail={detail} readOnly={readOnly} editing={editing} />
 
       {/*
         The doubt the importer had, and the one button that clears it.
@@ -257,87 +304,74 @@ function VolunteerDetail({
 
       <RawAnswers volunteer={volunteer} />
 
-      {!readOnly && (
-        <p>
-          <button className="btn" onClick={() => setEditing(true)}>
-            Modifier la fiche
-          </button>
-        </p>
-      )}
-
       {/*
         Refusals get their own line rather than a clause at the end of a grey sentence. They are
         hard constraints: placing somebody in a slot or a pole they ruled out is a tier 1 issue,
         and the régisseur looking at a box needs to see the veto without hunting for it.
       */}
-      {(volunteer.avoidedSlotIds ?? []).length > 0 && (
-        <div className="panel-section">
-          <p className="panel-section-title">Préfère éviter</p>
-          {(volunteer.avoidedSlotIds ?? []).map((id) => (
-            <span className="chip is-warn" key={id}>
-              Travailler {slotLabel(index.slots, id)}
-            </span>
-          ))}
-        </div>
+      {editing ? (
+        <AvoidedSlotsEdit {...sections} />
+      ) : (
+        (volunteer.avoidedSlotIds ?? []).length > 0 && (
+          <div className="panel-section">
+            <p className="panel-section-title">Préfère éviter</p>
+            {(volunteer.avoidedSlotIds ?? []).map((id) => (
+              <span className="chip is-warn" key={id}>
+                Travailler {slotLabel(index.slots, id)}
+              </span>
+            ))}
+          </div>
+        )
       )}
 
-      {(volunteer.refusedSlotIds.length > 0 || volunteer.refusedPoleKeys.length > 0) && (
-        <div className="panel-section">
-          <p className="panel-section-title">Ne veut pas</p>
-          {volunteer.refusedSlotIds.map((id) => (
-            <span className="chip is-bad" key={id}>
-              Travailler {slotLabel(index.slots, id)}
-            </span>
-          ))}
-          {volunteer.refusedPoleKeys.map((key) => (
-            <span className="chip is-bad" key={key}>
-              Le pôle {index.polePath(key)}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/*
-        Contact details, for the régisseur.
-
-        Who ELSE may see a volunteer's phone number is a separate question and not built: the
-        régisseur is already trusted with every field on the form. A pole organiser seeing only
-        their own pole's numbers needs a organiser login, which does not exist yet, and it is a GDPR
-        matter rather than a convenience. See feature_admin_ui.md.
-      */}
-      {(volunteer.phone || volunteer.email) && (
-        <p className="panel-contact">
-          {volunteer.phone && (
-            <a className="chip" href={`tel:${volunteer.phone.replace(/\s+/g, '')}`}>
-              {volunteer.phone}
-            </a>
-          )}
-          {volunteer.email && (
-            <a className="chip" href={`mailto:${volunteer.email}`}>
-              {volunteer.email}
-            </a>
-          )}
-        </p>
+      {editing ? (
+        <>
+          <RefusedSlotsEdit {...sections} withRanges={false} />
+          <RefusedPolesEdit {...sections} />
+        </>
+      ) : (
+        (volunteer.refusedSlotIds.length > 0 || volunteer.refusedPoleKeys.length > 0) && (
+          <div className="panel-section">
+            <p className="panel-section-title">Ne veut pas</p>
+            {volunteer.refusedSlotIds.map((id) => (
+              <span className="chip is-bad" key={id}>
+                Travailler {slotLabel(index.slots, id)}
+              </span>
+            ))}
+            {volunteer.refusedPoleKeys.map((key) => (
+              <span className="chip is-bad" key={key}>
+                Le pôle {index.polePath(key)}
+              </span>
+            ))}
+          </div>
+        )
       )}
 
       {/* Field data: shown whenever there is any, since this is what is needed in a hurry. */}
-      {((volunteer.emergencyContact ?? '').trim() !== '' || (volunteer.healthNote ?? '').trim() !== '' || volunteer.minor === true) && (
-        <div className="panel-section fiche-field-data">
+      {editing ? (
+        <div className="panel-section">
           <p className="panel-section-title">Sur le terrain</p>
-          {volunteer.minor === true && <span className="chip is-warn">Mineur·e</span>}
-          {(volunteer.emergencyContact ?? '').trim() !== '' && (
-            <p className="fiche-raw-answer">
-              <span className="fiche-raw-label">En cas d'urgence</span>
-              {volunteer.emergencyContact}
-            </p>
-          )}
-          {(volunteer.healthNote ?? '').trim() !== '' && (
-            <p className="fiche-raw-answer">
-              <span className="fiche-raw-label">Santé, besoins</span>
-              {volunteer.healthNote}
-            </p>
-          )}
+          <FieldDataEdit {...sections} />
         </div>
+      ) : (
+        hasFieldData && (
+          <div className="panel-section fiche-field-data">
+            <p className="panel-section-title">Sur le terrain</p>
+            {volunteer.minor === true && <span className="chip is-warn">Mineur·e</span>}
+            {(volunteer.emergencyContact ?? '').trim() !== '' && (
+              <p className="fiche-raw-answer">
+                <span className="fiche-raw-label">En cas d'urgence</span>
+                {volunteer.emergencyContact}
+              </p>
+            )}
+            {(volunteer.healthNote ?? '').trim() !== '' && (
+              <p className="fiche-raw-answer">
+                <span className="fiche-raw-label">Santé, besoins</span>
+                {volunteer.healthNote}
+              </p>
+            )}
+          </div>
+        )
       )}
 
       {chips.length > 0 && (
@@ -389,18 +423,25 @@ function VolunteerDetail({
         the other hand, and "Régime: sans restriction" on a hundred and twenty of them is a line
         that pushes the useful ones off the screen.
       */}
-      {(!isStandardDiet(volunteer.diet) || !isNoAllergy(volunteer.allergies)) && (
+      {editing ? (
         <div className="panel-section">
           <p className="panel-section-title">Repas</p>
-          <p>
-            {!isStandardDiet(volunteer.diet) && (
-              <span className="chip is-warn">{volunteer.diet.trim()}</span>
-            )}
-            {!isNoAllergy(volunteer.allergies) && (
-              <span className="chip is-bad">Allergie: {volunteer.allergies.trim()}</span>
-            )}
-          </p>
+          <MealsEdit {...sections} />
         </div>
+      ) : (
+        (!isStandardDiet(volunteer.diet) || !isNoAllergy(volunteer.allergies)) && (
+          <div className="panel-section">
+            <p className="panel-section-title">Repas</p>
+            <p>
+              {!isStandardDiet(volunteer.diet) && (
+                <span className="chip is-warn">{volunteer.diet.trim()}</span>
+              )}
+              {!isNoAllergy(volunteer.allergies) && (
+                <span className="chip is-bad">Allergie: {volunteer.allergies.trim()}</span>
+              )}
+            </p>
+          </div>
+        )
       )}
 
       <div className="panel-section">
@@ -409,11 +450,7 @@ function VolunteerDetail({
           The pole a responsable sent them to, 2026-09-15: counts as their first choice, and the
           solver keeps them there. The régisseur can still drag them anywhere.
         */}
-        {readOnly ? (
-          volunteer.imposedPoleKey && (
-            <p><span className="chip is-ok">Pôle imposé: {index.polePath(volunteer.imposedPoleKey)}</span></p>
-          )
-        ) : (
+        {editing ? (
           <label className="people-meta imposed-pole">
             Pôle imposé par un·e responsable{' '}
             <select
@@ -431,8 +468,14 @@ function VolunteerDetail({
               ))}
             </select>
           </label>
+        ) : (
+          volunteer.imposedPoleKey && (
+            <p><span className="chip is-ok">Pôle imposé: {index.polePath(volunteer.imposedPoleKey)}</span></p>
+          )
         )}
-        {volunteer.choices.length === 0 ? (
+        {editing ? (
+          <ChoicesEdit {...sections} />
+        ) : volunteer.choices.length === 0 ? (
           <p className="pool-item-meta">Aucun choix de pôle.</p>
         ) : (
           <p>
@@ -487,7 +530,7 @@ function VolunteerDetail({
         ))}
       </div>
 
-      <SkillsSection volunteer={volunteer} readOnly={readOnly} />
+      <SkillsSection volunteer={volunteer} readOnly={!editing} />
 
       {index.plan.sideActivities.length > 0 && (
         <div className="panel-section">
@@ -495,7 +538,7 @@ function VolunteerDetail({
           <SkillPicker
             skills={index.plan.sideActivities.map((a) => ({ key: a.key, label: a.when ? `${a.label} (${a.when})` : a.label }))}
             value={volunteer.sideActivityKeys ?? []}
-            readOnly={readOnly}
+            readOnly={!editing}
             name={`fiche-activity-${volunteer.key}`}
             onChange={(sideActivityKeys, changed, on) =>
               edit((p) => correctVolunteer(p, volunteer.key, { sideActivityKeys }), `${changed.label} ${on ? 'coché' : 'décoché'}: ${index.volunteerName(volunteer.key)}`)
@@ -516,29 +559,33 @@ function VolunteerDetail({
             index={index}
             windows={volunteer.unavailable ?? []}
             namePrefix="fiche"
-            readOnly={readOnly}
+            readOnly={!editing}
             onChange={(unavailable) =>
               edit((p) => correctVolunteer(p, volunteer.key, { unavailable }), `plages indisponibles de ${index.volunteerName(volunteer.key)}`)
             }
           />
         </div>
       ) : (
-        <AvailabilityDays volunteer={volunteer} readOnly={readOnly} />
+        <AvailabilityDays volunteer={volunteer} readOnly={!editing} />
       )}
 
-      <BuddiesSection volunteer={volunteer} buddies={detail.buddies} readOnly={readOnly} />
+      <BuddiesSection volunteer={volunteer} buddies={detail.buddies} readOnly={!editing} />
 
-      <PhaseAnswers volunteer={volunteer} />
+      <PhaseAnswers volunteer={volunteer} readOnly={!editing} />
 
-      {volunteer.artistKeys.length > 0 && (
-        <div className="panel-section">
-          <p className="panel-section-title">Ne veut pas manquer</p>
-          {volunteer.artistKeys.map((key) => (
-            <span key={key} className="chip">
-              {index.artistByKey.get(key)?.name ?? key}
-            </span>
-          ))}
-        </div>
+      {editing ? (
+        <ArtistsEdit {...sections} />
+      ) : (
+        volunteer.artistKeys.length > 0 && (
+          <div className="panel-section">
+            <p className="panel-section-title">Ne veut pas manquer</p>
+            {volunteer.artistKeys.map((key) => (
+              <span key={key} className="chip">
+                {index.artistByKey.get(key)?.name ?? key}
+              </span>
+            ))}
+          </div>
+        )
       )}
 
       {detail.issues.length > 0 && (
@@ -770,7 +817,7 @@ function RawAnswers({ volunteer }: { volunteer: Volunteer }) {
  * Correcting marks the field, so a re-import of the same export never puts the old reading back.
  * See `setVolunteerPhase`.
  */
-function PhaseAnswers({ volunteer }: { volunteer: Volunteer }) {
+function PhaseAnswers({ volunteer, readOnly }: { volunteer: Volunteer; readOnly: boolean }) {
   const { plan, edit } = useLoadedPlan();
   const phases = volunteerPhases(plan);
   if (phases.length === 0) return null;
@@ -788,6 +835,7 @@ function PhaseAnswers({ volunteer }: { volunteer: Volunteer }) {
               phase={phase}
               answer={id === 'montage' ? volunteer.montage : volunteer.demontage}
               namePrefix="fiche"
+              readOnly={readOnly}
               onChange={(presence) =>
                 edit((p) => setVolunteerPhase(p, volunteer.key, id, presence), `${label.toLowerCase()} de ${volunteer.firstName}`)
               }

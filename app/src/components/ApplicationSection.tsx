@@ -36,10 +36,17 @@ export function ApplicationSection({
   volunteer,
   detail,
   readOnly,
+  editing = true,
 }: {
   volunteer: Volunteer;
   detail: VolunteerReport;
   readOnly: boolean;
+  /**
+   * The fiche's mode édition, since 2026-10-24. Out of it the équipe and the énergie are read, not
+   * chosen; what the régisseur works through every day stays live in both: « Placer en réserve »,
+   * the steps ticked, the note, and freeing the places of somebody who cancelled.
+   */
+  editing?: boolean;
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const name = index.volunteerName(volunteer.key);
@@ -91,7 +98,16 @@ export function ApplicationSection({
         </div>
       )}
 
-      {plan.teams.length > 0 && (
+      {!editing && (volunteer.teamKey || volunteer.energy) && (
+        <p>
+          {volunteer.teamKey && (
+            <span className="chip">{plan.teams.find((t) => t.key === volunteer.teamKey)?.name ?? 'Équipe'}</span>
+          )}
+          {volunteer.energy && <span className="chip">{ENERGY_LABEL[volunteer.energy]}</span>}
+        </p>
+      )}
+
+      {editing && plan.teams.length > 0 && (
         <label className="field">
           <span className="field-label">Équipe</span>
           <select
@@ -117,7 +133,7 @@ export function ApplicationSection({
       )}
 
       <label className="field">
-        <span className="field-label">Réserve (renfort)</span>
+        <span className="field-label">Placer en réserve</span>
         <input
           type="checkbox"
           name="fiche-backup"
@@ -129,6 +145,7 @@ export function ApplicationSection({
         />
       </label>
 
+      {editing && (
       <label className="field">
         <span className="field-label">Énergie</span>
         <select
@@ -146,6 +163,7 @@ export function ApplicationSection({
           ))}
         </select>
       </label>
+      )}
       {volunteer.energy === 'fatigable' && detail.assignedHours > 0 && (
         <p className="people-meta is-bad">
           Fatigue vite: {fmtHours(detail.assignedHours)} affectées pour {fmtHours(detail.requestedTotalHours)} demandées.

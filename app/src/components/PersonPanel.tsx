@@ -46,6 +46,7 @@ import { NumberField } from './NumberField.tsx';
 import { withNickname } from './labels.ts';
 import { OrganiserFiche } from './OrganiserFiche.tsx';
 import { PersonMark } from './PersonMark.tsx';
+import { FicheEditButton } from './FicheEditButton.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
 import { useNavigation, type PersonRef } from './personNav.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
@@ -64,6 +65,9 @@ export function PersonPanel({
   onFocus(person: PersonRef): void;
 }) {
   const row = report.rows.find((r) => r.kind === person.kind && r.key === person.key);
+  // Held here rather than by the fiche, so it survives the arrow keys walking to the next person:
+  // "je corrige les quinze qui n'ont pas de téléphone" is one mode, fifteen fiches.
+  const [editing, setEditing] = useState(false);
 
   return (
     <aside className="panel is-person" aria-label="Fiche de la personne">
@@ -78,7 +82,15 @@ export function PersonPanel({
 
       <div className="panel-body">
         {row ? (
-          <PersonBody key={`${row.kind}|${row.key}`} row={row} report={report} onClose={onClose} onFocus={onFocus} />
+          <PersonBody
+            key={`${row.kind}|${row.key}`}
+            row={row}
+            report={report}
+            onClose={onClose}
+            onFocus={onFocus}
+            editing={editing}
+            onToggleEditing={() => setEditing(!editing)}
+          />
         ) : (
           <p className="pool-empty">Cette personne n'est plus dans le plan.</p>
         )}
@@ -92,11 +104,16 @@ function PersonBody({
   report,
   onClose,
   onFocus,
+  editing,
+  onToggleEditing,
 }: {
   row: TicketingRow;
   report: TicketingReport;
   onClose(): void;
   onFocus(person: PersonRef): void;
+  /** The fiche's mode édition, for a bénévole or a Staff / Responsable. See `FicheEditButton`. */
+  editing: boolean;
+  onToggleEditing(): void;
 }) {
   const { index } = useLoadedPlan();
   const who = personLabel(row);
@@ -105,14 +122,21 @@ function PersonBody({
 
   return (
     <>
-      <p className="panel-kind">{row.statuses.map((s) => s.label).join(' · ')}</p>
-      <h2 className="panel-title">
-        {mark && <PersonMark kind={mark} />}
-        {withNickname(`${row.firstName} ${row.lastName}`.trim(), nickname) || 'Sans nom'}
-      </h2>
+      <div className="fiche-head">
+        <div className="fiche-head-name">
+          <p className="panel-kind">{row.statuses.map((s) => s.label).join(' · ')}</p>
+          <h2 className="panel-title">
+            {mark && <PersonMark kind={mark} />}
+            {withNickname(`${row.firstName} ${row.lastName}`.trim(), nickname) || 'Sans nom'}
+          </h2>
+        </div>
+        {(row.kind === 'benevole' || row.kind === 'orga') && (
+          <FicheEditButton editing={editing} onToggle={onToggleEditing} />
+        )}
+      </div>
 
-      {row.kind === 'benevole' && <VolunteerFiche volunteerKey={row.key} />}
-      {row.kind === 'orga' && <OrganiserFiche organiserKey={row.key} />}
+      {row.kind === 'benevole' && <VolunteerFiche volunteerKey={row.key} editing={editing} />}
+      {row.kind === 'orga' && <OrganiserFiche organiserKey={row.key} editing={editing} />}
       {row.kind === 'orga' && <AccessSection organiserKey={row.key} who={who} onDeleted={onClose} />}
       {row.kind === 'artiste' && <MemberFiche memberKey={row.key} />}
       {row.kind === 'invite' && <GuestFiche guestKey={row.key} />}
@@ -120,7 +144,8 @@ function PersonBody({
 
       {(row.kind === 'benevole' || row.kind === 'orga') && <ActsOf row={row} />}
 
-      <DoorSection row={row} report={report} who={who} />
+      {/* A bénévole's or an orga's door is read out of the mode édition; the others have no such mode. */}
+      <DoorSection row={row} report={report} who={who} editing={editing || (row.kind !== 'benevole' && row.kind !== 'orga')} />
 
       {(row.kind === 'benevole' || row.kind === 'orga') && (
         <StatusSection kind={row.kind} personKey={row.key} who={who} onFocus={onFocus} />
@@ -355,8 +380,52 @@ const STATUS_TEXT: Record<StatusTarget, string> = {
 };
 
 /** The door's four fields, the same ones the row carries, with a way back to the defaults. */
-function DoorSection({ row, report, who }: { row: TicketingRow; report: TicketingReport; who: string }) {
+function DoorSection({
+  row,
+  report,
+  who,
+  editing,
+}: {
+  row: TicketingRow;
+  report: TicketingReport;
+  who: string;
+  editing: boolean;
+}) {
   const { edit } = useLoadedPlan();
+  if (!editing) {
+    const ticket = report.ticketTypes.find((t) => t.key === row.ticketTypeKey)?.label ?? 'aucun';
+    const bracelets = new Map(report.bracelets.map((b) => [b.key, b.label]));
+    return (
+      <div className="panel-section panel-divider">
+        <p className="panel-section-title">À l'entrée</p>
+        <dl className="kv is-near">
+          <dt>Billet d'entrée</dt>
+          <dd>{ticket}</dd>
+          <dt>Bracelet</dt>
+          <dd>{row.braceletKeys.map((key) => bracelets.get(key) ?? key).join(' + ') || 'aucun'}</dd>
+          {row.kind !== 'extra' && (
+            <>
+              <dt>Tickets boisson</dt>
+              <dd>{row.drinks}</dd>
+              <dt>Tickets repas</dt>
+              <dd>{row.meals}</dd>
+            </>
+          )}
+          {row.note !== '' && (
+            <>
+              <dt>Remarque</dt>
+              <dd>{row.note}</dd>
+            </>
+          )}
+        </dl>
+        {row.issues.map((issue) => (
+          <p key={issue} className="issue is-tier2">
+            {issue}
+          </p>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="panel-section panel-divider">
       <p className="panel-section-title">À l'entrée</p>

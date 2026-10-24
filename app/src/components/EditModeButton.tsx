@@ -13,18 +13,25 @@ export const MIN_WINDOW_HOURS = 0.25;
 /** How far the pointer travels on a pressed créneau or événement before the press is a slide. */
 export const SLIDE_THRESHOLD_PX = 4;
 
-export function EditModeButton({ editing, onToggle }: { editing: boolean; onToggle(): void }) {
+export function EditModeButton({
+  editing,
+  onToggle,
+  hint = 'Mode édition: étirer les créneaux, ajouter une place, créer un créneau dans le vide',
+  leaveHint = 'Quitter le mode édition (Échap)',
+}: {
+  editing: boolean;
+  onToggle(): void;
+  /** What the mode does, on the button. The fiches use the same switch since 2026-10-24. */
+  hint?: string;
+  leaveHint?: string;
+}) {
   return (
     <button
       type="button"
       className="btn-emoji is-framed"
       aria-pressed={editing}
       aria-label={editing ? 'Quitter le mode édition' : 'Mode édition'}
-      title={
-        editing
-          ? 'Quitter le mode édition (Échap)'
-          : 'Mode édition: étirer les créneaux, ajouter une place, créer un créneau dans le vide'
-      }
+      title={editing ? leaveHint : hint}
       onClick={(event) => {
         // The grid's background deselects on click; this button is not the background.
         event.stopPropagation();
