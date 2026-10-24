@@ -241,9 +241,16 @@ function volunteerToOrganiser(plan: Plan, key: string, role: OrganiserRole): Con
     demontageUntil,
     montagePoleKeys: [],
     demontagePoleKeys: [],
+    // The fields both fiches have, carried since 2026-10-24: the way back reads them off here.
+    skills: v.skills ?? [],
+    emergencyContact: v.emergencyContact ?? '',
+    healthNote: v.healthNote ?? '',
+    sideActivityKeys: v.sideActivityKeys ?? [],
     // Validated or not, the person stays where they stood: changing kind decides nothing.
     applicationStatus: statusOf(v),
     role,
+    // The bénévole fiche itself, whole, for the way back (2026-10-24). See `Organiser.asVolunteer`.
+    asVolunteer: v,
   };
 
   const mine = plan.assignments.filter((a) => a.volunteerKey === key);
@@ -279,7 +286,7 @@ function volunteerToOrganiser(plan: Plan, key: string, role: OrganiserRole): Con
   ];
   const lost = [
     "Son code d'accès bénévole ne fonctionnera plus. Un code responsable se donne depuis sa fiche, dans Personnes.",
-    'Aucune règle d\'heures ne s\'applique plus: volume, préférence, refus et choix de pôles ne comptent plus.',
+    "Aucune règle d'heures ne s'applique plus: volume, préférence, refus et choix de pôles ne comptent plus. Ils restent gardés et reviennent si la personne repasse bénévole.",
     ...(buddyNames.length > 0 ? [`${plural(buddyNames.length, 'Binôme retiré', 'Binômes retirés')}: ${buddyNames.join(', ')}.`] : []),
     ...(plan.reserve.includes(key) ? ["N'est plus en liste d'attente."] : []),
   ];
@@ -331,20 +338,30 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
   const roles = plan.leaderRoles.filter((r) => r.organiserKey === key);
   const roleNames = [...new Set(roles.map((r) => plan.poles.find((p) => p.key === r.poleKey)?.path ?? r.poleKey))];
 
-  const montage =
+  /*
+   * THE FICHE KEPT FROM BEFORE, when this person was a bénévole here (2026-10-24). Their answers
+   * come back as they were left, hand corrections included; what was edited on the orga fiche in
+   * the meantime (contact, diet, field data) wins, being the newer. A phase presence comes back
+   * with its windows only if the orga's arrival or departure still says present or absent alike.
+   */
+  const kept = o.asVolunteer;
+
+  const derivedMontage =
     o.montageFrom === null
       ? absentFromPhase()
       : { present: true, note: '', windows: [{ start: o.montageFrom, end: plan.montage.lengthHours }] };
-  const demontage =
+  const derivedDemontage =
     o.demontageUntil === null
       ? absentFromPhase()
       : { present: true, note: '', windows: [{ start: 0, end: o.demontageUntil }] };
+  const montage = kept && kept.montage.present === derivedMontage.present ? kept.montage : derivedMontage;
+  const demontage = kept && kept.demontage.present === derivedDemontage.present ? kept.demontage : derivedDemontage;
   const closedPhases = [
     montage.present && plan.montage.enabled && !plan.montage.volunteersAllowed ? plan.montage.label || 'Montage' : '',
     demontage.present && plan.demontage.enabled && !plan.demontage.volunteersAllowed ? plan.demontage.label || 'Démontage' : '',
   ].filter((label) => label !== '');
 
-  const volunteer: Volunteer = {
+  const blank: Volunteer = {
     key: newKey,
     firstName: o.firstName,
     lastName: o.lastName,
@@ -374,6 +391,27 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
     // orga turned bénévole was always « validée ».)
     status: applicationStatusOf(o),
   };
+  const volunteer: Volunteer = kept
+    ? {
+        ...kept,
+        key: newKey,
+        firstName: o.firstName,
+        lastName: o.lastName,
+        email: o.email,
+        phone: o.phone,
+        // A new code all the same: a credential is never moved between two kinds of access.
+        accessCode: blank.accessCode,
+        diet: o.diet,
+        allergies: o.allergies,
+        skills: o.skills ?? kept.skills,
+        emergencyContact: o.emergencyContact ?? kept.emergencyContact,
+        healthNote: o.healthNote ?? kept.healthNote,
+        sideActivityKeys: o.sideActivityKeys ?? kept.sideActivityKeys,
+        montage,
+        demontage,
+        status: applicationStatusOf(o),
+      }
+    : blank;
 
   const assignments: Assignment[] = [
     ...plan.assignments,
@@ -387,12 +425,17 @@ function organiserToVolunteer(plan: Plan, key: string): Conversion {
     ...(places.length > 0
       ? [`${places.length} ${plural(places.length, "place sur un créneau de l'exploit, gardée et verrouillée", "places sur des créneaux de l'exploit, gardées et verrouillées")}: le solveur ne ${plural(places.length, 'la', 'les')} déplacera pas.`]
       : []),
+    ...(kept
+      ? [`Sa fiche de bénévole d'avant: volume de ${kept.requestedHours} h, choix de pôles, tranches refusées et corrections faites à la main.`]
+      : []),
     ...(montage.present || demontage.present ? ['Sa présence au montage et au démontage.'] : []),
     ...commonCarried(plan, 'orga', key),
   ];
   const lost = [
     `Son code d'accès de ${ORGANISER_ROLE_LABEL[organiserRoleOf(o)]} ne fonctionnera plus. Un code bénévole est créé: à lui envoyer.`,
-    `Les règles des bénévoles s'appliquent désormais. La fiche part « À relire »: volume fixé à ${requestedHours} h, tranches refusées et choix de pôles à renseigner.`,
+    kept
+      ? "Les règles des bénévoles s'appliquent de nouveau."
+      : `Les règles des bénévoles s'appliquent désormais. La fiche part « À relire »: volume fixé à ${requestedHours} h, tranches refusées et choix de pôles à renseigner.`,
     ...(roleNames.length > 0 ? [`N'est plus ${plural(roleNames.length, 'responsable du pôle', 'responsable des pôles')}: ${roleNames.join(', ')}.`] : []),
     ...(o.note.trim() !== '' ? [`Ses remarques ne sont pas reprises: « ${o.note.trim()} ».`] : []),
     ...(closedPhases.length > 0

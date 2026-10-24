@@ -21,6 +21,7 @@ import {
   addLeaderOnPole,
   assignOrganiserToPole,
   assignOrganiserToPoleAt,
+  mergeOwnWindows,
   removeLeaderRole,
   giveOrganiserCode,
   clearOrganiserCode,
@@ -787,4 +788,27 @@ test('a validation mail draws the missing code, and only the mail that goes stor
   const regenerated = giveOrganiserCode(withOne, organiser.key);
   const kept = giveDrawnCodes(regenerated, codes);
   assert.notEqual(kept.organisers.find((l) => l.key === organiser.key)!.accessCode, code);
+});
+
+test('the same responsable dropped twice on one pole is one window, and windows apart stay two', () => {
+  // Reported 2026-10-24: two identical bands, drawn as one, and « je ne peux plus les supprimer ».
+  const { plan: withOne, organiser } = oneOrganiser();
+  const mine = (p: Plan) => p.leaderRoles.filter((r) => r.organiserKey === organiser.key && r.poleKey === aRoot.key);
+  const base: Plan = { ...withOne, leaderRoles: withOne.leaderRoles.filter((r) => r.poleKey !== aRoot.key) };
+
+  const once = assignOrganiserToPoleAt(base, organiser.key, aRoot.key, 2, 4);
+  const twice = assignOrganiserToPoleAt(once, organiser.key, aRoot.key, 2, 4);
+  assert.equal(mine(twice).length, 1);
+  assert.deepEqual([mine(twice)[0]!.start, mine(twice)[0]!.end], [2, 4]);
+
+  // Overlapping or touching grows the one window; apart makes a second.
+  const longer = assignOrganiserToPoleAt(twice, organiser.key, aRoot.key, 3, 5);
+  assert.deepEqual(mine(longer).map((r) => [r.start, r.end]), [[2, 5]]);
+  const apart = assignOrganiserToPoleAt(longer, organiser.key, aRoot.key, 8, 10);
+  assert.equal(mine(apart).length, 2);
+
+  // A band pulled onto the other one swallows it, under its own key.
+  const second = mine(apart).find((r) => r.start === 8)!;
+  const pulled = mergeOwnWindows(setOrganiserWindow(apart, second.key, 4, 10), second.key);
+  assert.deepEqual(mine(pulled).map((r) => [r.key, r.start, r.end]), [[second.key, 2, 10]]);
 });

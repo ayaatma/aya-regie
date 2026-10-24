@@ -656,6 +656,14 @@ export interface Organiser {
    * own. See `organiserRoleOf`.
    */
   role?: OrganiserRole;
+  /**
+   * The bénévole fiche this person had, kept whole when they became Staff or Responsable, and
+   * put back if they become a bénévole again. Since 2026-10-24: the way back used to start a
+   * blank fiche, so the volume, the pole choices, the refused slots and every hand correction
+   * were typed a second time. Read by nothing else: no rule of a bénévole applies to an orga.
+   * Absent: never a bénévole in this plan. See `convertPerson`.
+   */
+  asVolunteer?: Volunteer;
 }
 
 /** Staff or Responsable. See `Organiser.role`. */

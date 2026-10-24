@@ -685,7 +685,46 @@ export function assignOrganiserToPoleAt(
     start,
     end,
   };
-  return withLeaderRole(plan, organiserKey, created);
+  return mergeOwnWindows(withLeaderRole(plan, organiserKey, created), created.key);
+}
+
+/**
+ * One window where a person's windows on one pole overlap or touch, since 2026-10-24.
+ *
+ * The same responsable dropped twice at the same place on a frise was two identical roles drawn
+ * as one band, and removing it left the twin behind: the régisseur read it as a band that could
+ * not be removed. Two windows of one person on one pole that meet say nothing two separate ones
+ * would not, so they become the union, under the key of the one just written. Windows apart
+ * (« de 14h à 18h, puis de 22h à 02h ») stay two. Called by the grid's gestures, not by the
+ * Réglages fields, where a window is typed one end at a time and would merge halfway through.
+ */
+export function mergeOwnWindows(plan: Plan, roleKey: string): Plan {
+  const role = plan.leaderRoles.find((r) => r.key === roleKey);
+  if (!role || role.start === null || role.end === null) return plan;
+  let start = role.start;
+  let end = role.end;
+  const absorbed = new Set<string>();
+  // Repeated until nothing more joins: a union that grew may now reach a third window.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const other of plan.leaderRoles) {
+      if (other.key === roleKey || absorbed.has(other.key)) continue;
+      if (other.organiserKey !== role.organiserKey || other.poleKey !== role.poleKey) continue;
+      if (other.start === null || other.end === null) continue;
+      if (other.start > end || other.end < start) continue;
+      start = Math.min(start, other.start);
+      end = Math.max(end, other.end);
+      absorbed.add(other.key);
+      grew = true;
+    }
+  }
+  if (absorbed.size === 0) return plan;
+  return {
+    ...plan,
+    leaderRoles: plan.leaderRoles
+      .filter((r) => !absorbed.has(r.key))
+      .map((r) => (r.key === roleKey ? { ...r, start, end } : r)),
+  };
 }
 
 /**

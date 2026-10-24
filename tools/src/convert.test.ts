@@ -271,3 +271,43 @@ test('the Staff may be handed a fixed number of the exploit meals rather than a 
   const two = { ...plan, catering: { ...plan.catering, rules: { ...rules, organiserMeals: 2, organiserMealsFixed: true } } };
   assert.equal(exploitMeals(two), Math.min(2, cateringReport(two, new PlanIndex(two)).services.filter((s) => s.inMoment.exploit !== undefined).length));
 });
+
+test('2026-10-24: the way back gives the bénévole fiche as it was left, hand corrections included', () => {
+  const plan = makePlan();
+  const anne = plan.volunteers.find((v) => v.key === 'mail:anne@example.org')!;
+  const corrected: Plan = {
+    ...plan,
+    volunteers: plan.volunteers.map((v) =>
+      v.key === anne.key
+        ? {
+            ...v,
+            requestedHours: 10,
+            choices: [{ poleKey: 'bar', level: 'confirme' } as unknown as Volunteer['choices'][number]],
+            refusedPoleKeys: ['bar-plonge'],
+            availabilityNote: 'Pas avant 15h',
+            manualFields: ['requestedHours'],
+          }
+        : v,
+    ),
+  };
+  const there = convertPerson(corrected, 'benevole', anne.key, 'responsable');
+  const kept = there.plan.organisers.find((o) => o.key === there.newKey)!.asVolunteer;
+  assert.equal(kept?.requestedHours, 10, 'la fiche de bénévole est gardée sur le Responsable');
+
+  // Edited on the orga fiche in the meantime: the newer value wins on the way back.
+  const edited: Plan = {
+    ...there.plan,
+    organisers: there.plan.organisers.map((o) => (o.key === there.newKey ? { ...o, phone: '06 11 22 33 44' } : o)),
+  };
+  const back = convertPerson(edited, 'orga', there.newKey);
+  const v = back.plan.volunteers.find((x) => x.key === back.newKey)!;
+  assert.equal(v.requestedHours, 10);
+  assert.deepEqual(v.refusedPoleKeys, ['bar-plonge']);
+  assert.equal(v.availabilityNote, 'Pas avant 15h');
+  assert.deepEqual(v.manualFields, ['requestedHours']);
+  assert.equal(v.choices.length, 1);
+  assert.equal(v.phone, '06 11 22 33 44');
+  assert.notEqual(v.accessCode, anne.accessCode, 'un code neuf, jamais repris');
+  assert.ok(back.carried.some((line) => line.includes('volume de 10 h')));
+  assert.ok(!back.lost.some((line) => line.includes('À relire')));
+});

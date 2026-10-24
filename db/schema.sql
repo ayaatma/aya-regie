@@ -296,6 +296,9 @@ create table organiser (
     check (application_status in ('candidature', 'valide', 'annule')),
   -- Staff or Responsable, since 2026-10-23. A Responsable may hold poles (leader_role).
   role            text not null default 'responsable' check (role in ('responsable', 'staff')),
+  -- What this person answered as a bénévole, kept whole when they became Staff or Responsable,
+  -- and put back if they become a bénévole again. Since 2026-10-24. Null: never a bénévole here.
+  as_volunteer    jsonb check (as_volunteer is null or jsonb_typeof(as_volunteer) = 'object'),
   sort_order  int not null default 0,
   unique (event_id, key)
 );
@@ -1141,7 +1144,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 31,
+values ('min_plan_format', 32,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1403,6 +1406,7 @@ as $fn$
              'sideActivityKeys', to_jsonb(l.side_activity_keys),
              'applicationStatus', l.application_status,
              'role',           l.role,
+             'asVolunteer',    l.as_volunteer,
              'montagePoleKeys', coalesce((
                                   select jsonb_agg(pp.key order by opp.sort_order, pp.key)
                                   from organiser_phase_pole opp
@@ -2040,7 +2044,7 @@ begin
   insert into organiser (event_id, key, first_name, last_name, email, phone, access_code,
                          diet, allergies, note, montage_from, demontage_until, skills,
                          emergency_contact, health_note, side_activity_keys, application_status,
-                         role, sort_order)
+                         role, as_volunteer, sort_order)
   select p_event_id, x->>'key',
          coalesce(x->>'firstName', ''), coalesce(x->>'lastName', ''),
          coalesce(x->>'email', ''), coalesce(x->>'phone', ''),
@@ -2059,6 +2063,7 @@ begin
          case when x->>'applicationStatus' in ('candidature', 'valide', 'annule')
               then x->>'applicationStatus' else 'candidature' end,
          case when x->>'role' = 'staff' then 'staff' else 'responsable' end,
+         case when jsonb_typeof(x->'asVolunteer') = 'object' then x->'asVolunteer' end,
          (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'organisers', '[]'::jsonb)) with ordinality as t(x, ord);
 

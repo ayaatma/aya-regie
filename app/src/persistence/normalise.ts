@@ -141,6 +141,11 @@ const organiser = (value: unknown): Organiser => {
     applicationStatus: applicationStatus(loose.applicationStatus),
     // Absent from anything written before 2026-10-23: a Responsable, as the régisseur decided.
     role: loose.role === 'staff' ? 'staff' : 'responsable',
+    // Absent from anything written before 2026-10-24: nobody's bénévole fiche had been kept.
+    // Read by the bénévole reader itself, so the way back gets a fiche as sound as any other.
+    ...(loose.asVolunteer !== null && typeof loose.asVolunteer === 'object'
+      ? { asVolunteer: volunteer(loose.asVolunteer) }
+      : {}),
   };
 };
 

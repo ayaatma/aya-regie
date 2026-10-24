@@ -139,6 +139,17 @@ test('three overlapping windows take three rows, and a fourth reuses the first f
   assert.deepEqual([...rows.values()], [0, 1, 2, 0]);
 });
 
+test("one person keeps one row for windows in turn, and gets a second for windows on top of each other", () => {
+  // Reported 2026-10-24: the same responsable dropped twice on a frise was two identical bands
+  // drawn as one, and removing it seemed not to work since its twin stayed underneath.
+  const a1 = { who: 'a', start: 2, end: 4 };
+  const a2 = { who: 'a', start: 2, end: 4 };
+  const a3 = { who: 'a', start: 6, end: 8 };
+  const rows = packRows([a1, a2, a3], (w) => w.who);
+  assert.notEqual(rows.get(a1), rows.get(a2), 'les deux jumeaux sont sur deux lignes');
+  assert.equal(rows.get(a3), rows.get(a1), 'la fenêtre qui suit reste sur la ligne de la première');
+});
+
 // ---------------------------------------------------------------------------
 // Trimming a box: the three ways it used to go wrong
 // ---------------------------------------------------------------------------

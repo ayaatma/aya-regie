@@ -253,17 +253,29 @@ export function packRows<T extends Window>(
     return placed;
   }
 
-  // Grouped by person, in the order their first window starts, so the rows read top to bottom
-  // the way the day does.
-  const byPerson = new Map<string, T[]>();
+  /*
+   * Grouped by person, in the order their first window starts, so the rows read top to bottom
+   * the way the day does.
+   *
+   * A PERSON'S OWN OVERLAPS SPLIT THEM IN TWO GROUPS, since 2026-10-24. Two windows of one person
+   * that overlap were drawn on the same row, exactly on top of one another: the same responsable
+   * dropped twice on a frise looked like one band, and removing it left the twin in its place, so
+   * the band seemed impossible to remove. Each group is a run of that person's windows that do
+   * not overlap, packed greedily like the windows of the plain case.
+   */
+  const byPerson = new Map<string, T[][]>();
   for (const window of inOrder) {
     const key = keyOf(window);
-    byPerson.set(key, [...(byPerson.get(key) ?? []), window]);
+    const groups = byPerson.get(key) ?? [];
+    const fits = groups.find((group) => group[group.length - 1]!.end <= window.start);
+    if (fits) fits.push(window);
+    else groups.push([window]);
+    byPerson.set(key, groups);
   }
 
   /** What each row already holds. A person joins a row only if they clash with none of it. */
   const rows: T[][] = [];
-  for (const windows of byPerson.values()) {
+  for (const windows of [...byPerson.values()].flat()) {
     let row = rows.findIndex((held) =>
       windows.every((mine) => held.every((other) => mine.start >= other.end || other.start >= mine.end)),
     );

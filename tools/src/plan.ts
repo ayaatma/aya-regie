@@ -163,8 +163,10 @@ import {
  *    `Plan.markers`, the repères of the timelines. A build that predates this writes both away.
  * 31: 2026-10-24, the Staff places: `Shift.staffHeadcount` and `Pole.defaultStaffHeadcount`. A
  *    build that predates this writes every Staff place away.
+ * 32: 2026-10-24, `Organiser.asVolunteer`: the bénévole fiche kept while somebody is Staff or
+ *    Responsable. A build that predates this writes it away, and the way back starts blank again.
  */
-export const PLAN_FORMAT = 31;
+export const PLAN_FORMAT = 32;
 
 /** See `Plan.availabilityMode`. */
 export type AvailabilityMode = 'tranches' | 'plages';

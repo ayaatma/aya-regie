@@ -81,6 +81,7 @@ import {
   assignOrganiserToPoleAt,
   defaultShiftHours,
   deleteShift,
+  mergeOwnWindows,
   setOrganiserWindow,
   setPoleLocked,
   setShiftWindow,
@@ -640,7 +641,7 @@ export function GridScreen({
       const role = plan.leaderRoles.find((r) => r.key === roleKey);
       const who = role ? plan.organisers.find((o) => o.key === role.organiserKey) : undefined;
       edit(
-        (p) => setOrganiserWindow(p, roleKey, start, end),
+        (p) => mergeOwnWindows(setOrganiserWindow(p, roleKey, start, end), roleKey),
         `horaires de ${who ? organiserName(who) : 'responsable'}`,
       );
     },
