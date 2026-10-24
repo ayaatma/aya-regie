@@ -314,6 +314,7 @@ export const OrganiserBand = memo(function OrganiserBand({
   onResize,
   onSelect,
   pickedRoleKey = null,
+  kinOrganiserKey = null,
   clashes,
   checkWindow,
 }: {
@@ -343,6 +344,11 @@ export const OrganiserBand = memo(function OrganiserBand({
   onSelect?(roleKey: string): void;
   /** The window that is selected, filled so it can be told from the others at a glance. */
   pickedRoleKey?: string | null;
+  /**
+   * The Staff / Responsable the selection is about: their other windows are ringed, the way a
+   * bénévole's other boxes are (`.box.is-kin`). Since 2026-10-24.
+   */
+  kinOrganiserKey?: string | null;
 }) {
   const placed = organisers.filter(
     ({ role }) => role.start !== null && role.end !== null && role.end > role.start,
@@ -389,6 +395,7 @@ export const OrganiserBand = memo(function OrganiserBand({
           onResize={onResize}
           onSelect={onSelect}
           picked={entry.role.key === pickedRoleKey}
+          kin={entry.organiser.key === kinOrganiserKey}
           clash={clashes?.get(entry.role.key)}
           checkWindow={checkWindow}
         />
@@ -427,6 +434,7 @@ function BandItem({
   onResize,
   onSelect,
   picked,
+  kin,
   clash,
   checkWindow,
 }: {
@@ -442,6 +450,7 @@ function BandItem({
   onResize?(roleKey: string, start: number, end: number): void;
   onSelect?(roleKey: string): void;
   picked: boolean;
+  kin: boolean;
   clash?: readonly string[];
   checkWindow?(roleKey: string, start: number, end: number): readonly string[];
 }) {
@@ -524,8 +533,12 @@ function BandItem({
       ref={element}
       className={
         'organiser-band-item' + (shown ? ' is-moving' : '') + (picked ? ' is-picked' : '') +
-        (warning ? ' is-illegal' : '')
+        (kin && !picked ? ' is-kin' : '') + (warning ? ' is-illegal' : '')
       }
+      // A button to the grid's background, which lets go of the selection on any click that is
+      // not on a box or a button: without it the click ending this press selected the window and
+      // then cleared it at once, and the band never looked selected (2026-10-24).
+      role="button"
       style={{
         left: window_.start * pxPerHour,
         width: Math.max(10, (window_.end - window_.start) * pxPerHour - 2),

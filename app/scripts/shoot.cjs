@@ -220,6 +220,32 @@ async function main() {
         await sleep(400);
         await shot('23b-grille-conflit-fiche');
       }
+      if (want('responsable')) {
+        // A responsable's window selected like a box (2026-10-24): a real click on the band, the
+        // fiche in the pane, the person's other windows and boxes ringed, then Suppr.
+        await tab('Grille');
+        await page.evaluate(() =>
+          document.querySelector('.organiser-band-item')?.scrollIntoView({ block: 'center', inline: 'center' }),
+        );
+        await sleep(300);
+        await page.click('.organiser-band-item');
+        await sleep(400);
+        const picked = await page.evaluate(() => ({
+          picked: document.querySelectorAll('.organiser-band-item.is-picked').length,
+          kin: document.querySelectorAll('.organiser-band-item.is-kin, .box.is-orga-box.is-kin').length,
+          row: !!document.querySelector('.panel-picked-row'),
+          bands: document.querySelectorAll('.organiser-band-item').length,
+        }));
+        console.log('responsable:', JSON.stringify(picked));
+        await shot('24-grille-responsable');
+        await page.keyboard.press('Delete');
+        await sleep(400);
+        const after = await page.evaluate(() => ({
+          bands: document.querySelectorAll('.organiser-band-item').length,
+        }));
+        console.log('responsable suppr:', JSON.stringify(after));
+        await shot('24b-grille-responsable-suppr');
+      }
       if (want('edition')) {
         // Mode édition (2026-09-16): in, a place added, an edge pulled, a créneau created in the
         // void, Échap out; then the same on the montage, and leaving by changing tab. Each check

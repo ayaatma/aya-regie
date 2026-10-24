@@ -6336,6 +6336,12 @@ textarea.select,
   background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 
+/* Les autres horaires de la personne sélectionnée: cerclés, comme `.box.is-kin`. */
+.organiser-band-item.is-kin {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .organiser-band-item.is-picked {
   background: var(--accent-soft);
   color: var(--accent);
@@ -6491,4 +6497,34 @@ textarea.select,
 
 .fiche-warning[open] > .fiche-warning-line {
   margin-bottom: 8px;
+}
+
+/*
+ * L'horaire de responsable sélectionné sur une frise, dans la fiche du volet (2026-10-24): la
+ * ligne de « Responsable de » qu'il est, sur le même bleu pâle que le bandeau choisi.
+ */
+.panel-picked-row {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  padding: 4px 6px;
+}
+
+.panel-picked-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* Un pôle de « Responsable de » qui sélectionne cet horaire sur sa frise. */
+button.chip.is-link {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.chip.is-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }

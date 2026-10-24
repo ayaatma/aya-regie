@@ -82,6 +82,7 @@ import {
   defaultShiftHours,
   deleteShift,
   mergeOwnWindows,
+  removeLeaderRole,
   setOrganiserWindow,
   setPoleLocked,
   setShiftWindow,
@@ -198,6 +199,13 @@ export function GridScreen({
    */
   const [selection, setSelection] = useState<Selection | null>(null);
   const selected = selectedVolunteerKey(selection);
+  /** The Staff / Responsable the selection is about, from their fiche or one of their windows. */
+  const selectedOrga =
+    selection?.kind === 'orga'
+      ? selection.organiserKey
+      : selection?.kind === 'role'
+        ? (plan.leaderRoles.find((r) => r.key === selection.roleKey)?.organiserKey ?? null)
+        : null;
   const [panelTab, setPanelTab] = useState<PanelTab>('disponibles');
   const [drag, setDrag] = useState<DragSession | null>(null);
   const [dropShiftKey, setDropShiftKey] = useState<string | null>(null);
@@ -821,6 +829,31 @@ export function GridScreen({
     setKeyNote(`${box.name} retiré de ce créneau. Ctrl+Z annule.`);
   }, [boxAt, cursor, edit, lockedKeys]);
 
+  /**
+   * A responsable's window picked on a pole's frise: Suppr takes that window away, as it takes a
+   * box off a créneau (2026-10-24). The person stays Responsable and keeps every other window;
+   * the selection moves to their fiche, which is what is left to look at.
+   */
+  const pickRole = useCallback((roleKey: string) => {
+    // The cursor goes, or Suppr would still be aimed at the bénévole box it stood on.
+    setCursor(null);
+    setSelection({ kind: 'role', roleKey });
+  }, []);
+
+  const deleteRole = useCallback(
+    (roleKey: string) => {
+      const role = plan.leaderRoles.find((r) => r.key === roleKey);
+      if (!role) return;
+      const who = plan.organisers.find((o) => o.key === role.organiserKey);
+      const name = who ? organiserName(who) : 'responsable';
+      const pole = index.poleByKey.get(role.poleKey)?.path ?? role.poleKey;
+      edit((p) => removeLeaderRole(p, roleKey), `${name} n'est plus responsable de ${pole}`);
+      setSelection({ kind: 'orga', organiserKey: role.organiserKey });
+      setKeyNote(`${name} n'est plus responsable de ${pole} sur cet horaire. Ctrl+Z annule.`);
+    },
+    [edit, index, plan.leaderRoles, plan.organisers],
+  );
+
   /*
    * Bound on the window, like the undo shortcut, and stepped around every field the régisseur
    * might be typing in. The search box sits in the same toolbar, and an arrow key inside it
@@ -851,6 +884,11 @@ export function GridScreen({
           return;
         case 'Delete':
         case 'Backspace':
+          if (selection?.kind === 'role') {
+            event.preventDefault();
+            if (!readOnly) deleteRole(selection.roleKey);
+            return;
+          }
           if (!cursor) return;
           event.preventDefault();
           deleteAtCursor();
@@ -868,7 +906,7 @@ export function GridScreen({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [clearSelection, cursor, deleteAtCursor, editing, moveCursor]);
+  }, [clearSelection, cursor, deleteAtCursor, deleteRole, editing, moveCursor, readOnly, selection]);
 
   // Leaving the mode drops whatever it had under way.
   useEffect(() => {
@@ -1468,8 +1506,9 @@ export function GridScreen({
                         readOnly={readOnly}
                         snap={RESPONSABLE_SNAP}
                         onResize={onResizeRole}
-                        onSelect={(roleKey) => setSelection({ kind: 'role', roleKey })}
+                        onSelect={pickRole}
                         pickedRoleKey={selection?.kind === 'role' ? selection.roleKey : null}
+                        kinOrganiserKey={selectedOrga}
                         clashes={orgaClashes.byRole}
                         checkWindow={checkRoleWindow}
                       />
@@ -1587,6 +1626,7 @@ export function GridScreen({
                                   lockedKeys={lockedKeys}
                                   volumeBands={volumeBands}
                                   selectedVolunteerKey={selected}
+                                  selectedOrganiserKey={selectedOrga}
                                   buddyKeys={buddyKeys}
                                   teammateKeys={teammateKeys}
                                   dragActive={drag !== null}

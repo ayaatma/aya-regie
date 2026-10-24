@@ -60,6 +60,11 @@ export interface ShiftBlockProps {
   /** The 6 h / 8 h band per volunteer, from validate(). Never recomputed here. */
   volumeBands: ReadonlyMap<string, VolumeBand>;
   selectedVolunteerKey: string | null;
+  /**
+   * The Staff / Responsable the selection is about (their fiche, or one of their responsable
+   * windows): their boxes are ringed like a bénévole's. Since 2026-10-24.
+   */
+  selectedOrganiserKey?: string | null;
   /** People the selected volunteer asked to work with. Highlighted in the buddy colour. */
   buddyKeys: ReadonlySet<string>;
   /** The selected volunteer's teammates, when the event works in teams. Ringed dashed. */
@@ -166,6 +171,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     lockedKeys,
     volumeBands,
     selectedVolunteerKey,
+    selectedOrganiserKey = null,
     buddyKeys,
     teammateKeys,
     dragActive,
@@ -306,7 +312,10 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
         return (
         <div
           key={`orga-${orga.key}`}
-          className={`box is-orga-box${clash ? ' is-illegal' : inSupport ? ' is-warned' : ''}`}
+          className={
+            `box is-orga-box${clash ? ' is-illegal' : inSupport ? ' is-warned' : ''}` +
+            (orga.key === selectedOrganiserKey ? ' is-kin' : '')
+          }
           role="button"
           // Draggable since 2026-09-12, like a volunteer's box: an orga put on the wrong créneau
           // was removed with the ✕ and placed again from the list, which is two gestures for what

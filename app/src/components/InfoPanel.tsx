@@ -195,7 +195,7 @@ function Body({
         />
       );
     case 'role':
-      return <RoleBody roleKey={selection.roleKey} onSelect={onSelect} readOnly={readOnly} />;
+      return <RoleBody roleKey={selection.roleKey} onSelect={onSelect} readOnly={readOnly} context={grid} />;
     case 'evenement':
       return (
         <EvenementBody
@@ -296,11 +296,14 @@ function OrgaBody({
   onSelect,
   readOnly,
   context,
+  pickedRoleKey = null,
 }: {
   organiserKey: string;
   onSelect(selection: Selection | null): void;
   readOnly: boolean;
   context: 'exploit' | 'phase';
+  /** The responsable window picked on a frise, lit in « Responsable de ». See `RoleBody`. */
+  pickedRoleKey?: string | null;
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const [editing, setEditing] = useState(false);
@@ -314,7 +317,11 @@ function OrgaBody({
   return (
     <>
       <Head
-        what={ORGANISER_ROLE_LABEL[organiserRoleOf(person)]}
+        what={
+          pickedRoleKey
+            ? `Horaire de responsable · ${ORGANISER_ROLE_LABEL[organiserRoleOf(person)]}`
+            : ORGANISER_ROLE_LABEL[organiserRoleOf(person)]
+        }
         name={organiserName(person)}
         kind="orga"
         action={!readOnly && <FicheEditButton editing={editing} onToggle={() => setEditing(!editing)} />}
@@ -337,34 +344,58 @@ function OrgaBody({
       {roles.length > 0 && (
         <div className="panel-section">
           <p className="panel-section-title">Responsable de</p>
-          {roles.map((role) => (
-            <p key={role.key}>
-              <span className="chip">
-                {index.poleByKey.get(role.poleKey)?.path ?? role.poleKey}
-              </span>{' '}
-              <span className="pool-item-meta">
-                {role.start === null || role.end === null
-                  ? 'horaires non réglés'
-                  : `${index.label(role.start)} → ${index.label(role.end)}`}
-              </span>{' '}
-              {!readOnly && (
-                <button
-                  className="btn is-small"
-                  title="Cette personne ne tient plus ce pôle. Elle reste Responsable."
-                  onClick={() =>
-                    edit(
-                      (p) => removeLeaderRole(p, role.key),
-                      `${organiserName(person)} n'est plus responsable de ${
-                        index.poleByKey.get(role.poleKey)?.path ?? role.poleKey
-                      }`,
-                    )
-                  }
-                >
-                  Retirer
-                </button>
-              )}
-            </p>
-          ))}
+          {roles.map((role) => {
+            const pole = index.poleByKey.get(role.poleKey)?.path ?? role.poleKey;
+            const picked = role.key === pickedRoleKey;
+            const timed = role.start !== null && role.end !== null;
+            return (
+              <p key={role.key} className={picked ? 'panel-picked-row' : undefined}>
+                {/* On the exploit a window is selectable on its frise, so it is from here too. */}
+                {context === 'exploit' && timed && !picked ? (
+                  <button
+                    className="chip is-link"
+                    title="Sélectionner cet horaire sur la frise du pôle"
+                    onClick={() => onSelect({ kind: 'role', roleKey: role.key })}
+                  >
+                    {pole}
+                  </button>
+                ) : (
+                  <span className="chip">{pole}</span>
+                )}{' '}
+                <span className="pool-item-meta">
+                  {timed
+                    ? `${index.label(role.start!)} → ${index.label(role.end!)}` +
+                      (picked ? ` · ${fmtHours(role.end! - role.start!)}` : '')
+                    : 'horaires non réglés'}
+                </span>{' '}
+                {!readOnly && (
+                  <button
+                    className="btn is-small"
+                    title={
+                      'Cette personne ne tient plus ce pôle sur cet horaire. Elle reste Responsable.' +
+                      (picked ? ' Touche Suppr.' : '')
+                    }
+                    onClick={() => {
+                      edit(
+                        (p) => removeLeaderRole(p, role.key),
+                        `${organiserName(person)} n'est plus responsable de ${pole}`,
+                      );
+                      if (picked) onSelect({ kind: 'orga', organiserKey });
+                    }}
+                  >
+                    Retirer
+                  </button>
+                )}
+                {picked && (
+                  <span className="panel-picked-hint">
+                    {readOnly
+                      ? 'Horaire sélectionné sur la frise du pôle.'
+                      : 'Horaire sélectionné: glisser le bandeau le déplace, tirer un bord change cette heure-là, Suppr le retire.'}
+                  </span>
+                )}
+              </p>
+            );
+          })}
         </div>
       )}
 
@@ -407,71 +438,33 @@ function OrgaBody({
 /**
  * One responsable's window on one pole, picked on the pole's frise (2026-10-24).
  *
- * What the band says, said in full: who, which pole, from when to when and for how long, with the
- * way to the person's fiche and the way out of the role. The hours are changed on the band itself.
+ * THE PERSON'S FICHE, WITH THE WINDOW LIT. A first version said the window alone (pole, hours,
+ * length) with a « Voir la fiche » button, and the régisseur asked for the band to behave as a
+ * box does: a box shows the person in it, so the band does too. The window is the lit line of
+ * « Responsable de », with its length and the hint that Suppr takes it away.
  */
 function RoleBody({
   roleKey,
   onSelect,
   readOnly,
+  context,
 }: {
   roleKey: string;
   onSelect(selection: Selection | null): void;
   readOnly: boolean;
+  context: 'exploit' | 'phase';
 }) {
-  const { plan, index, edit } = useLoadedPlan();
+  const { plan } = useLoadedPlan();
   const role = plan.leaderRoles.find((r) => r.key === roleKey);
-  const person = role ? plan.organisers.find((o) => o.key === role.organiserKey) : undefined;
-  if (!role || !person) return <p className="pool-empty">Cet horaire de responsable n'est plus dans le plan.</p>;
-
-  const pole = index.poleByKey.get(role.poleKey)?.path ?? role.poleKey;
-  const timed = role.start !== null && role.end !== null;
-  const clashes = index
-    .organiserConflicts()
-    .filter((c) => c.other.kind === 'role' && c.other.role.key === roleKey);
-
+  if (!role) return <p className="pool-empty">Cet horaire de responsable n'est plus dans le plan.</p>;
   return (
-    <>
-      <Head what="Horaire de responsable" name={organiserName(person)} kind="orga" />
-      <ConflictList conflicts={clashes} />
-      <dl className="kv is-near">
-        <dt>Pôle</dt>
-        <dd>{pole}</dd>
-        <dt>Horaires</dt>
-        <dd>{timed ? `${index.label(role.start!)} → ${index.label(role.end!)}` : 'non réglés'}</dd>
-        {timed && (
-          <>
-            <dt>Durée</dt>
-            <dd>{fmtHours(role.end! - role.start!)}</dd>
-          </>
-        )}
-      </dl>
-      <p className="panel-sub">
-        {readOnly
-          ? 'Les horaires se lisent sur la frise du pôle.'
-          : "Les horaires se changent sur la frise du pôle: glisser le bandeau le déplace, tirer un bord change cette heure-là."}
-      </p>
-      <p>
-        <button
-          className="btn is-small"
-          onClick={() => onSelect({ kind: 'orga', organiserKey: person.key })}
-        >
-          Voir la fiche
-        </button>{' '}
-        {!readOnly && (
-          <button
-            className="btn is-small"
-            title="Cette personne ne tient plus ce pôle sur cet horaire. Elle reste Responsable."
-            onClick={() => {
-              edit((p) => removeLeaderRole(p, role.key), `${organiserName(person)} n'est plus responsable de ${pole}`);
-              onSelect({ kind: 'orga', organiserKey: person.key });
-            }}
-          >
-            Retirer cet horaire
-          </button>
-        )}
-      </p>
-    </>
+    <OrgaBody
+      organiserKey={role.organiserKey}
+      onSelect={onSelect}
+      readOnly={readOnly}
+      context={context}
+      pickedRoleKey={roleKey}
+    />
   );
 }
 

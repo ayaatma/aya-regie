@@ -1844,6 +1844,25 @@ test("a responsable's band carries a grip at each end, and none for a reader", (
   assert.equal((reader.match(/organiser-band-grip/g) ?? []).length, 0);
 });
 
+test("a responsable's band is a button, so the click that selects it does not clear it", () => {
+  // 2026-10-24: the grid's background lets go of the selection on any click outside a box or a
+  // button. The band was neither, so the click ending the press selected it and cleared it at once.
+  const html = render(<GridScreen onSolve={noop} solving={false} solveMode={null} />, planWithOrga());
+  assert.ok(/class="organiser-band-item"[^>]*role="button"/.test(html), 'le bandeau est un bouton');
+});
+
+test("a picked responsable window shows the person's fiche with that window lit", () => {
+  const html = infoOf(planWithOrga(), { kind: 'role', roleKey: 'r1' });
+  assert.ok(shows(html, 'Camille Dubois'));
+  assert.ok(html.includes('Horaire de responsable'), 'le volet dit ce qui est choisi');
+  assert.ok(html.includes("Sur l&#x27;exploit") || html.includes("Sur l'exploit"), 'la fiche entière');
+  assert.equal((html.match(/panel-picked-row/g) ?? []).length, 1, 'la ligne de cet horaire est éclairée');
+  assert.ok(html.includes('Suppr le retire'));
+
+  const reader = infoOf(planWithOrga(), { kind: 'role', roleKey: 'r1' }, true);
+  assert.ok(!reader.includes('Suppr'), 'rien à retirer pour un lecteur');
+});
+
 /** Every band, as [top, height], read off the style the component writes. */
 const bandRows = (html: string): Array<[number, number]> =>
   [...html.matchAll(/class="organiser-band-item"[^>]*top:(\d+)px;height:(\d+)px/g)].map((m) => [
