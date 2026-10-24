@@ -3054,3 +3054,17 @@ test('a Personnes fiche folds in categories, the grid panes keep what placing so
   );
   assert.ok(!shows(phase, 'Ses choix'), "the exploit's choices are not the montage's question");
 });
+
+test('a Responsable and a Staff carry two different marks, since 2026-10-24', () => {
+  const base = planWithArtistFile();
+  const orga = base.organisers[0]!;
+  const asRole = (role: 'responsable' | 'staff'): Plan => ({
+    ...base,
+    organisers: base.organisers.map((o) => (o.key === orga.key ? { ...o, role } : o)),
+  });
+  const responsable = infoOf(asRole('responsable'), { kind: 'orga', organiserKey: orga.key });
+  assert.ok(responsable.includes('title="Responsable">📣</span>'), 'le mégaphone du Responsable');
+  const staff = infoOf(asRole('staff'), { kind: 'orga', organiserKey: orga.key });
+  assert.ok(staff.includes('title="Staff">👕</span>'), 'le t-shirt du Staff');
+  assert.ok(!staff.includes('🤩'));
+});

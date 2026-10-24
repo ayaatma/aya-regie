@@ -10,6 +10,11 @@
  * picked because stars already mean the level a volunteer declared in their pole and a second
  * meaning for the same shape would have made both unreadable. A diamond read as decoration; a
  * face is seen without being looked for, which is what a mark on a crowded grid has to do.
+ * TWO MARKS SINCE 2026-10-24, the régisseur having asked for a Responsable told from a Staff
+ * at a glance, and for something else than 🤩: 📣 for a Responsable (the one who coordinates a
+ * pôle), 👕 for the Staff (the team T-shirt). Neither was used anywhere else in the tool. An
+ * orga whose key is not given or not found reads as a Responsable, the role's default.
+ *
  * The mark appears on orgas only, because they are the exception: marking both kinds would put
  * a symbol in front of every name on the screen and say nothing.
  *
@@ -17,10 +22,13 @@
  * their kind is in the panel that opens; a lone glyph announced before every name is noise.
  */
 
-import { applicationStatusOf, statusOf, type MealPersonKind, type Plan } from '../engine.ts';
+import { useContext } from 'react';
 
-/** The orga mark itself, for the rare place that needs it outside a React tree. */
-export const ORGA_MARK = '🤩';
+import { applicationStatusOf, organiserRoleOf, statusOf, type MealPersonKind, type OrganiserRole, type Plan } from '../engine.ts';
+import { PlanContext } from '../store/store.tsx';
+
+/** The orga marks themselves, for the rare place that needs one outside a React tree. */
+export const ORGA_MARK: Record<OrganiserRole, string> = { responsable: '📣', staff: '👕' };
 
 /**
  * A member of an act, since 2026-09-13, on the one screen where the three kinds sit in one
@@ -28,11 +36,22 @@ export const ORGA_MARK = '🤩';
  */
 export const ARTIST_MARK = '🎤';
 
-export function PersonMark({ kind }: { kind: MealPersonKind }) {
+/** `personKey`: the orga, to tell a Responsable from a Staff. Read from the plan in context. */
+export function PersonMark({ kind, personKey }: { kind: MealPersonKind; personKey?: string }) {
+  const plan = useContext(PlanContext)?.plan;
   if (kind === 'benevole') return null;
+  if (kind === 'artiste') {
+    return (
+      <span className="person-mark" aria-hidden="true" title="Artiste">
+        {ARTIST_MARK}
+      </span>
+    );
+  }
+  const organiser = personKey === undefined ? undefined : plan?.organisers.find((o) => o.key === personKey);
+  const role: OrganiserRole = organiser ? organiserRoleOf(organiser) : 'responsable';
   return (
-    <span className="person-mark" aria-hidden="true" title={kind === 'orga' ? 'Staff' : 'Artiste'}>
-      {kind === 'orga' ? ORGA_MARK : ARTIST_MARK}
+    <span className="person-mark" aria-hidden="true" title={role === 'staff' ? 'Staff' : 'Responsable'}>
+      {ORGA_MARK[role]}
     </span>
   );
 }
@@ -40,7 +59,7 @@ export function PersonMark({ kind }: { kind: MealPersonKind }) {
 /**
  * « Inscription », not validated yet, since 2026-10-22: a ⏳ before the name, on every grid and in
  * the pool. The régisseur chose it over a dashed box: the box's own border already speaks for the
- * rules (red, orange, blue), and a person still to validate is a fact about the person, like 🤩.
+ * rules (red, orange, blue), and a person still to validate is a fact about the person, like 📣 or 👕.
  * Validated people carry nothing, being the normal case once the recruitment is done.
  */
 export const PENDING_MARK = '⏳';

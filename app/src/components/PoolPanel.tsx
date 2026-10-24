@@ -323,7 +323,7 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
             }}
             onDragEnd={onDragEndPool}
           >
-            <PersonMark kind={row.kind} />
+            <PersonMark kind={row.kind} personKey={row.personKey} />
             <PendingMark pending={pendingKeys.has(`${row.kind}|${row.personKey}`)} />
             <span className="pool-item-name">{row.name}</span>
             {/*

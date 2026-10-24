@@ -144,7 +144,7 @@ function PersonBody({
         <div className="fiche-head-name">
           <p className="panel-kind">{row.statuses.map((s) => s.label).join(' · ')}</p>
           <h2 className="panel-title">
-            {mark && <PersonMark kind={mark} />}
+            {mark && <PersonMark kind={mark} personKey={row.key} />}
             {withNickname(`${row.firstName} ${row.lastName}`.trim(), nickname) || 'Sans nom'}
           </h2>
         </div>

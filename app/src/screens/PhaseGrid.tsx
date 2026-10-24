@@ -1168,7 +1168,7 @@ export function PhaseGrid({
                                   });
                                 }}
                               >
-                                <PersonMark kind={box.personKind} />
+                                <PersonMark kind={box.personKind} personKey={box.personKey} />
                                 <PendingMark pending={pendingKeys.has(`${box.personKind}|${box.personKey}`)} />
                                 {nameOf(box.personKind, box.personKey)}
                               </span>
@@ -1711,7 +1711,7 @@ function Bars({
         >
           {i === 0 && (
             <span className="phase-bar-name">
-              <PersonMark kind={box.personKind} />
+              <PersonMark kind={box.personKind} personKey={box.personKey} />
               <PendingMark pending={pending} />
               {label}
             </span>

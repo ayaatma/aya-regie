@@ -357,7 +357,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           onDragEnd={onDragEndBox}
         >
           <span className="box-name">
-            <PersonMark kind="orga" />
+            <PersonMark kind="orga" personKey={orga.key} />
             <PendingMark pending={pendingKeys?.has(`orga|${orga.key}`)} />
             {orga.short}
           </span>

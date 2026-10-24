@@ -222,11 +222,14 @@ function Head({
   what,
   name,
   kind,
+  personKey,
   action,
 }: {
   what: string;
   name: string;
   kind?: PersonKind;
+  /** Tells a Responsable from a Staff in the mark. */
+  personKey?: string;
   /** At the top right of the head: the fiche's 🖍️ since 2026-10-24. */
   action?: ReactNode;
 }) {
@@ -235,7 +238,7 @@ function Head({
       <div className="fiche-head-name">
         <p className="panel-kind">{what}</p>
         <h2 className="panel-title">
-          {kind && <PersonMark kind={kind} />}
+          {kind && <PersonMark kind={kind} personKey={personKey} />}
           {name}
         </h2>
       </div>
@@ -337,6 +340,7 @@ function OrgaBody({
         }
         name={organiserName(person)}
         kind="orga"
+        personKey={organiserKey}
         action={!readOnly && <FicheEditButton editing={editing} onToggle={() => setEditing(!editing)} />}
       />
       {!readOnly && <OpenInPeople kind="orga" personKey={organiserKey} />}
@@ -662,7 +666,7 @@ function CreneauBody({
               className="link-button"
               onClick={() => onSelect({ kind: 'orga', organiserKey: orga.key })}
             >
-              <PersonMark kind="orga" />
+              <PersonMark kind="orga" personKey={orga.key} />
               {orga.name}
             </button>
             {!readOnly && (
@@ -750,7 +754,7 @@ function CreneauBody({
                   )
                 }
               >
-                <PersonMark kind="orga" />
+                <PersonMark kind="orga" personKey={orga.key} />
                 <span className="pool-item-name">{organiserName(orga)}</span>
               </div>
             ))}
@@ -806,6 +810,7 @@ function CaseBody({
         what={`Case · ${phase.label || (phaseId === 'montage' ? 'Montage' : 'Démontage')}`}
         name={name}
         kind={box.personKind}
+        personKey={box.personKey}
       />
       <p className="panel-sub">
         {box.personKind === 'orga' ? 'Staff' : 'Bénévole'} · {where} ·{' '}
@@ -971,7 +976,7 @@ function EvenementBody({
                 onSelect({ kind: 'case', phaseId, assignmentKey: box.assignmentKey })
               }
             >
-              <PersonMark kind={box.personKind} />
+              <PersonMark kind={box.personKind} personKey={box.personKey} />
               {nameOf(box.personKind, box.personKey)}
             </button>{' '}
             {!readOnly && (
@@ -1028,7 +1033,7 @@ function EvenementBody({
                 )
               }
             >
-              <PersonMark kind={person.kind} />
+              <PersonMark kind={person.kind} personKey={person.key} />
               <span className="pool-item-name">{nameOf(person.kind, person.key)}</span>
               <span className="pool-item-meta">
                 {person.kind === 'orga' ? 'orga' : 'bénévole'}

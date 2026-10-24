@@ -130,7 +130,7 @@ export function SideActivitiesScreen() {
                           return (
                             <tr key={`${p.kind}|${p.key}`}>
                               <td>
-                                <PersonMark kind={p.kind} />{' '}
+                                <PersonMark kind={p.kind} personKey={p.key} />{' '}
                                 {nav ? (
                                   <button
                                     className="btn is-link"

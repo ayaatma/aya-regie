@@ -261,7 +261,7 @@ export function CateringScreen({ onGoToSetup }: { onGoToSetup(): void }) {
                         return (
                           <tr key={`${person.kind}|${person.key}`}>
                             <td className="catering-who">
-                              <PersonMark kind={person.kind} /> {person.name}
+                              <PersonMark kind={person.kind} personKey={person.key} /> {person.name}
                               {person.group !== '' && (
                                 <span className="people-meta"> · {person.group}</span>
                               )}
