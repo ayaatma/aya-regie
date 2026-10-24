@@ -254,9 +254,10 @@ function VolunteerDetail({
         name={`${volunteer.firstName} ${volunteer.lastName}`}
         readOnly={readOnly}
         editing={editing}
-        compact={!folded}
         formFileId={driveFileIds(volunteer.formAnswers?.photo ?? '')[0] ?? null}
       />
+      {/* Right under the photo since 2026-10-24: what is wrong is the first thing read after the face. */}
+      <FicheWarning volunteer={volunteer} detail={detail} readOnly={readOnly} onReviewed={onReviewed} />
       {editing ? (
         <div className="panel-section">
           <IdentityEdit {...sections} />
@@ -274,7 +275,6 @@ function VolunteerDetail({
           {volunteer.backup === true && <span className="chip is-ok">Réserve</span>}
         </p>
       )}
-      <FicheWarning volunteer={volunteer} detail={detail} readOnly={readOnly} onReviewed={onReviewed} />
     </>
   );
 

@@ -25,6 +25,7 @@ import { fmtHours, type Plan } from './plan.js';
 import { EDITABLE_FIELDS, ENERGY_LABEL, choicePoleLabel, type EditableField, type Volunteer } from './model.js';
 import { parseSubmittedAt, type ImportIssue, type ImportResult } from './import.js';
 import { organiserIdentity } from './import-organisers.js';
+import { normalise } from './text.js';
 
 /** One answer that differs between the plan and the new export. */
 export interface FieldChange {
@@ -301,6 +302,50 @@ export const FIELD_LABEL: Record<EditableField, string> = {
 };
 
 /**
+ * What an answer's doubt is about: its words up to the answer quoted, « Artiste introuvable dans
+ * la programmation: "X" ». Two wordings of the same doubt share it; null for a line quoting nothing.
+ */
+const doubtSubject = (reason: string): string | null => /^[^"]*"[^"]*"/.exec(reason)?.[0] ?? null;
+
+/** The answer a line quotes first, trimmed. */
+const quotedAnswer = (reason: string): string | null => /"([^"]*)"/.exec(reason)?.[1]?.trim() ?? null;
+
+/**
+ * The review lines a fiche keeps when the person's answers did not change, since 2026-10-24.
+ *
+ * The lines stay those a human left, with two exceptions about the import's own doubts:
+ *   - a line the importer now words differently is replaced by its new wording, so « À régler »
+ *     recognises it and offers its choice (an artist line written before 2026-10-23 had none);
+ *   - a line quoting an answer the correspondence now settles is gone, which is what « Retenir
+ *     pour les N fiches » promises for people already in the plan.
+ * A line about a correction overtaken (« La réponse ... a changé ») is a human matter and stays.
+ */
+function keptReasons(before: readonly string[], fresh: readonly string[], settled: readonly string[]): string[] {
+  const freshBySubject = new Map(fresh.flatMap((line) => {
+    const subject = doubtSubject(line);
+    return subject === null ? [] : [[subject, line] as const];
+  }));
+  const done = new Set(settled.map(normalise));
+  const kept: string[] = [];
+  for (const line of before) {
+    if (fresh.includes(line) || line.startsWith('La réponse')) {
+      kept.push(line);
+      continue;
+    }
+    const subject = doubtSubject(line);
+    const reworded = subject === null ? undefined : freshBySubject.get(subject);
+    if (reworded !== undefined) {
+      if (!kept.includes(reworded)) kept.push(reworded);
+      continue;
+    }
+    const answer = quotedAnswer(line);
+    if (answer !== null && done.has(normalise(answer))) continue;
+    kept.push(line);
+  }
+  return kept;
+}
+
+/**
  * The imported answers, with the régisseur's own corrections kept on top.
  *
  * THE FUNCTION THE WHOLE MANUAL-CORRECTION FEATURE RESTS ON, and the reason it is exported:
@@ -326,10 +371,16 @@ export const FIELD_LABEL: Record<EditableField, string> = {
  * `validated`: the régisseur read this fiche during this import's review (« La lecture est
  * bonne », or a correction saved). The fiche then leaves the queue whatever it held before.
  *
+ * `settled`: the answers of this fiche the form's correspondence now reads (`AnswerSettled`).
+ *
  * The access code is preserved for a different reason: it is not an answer, it is ours, and it
  * may already be in somebody's inbox.
  */
-export function mergeWithManual(before: Volunteer, imported: Volunteer, options: { validated?: boolean } = {}): Volunteer {
+export function mergeWithManual(
+  before: Volunteer,
+  imported: Volunteer,
+  options: { validated?: boolean; settled?: readonly string[] } = {},
+): Volunteer {
   const corrected = new Set<EditableField>([...before.manualFields, ...imported.manualFields]);
   const merged: Volunteer = {
     ...imported,
@@ -362,8 +413,10 @@ export function mergeWithManual(before: Volunteer, imported: Volunteer, options:
     (!before.formAnswers ||
       !imported.formAnswers ||
       DOUBTFUL_FIELDS.every((field) => (before.formAnswers![field] ?? '') === (imported.formAnswers![field] ?? '')));
-  const reasons = sameAnswers ? [...before.reviewReasons] : [...imported.reviewReasons];
+  const reasons = sameAnswers ? keptReasons(before.reviewReasons, imported.reviewReasons, options.settled ?? []) : [...imported.reviewReasons];
   let needsReview = sameAnswers ? before.needsReview : imported.needsReview;
+  // Every line of the fiche was a doubt the correspondence has now settled: nothing left to read.
+  if (sameAnswers && before.reviewReasons.length > 0 && reasons.length === 0 && !imported.needsReview) needsReview = false;
 
   for (const field of before.manualFields) {
     if (imported.manualFields.includes(field)) continue;
@@ -402,6 +455,12 @@ export function mergeWithManual(before: Volunteer, imported: Volunteer, options:
 }
 
 /**
+ * The answers of one fiche the correspondence settled on this import. See `AnswerSettled`.
+ */
+const settledOf = (imported: ImportResult, key: string): string[] =>
+  imported.settled?.find((entry) => entry.key === key)?.answers ?? [];
+
+/**
  * What the plan will hold for every person of an import once it is applied: the merge with the
  * fiche already there, or the fresh fiche. The import screen's review lists read this, so a fiche
  * a human settled on an earlier import does not come back to be read again.
@@ -411,7 +470,7 @@ export function plannedVolunteers(plan: Plan, imported: ImportResult): Volunteer
   const validated = new Set(imported.validated ?? []);
   return imported.volunteers.map((fresh) => {
     const before = current.get(fresh.key);
-    return before ? mergeWithManual(before, fresh, { validated: validated.has(fresh.key) }) : fresh;
+    return before ? mergeWithManual(before, fresh, { validated: validated.has(fresh.key), settled: settledOf(imported, fresh.key) }) : fresh;
   });
 }
 
@@ -463,7 +522,7 @@ export function reconcileVolunteers(plan: Plan, imported: ImportResult): Reconci
       continue;
     }
     // Diffed against what accepting the import would really produce, corrections included.
-    const after = mergeWithManual(before, fresh, { validated: imported.validated?.includes(key) });
+    const after = mergeWithManual(before, fresh, { validated: imported.validated?.includes(key), settled: settledOf(imported, key) });
     const changes = changesBetween(before, after, poleName, artistName);
     if (changes.length === 0) unchanged++;
     else updated.push({ key, name: name(after), before, after, changes });
@@ -558,7 +617,7 @@ export function applyReconciliation(
     const before = byKey.get(volunteer.key);
     // The access code, and every field the régisseur corrected by hand. Both are things a
     // re-import must never undo; `mergeWithManual` is the single place that says so.
-    const merged = before ? mergeWithManual(before, volunteer, { validated: imported.validated?.includes(volunteer.key) }) : volunteer;
+    const merged = before ? mergeWithManual(before, volunteer, { validated: imported.validated?.includes(volunteer.key), settled: settledOf(imported, volunteer.key) }) : volunteer;
     volunteers.push(
       before && reinstate.has(volunteer.key) && before.status === 'annule' ? { ...merged, status: 'candidature' } : merged,
     );

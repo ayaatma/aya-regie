@@ -109,14 +109,8 @@ export function OrganiserFiche({
 
   const head = (
     <>
-      <PersonPhoto personKey={person.key} name={who} readOnly={readOnly} editing={live} compact={!folded} />
-      {live && (
-        <div className="rules-grid">
-          {field('Prénom', 'firstName', { autoComplete: 'given-name' })}
-          {field('Nom', 'lastName', { autoComplete: 'family-name' })}
-        </div>
-      )}
-      <RegistrationSection kind="orga" personKey={person.key} readOnly={readOnly || !folded} part="status" />
+      <PersonPhoto personKey={person.key} name={who} readOnly={readOnly} editing={live} />
+      {/* Right under the photo, as on a bénévole's fiche. */}
       {clashes.length > 0 && (
         <div className="fiche-review is-bad">
           <details className="fiche-warning">
@@ -132,6 +126,13 @@ export function OrganiserFiche({
           </details>
         </div>
       )}
+      {live && (
+        <div className="rules-grid">
+          {field('Prénom', 'firstName', { autoComplete: 'given-name' })}
+          {field('Nom', 'lastName', { autoComplete: 'family-name' })}
+        </div>
+      )}
+      <RegistrationSection kind="orga" personKey={person.key} readOnly={readOnly || !folded} part="status" />
     </>
   );
 

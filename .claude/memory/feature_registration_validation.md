@@ -57,3 +57,13 @@ bounces are not seen. No bulk validation.
   `drawMissingCodes` (setupEdits.ts) draws one when the window opens (fiche and « Valider les
   personnes placées »), the preview shows it, and `giveDrawnCodes` stores it only with a mail that
   leaves. Validating without a mail still invents no credential.
+
+## 2026-10-24, second round (ToDo of the developer)
+
+- The status is no longer a boxed banner above the buttons: one line, the status name alone in its
+  colour (orange / green / red, no icon, no « pas encore validée »), then « Valider » / « Annuler »
+  (or « Remettre en inscription »), the audience pushed right. « Envoyer / Renvoyer le mail » stays
+  on its own line in Suivi. Labels unchanged (« Inscription », not « En attente »).
+- On a fiche, the warning (« Fiche à relire · N signalements ») sits right under the photo, on
+  bénévoles and orgas. Its « Valider la fiche » was blue on blue: the later `.btn.is-small` rule
+  set `color: var(--accent)`; `.btn.is-primary.is-small` restores `--accent-ink`.

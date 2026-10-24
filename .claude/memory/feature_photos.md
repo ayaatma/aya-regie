@@ -70,3 +70,6 @@ to the organiser's key (by `organiserIdentity`), and the « Passer Staff / Respo
 button calls `movePhoto`. The stranded objects under the old hashes stay in the bucket.
 **Verified live by the developer on 2026-10-24: bénévoles' photos show, and with this fix the
 Staff / Responsables' too.** Open: orphan objects under old hashes (cleanup offered, not asked).
+
+2026-10-24, later: the planning's panes show the photo as large as Personnes does; the `compact`
+prop of `PersonPhoto` is gone.

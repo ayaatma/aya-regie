@@ -121,13 +121,48 @@ export function RegistrationSection({
     setConfirming(null);
   };
 
+  const showStatus = part !== 'mails';
+  const showMails = part !== 'status';
+
+  /*
+    TWO BUTTONS RATHER THAN A LIST, 2026-10-24, the régisseur's design: « Valider » in green and
+    « Annuler » in red while the person is an inscription, then one neutral button to bring
+    them back to it. Validating and cancelling still go through the window and its mail.
+  */
+  const statusButtons =
+    !readOnly &&
+    showStatus &&
+    confirming === null &&
+    (status === 'candidature' ? (
+      <>
+        <button type="button" className="btn is-ok" onClick={() => open('validation')}>
+          Valider
+        </button>
+        <button type="button" className="btn is-danger" onClick={() => open('annulation')}>
+          Annuler
+        </button>
+      </>
+    ) : (
+      <button
+        type="button"
+        className="btn is-small"
+        title="Repasse en inscription, sans envoyer de mail"
+        aria-label={`Remettre ${who} en inscription`}
+        onClick={() => setStatus('candidature')}
+      >
+        Remettre en inscription
+      </button>
+    ));
+
+  /*
+    ONE LINE, NOT A WARNING, since 2026-10-24 (the régisseur: the boxed line above the buttons took
+    too much room for what is a fact): the status's name in its colour, then the buttons that
+    change it, the audience at the end.
+  */
   const banner = (
     <div className={`registration is-${status}`}>
-      <span className="registration-status">
-        {status === 'candidature' ? '⏳ ' : status === 'valide' ? '✓ ' : '✕ '}
-        {APPLICATION_STATUS_LABEL[status]}
-        {status === 'candidature' && <span className="registration-hint">, pas encore validée</span>}
-      </span>
+      <span className="registration-status">{APPLICATION_STATUS_LABEL[status]}</span>
+      {statusButtons}
       <span className="registration-audience">{audienceLabel(plan, person.audience)}</span>
       {followUp && status === 'valide' && followUp.stage.label !== 'Validé·e' && (
         <span className="registration-stage">{followUp.stage.label}</span>
@@ -146,46 +181,15 @@ export function RegistrationSection({
 
   if (readOnly) return part === 'mails' ? null : <div className="panel-section">{banner}</div>;
 
-  const showStatus = part !== 'mails';
-  const showMails = part !== 'status';
-
   return (
     <div className="panel-section registration-section">
       {showStatus && banner}
 
-      {/*
-        TWO BUTTONS RATHER THAN A LIST, 2026-10-24, the régisseur's design: « Valider » in green and
-        « Annuler » in red while the person is an inscription, then one neutral button to bring
-        them back to it. Validating and cancelling still go through the window and its mail.
-      */}
-      {confirming === null && (showStatus || status === 'valide') && (
+      {confirming === null && showMails && status === 'valide' && (
         <div className="registration-actions">
-          {showStatus && status === 'candidature' && (
-            <>
-              <button type="button" className="btn is-ok" onClick={() => open('validation')}>
-                Valider
-              </button>
-              <button type="button" className="btn is-danger" onClick={() => open('annulation')}>
-                Annuler
-              </button>
-            </>
-          )}
-          {showStatus && status !== 'candidature' && (
-            <button
-              type="button"
-              className="btn is-small"
-              title="Repasse en inscription, sans envoyer de mail"
-              aria-label={`Remettre ${who} en inscription`}
-              onClick={() => setStatus('candidature')}
-            >
-              Remettre en inscription
-            </button>
-          )}
-          {showMails && status === 'valide' && (
-            <button type="button" className="btn is-small" onClick={() => open('renvoi')} disabled={!isMailAddress(person.email)}>
-              {last ? 'Renvoyer le mail' : 'Envoyer le mail'}
-            </button>
-          )}
+          <button type="button" className="btn is-small" onClick={() => open('renvoi')} disabled={!isMailAddress(person.email)}>
+            {last ? 'Renvoyer le mail' : 'Envoyer le mail'}
+          </button>
         </div>
       )}
 

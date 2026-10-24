@@ -578,3 +578,26 @@ test("a re-import never touches the régisseur's tracking of an application", ()
   deepStrictEqual(alice.statusSteps, ['confirmation']);
   strictEqual(alice.regieNote, 'mail du 3');
 });
+
+// 2026-10-24, the régisseur's case: fiches imported before 2026-10-23 carried the artist line in
+// its old words, which « À régler » no longer recognised, and deciding the answer there left it.
+test('an artist doubt in its old words takes the new ones, and leaves once the answer is settled', () => {
+  const plan = planWith(BASE);
+  const base = plan.volunteers[0]!;
+  const answer = "Set final par les artistes de l'association Aya Atma";
+  const oldLine = `Artiste introuvable dans la programmation: "${answer}".`;
+  const newLine = `${oldLine} Choisir l'artiste dans « À régler » ou sur la fiche.`;
+  const human = 'Appeler pour le covoiturage.';
+  const before: Volunteer = { ...base, needsReview: true, reviewReasons: [oldLine, human] };
+
+  const stillUnread = mergeWithManual(before, { ...base, needsReview: true, reviewReasons: [newLine] });
+  deepStrictEqual(stillUnread.reviewReasons, [newLine, human], 'la nouvelle formulation, que « À régler » reconnaît');
+
+  const decided = mergeWithManual(before, { ...base, needsReview: false, reviewReasons: [] }, { settled: [answer] });
+  deepStrictEqual(decided.reviewReasons, [human], 'la ligne réglée part, celle du régisseur reste');
+  ok(decided.needsReview);
+
+  const only = mergeWithManual({ ...before, reviewReasons: [oldLine] }, { ...base, needsReview: false, reviewReasons: [] }, { settled: [answer] });
+  deepStrictEqual(only.reviewReasons, []);
+  ok(!only.needsReview, 'plus rien à relire');
+});

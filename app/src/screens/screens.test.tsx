@@ -2542,7 +2542,8 @@ test('a fiche says at once whether the person is validated, and offers to valida
   const pending: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'candidature' as const } : v)) };
   const html = peopleOf(pending, { kind: 'benevole', key });
   assert.ok(html.includes('registration is-candidature'));
-  assert.ok(shows(html, 'pas encore validée'));
+  // The name of the status alone, on the line of its buttons, since 2026-10-24.
+  assert.ok(html.includes('<span class="registration-status">Inscription</span><button type="button" class="btn is-ok">'));
   // Two buttons since 2026-10-24, green and red, in place of the list of statuses.
   assert.ok(html.includes('class="btn is-ok">Valider</button>'));
   assert.ok(html.includes('class="btn is-danger">Annuler</button>'));

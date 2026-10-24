@@ -428,6 +428,18 @@ export interface AnswerDoubt {
   messages: string[];
 }
 
+/**
+ * The answers of one fiche read through the régisseur's correspondence rather than guessed,
+ * since 2026-10-24. A person already in the plan keeps the review lines of the import that
+ * first raised a doubt (`mergeWithManual`), so deciding an answer in « À régler » has to say
+ * which ones it settled, or the line would stay on every fiche it was decided for.
+ */
+export interface AnswerSettled {
+  key: string;
+  /** As typed, trimmed. */
+  answers: string[];
+}
+
 export interface ResolvedBuddy {
   fromKey: string;
   rawName: string;
@@ -442,6 +454,8 @@ export interface ImportResult {
   issues: ImportIssue[];
   /** The closed answers read with a doubt, one per fiche and answer. See `AnswerDoubt`. */
   doubts?: AnswerDoubt[];
+  /** The answers the form's correspondence settled, per fiche. See `AnswerSettled`. */
+  settled?: AnswerSettled[];
   /**
    * The fiches the régisseur read during this import's review, never set by the importer: the
    * import screen adds them. They leave the queue on apply. See `mergeWithManual`.
@@ -1161,8 +1175,13 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
 
   /** The régisseur's reading of an answer, when there is one. `undefined` means none: read it. */
   const answers: AnswerMaps = mapping.answers;
-  const decidedAnswer = <K extends AnswerKind>(kind: K, raw: string): NonNullable<AnswerMaps[K]>[string] | undefined =>
-    (answers[kind] as Record<string, NonNullable<AnswerMaps[K]>[string]> | undefined)?.[normalise(raw)];
+  /** The answers of the row being read that the régisseur's reading settled. See `AnswerSettled`. */
+  let rowSettled: string[] = [];
+  const decidedAnswer = <K extends AnswerKind>(kind: K, raw: string): NonNullable<AnswerMaps[K]>[string] | undefined => {
+    const decided = (answers[kind] as Record<string, NonNullable<AnswerMaps[K]>[string]> | undefined)?.[normalise(raw)];
+    if (decided !== undefined && raw.trim() !== '') rowSettled.push(raw.trim());
+    return decided;
+  };
 
   const readPole = (raw: string): AnswerReading<string> => {
     const decided = decidedAnswer('pole', raw);
@@ -1206,6 +1225,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
   const photoOf = new Map<string, string>();
   const identities = new Set<string>();
   const doubts: AnswerDoubt[] = [];
+  const settled: AnswerSettled[] = [];
 
   const activityColumns = sideActivityColumns(rows[0]!, binding, options.sideActivities ?? []);
 
@@ -1234,6 +1254,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const firstName = cell(row, 'firstName');
     const lastName = cell(row, 'lastName');
     const person = `${firstName} ${lastName}`.trim();
+    rowSettled = [];
 
     if (firstName === '' || lastName === '') {
       issues.push({ severity: 'error', code: 'identite-incomplete', row: rowNumber, person, message: 'Prénom ou nom manquant.' });
@@ -1611,6 +1632,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     identities.add(key);
     rowOf.set(key, rowNumber);
     for (const doubt of rowDoubts) doubts.push({ key, ...doubt });
+    if (rowSettled.length > 0) settled.push({ key, answers: [...new Set(rowSettled)] });
     // The first file of the answer: the question takes one photo, and a second is a mistake.
     const photo = driveFileIds(cell(row, 'photo'))[0];
     if (photo) photoOf.set(key, photo);
@@ -1726,7 +1748,7 @@ export function importVolunteers(csvText: string, options: ImportOptions): Impor
     const key = issue.row === null ? undefined : keyOfRow.get(issue.row);
     if (key !== undefined) issue.key = key;
   }
-  return { volunteers, buddies, issues, doubts, photos:[...photoOf].map(([volunteerKey, driveFileId]) => ({ volunteerKey, driveFileId })) };
+  return { volunteers, buddies, issues, doubts, settled, photos:[...photoOf].map(([volunteerKey, driveFileId]) => ({ volunteerKey, driveFileId })) };
 }
 
 /**

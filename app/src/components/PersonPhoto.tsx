@@ -11,7 +11,8 @@
  * the form carries and an import could not bring (`formFileId`, read from the raw answers).
  *
  * Since 2026-10-24, LARGE FROM THE START, which is what a click on it used to do: a 72 px thumbnail
- * did not tell two faces apart. Its tools belong to the fiche's mode édition (`editing`): out of it
+ * did not tell two faces apart. On the planning's panes as large as on Personnes (2026-10-24, the
+ * small square there was not enough either). Its tools belong to the fiche's mode édition (`editing`): out of it
  * the photo is shown and nothing else; in it, a click on the photo opens the cropper (or the file
  * dialog when there is none yet), a file can be dropped on it, and the buttons are under it.
  *
@@ -40,7 +41,6 @@ export function PersonPhoto({
   readOnly = false,
   formFileId = null,
   editing = true,
-  compact = false,
 }: {
   personKey: string;
   name: string;
@@ -49,8 +49,6 @@ export function PersonPhoto({
   formFileId?: string | null;
   /** The fiche's mode édition: the buttons, the drop, the click that crops. */
   editing?: boolean;
-  /** The planning's panes, since 2026-10-24: the small square even with a photo, the grid needs the room. */
-  compact?: boolean;
 }) {
   const { id: eventId } = usePlan();
   const { url, source, loading, error } = usePhoto(readOnly ? null : eventId, personKey);
@@ -131,7 +129,7 @@ export function PersonPhoto({
 
   return (
     <div
-      className={`person-photo${over ? ' is-over' : ''}${url && !compact ? ' is-large' : ''}${editing ? ' is-editing' : ''}`}
+      className={`person-photo${over ? ' is-over' : ''}${url ? ' is-large' : ''}${editing ? ' is-editing' : ''}`}
       onDragOver={(event) => {
         if (!editing || ![...event.dataTransfer.types].includes('Files')) return;
         event.preventDefault();

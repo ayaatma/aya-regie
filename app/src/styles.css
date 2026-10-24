@@ -3718,6 +3718,11 @@ button {
   border-color: var(--accent);
 }
 
+/* A small primary button keeps its ink: the rule above wrote blue on blue (« Valider la fiche »). */
+.btn.is-primary.is-small {
+  color: var(--accent-ink);
+}
+
 .btn.is-link {
   border: 0;
   background: transparent;
@@ -5608,40 +5613,32 @@ textarea.select,
   gap: 6px;
 }
 
-/* The status, first thing on a fiche: orange to validate, green validated, red cancelled. */
+/*
+ * The status, one line since 2026-10-24: its name coloured (orange to validate, green validated,
+ * red cancelled), the buttons that change it right after, the audience at the end. No box: a
+ * status is a fact, not a warning.
+ */
 .registration {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  padding: 7px 10px;
-  border: 1px solid var(--orange-fonce);
-  border-radius: var(--radius);
-  background: var(--orange-fonce-bg);
-  color: var(--orange-fonce);
-}
-
-.registration.is-valide {
-  border-color: var(--ok);
-  background: var(--ok-bg);
-  color: var(--ok);
-}
-
-.registration.is-annule {
-  border-color: var(--rouge);
-  background: var(--rouge-bg);
-  color: var(--rouge);
 }
 
 .registration-status {
   font-weight: 600;
+  color: var(--orange-fonce);
 }
 
-.registration-hint {
-  font-weight: 400;
+.registration.is-valide .registration-status {
+  color: var(--ok);
+}
+
+.registration.is-annule .registration-status {
+  color: var(--rouge);
 }
 
 .registration-audience {
+  margin-left: auto;
   font-size: 11px;
   color: var(--ink-soft);
   white-space: nowrap;

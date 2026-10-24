@@ -785,6 +785,8 @@ test('an act the form words unlike its fiche is a doubt, offered when its words 
   deepStrictEqual(decided.volunteers[0]!.artistKeys, ['voltz']);
   ok(!(decided.doubts ?? []).some((d) => d.kind === 'artist'));
   ok(!decided.issues.some((i) => i.code === 'artiste-inconnu'));
+  // Said, so that a fiche already in the plan drops the line too. See `mergeWithManual`.
+  ok(decided.settled?.some((s) => s.answers.includes('Le set final des copains')), JSON.stringify(decided.settled));
 });
 
 test('a refused pole is read like a choice, emoji and parenthesis included', () => {

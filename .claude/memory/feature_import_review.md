@@ -119,3 +119,19 @@ min_plan_format 30: apply it, THEN deploy the front.**
 
 Consequence: an answer doubt (« À régler ») no longer lists people already validated; they get
 the reading through the reconciliation's « Réponses modifiées » instead.
+
+## 2026-10-24: an old-worded doubt on a fiche already in the plan
+
+The developer saw « Artiste introuvable dans la programmation: "Set final par les artistes de
+l'association Aya Atma" » in « À régler » as a plain line, no choice, no « Retenir pour les N
+fiches ». Cause: those fiches were imported before 2026-10-23, so their review line is the OLD
+wording (no « Choisir l'artiste dans... » suffix); answers unchanged means `mergeWithManual` keeps
+the fiche's own lines, and « À régler » only groups a doubt whose message matches a line word for
+word. Second defect behind it: deciding an answer there never removed the line from a fiche
+already in the plan, for any kind of doubt.
+
+Fix in `reconcile.ts` (`keptReasons`): with unchanged answers, a fiche line sharing a fresh line's
+subject (words up to the first quoted answer) takes the fresh wording; a line quoting an answer
+the correspondence settled (`ImportResult.settled`, recorded by `decidedAnswer` in `import.ts`) is
+dropped; « La réponse ... a changé » lines always stay. A fiche whose every line was so settled
+leaves the queue. No schema, no plan format. Not checked in the browser on the real export.
