@@ -32,3 +32,10 @@ there clickable to select their window. Suppr / Retour on a `role` selection cal
 selected Staff / Responsable (orga or role selection) rings their créneau boxes (`ShiftBlock`
 `selectedOrganiserKey`) and other bands (`OrganiserBand` `kinOrganiserKey`, `.is-kin`). Seen in
 headless Chrome: `npm run shots -- responsable`.
+
+**Round 3, same day: Staff boxes too.** `Selection` `orga` carries an optional `shiftKey` when
+the box itself was clicked (`ShiftBlock.onSelectOrga(orgaKey, shiftKey)`, `GridScreen.pickOrgaBox`,
+which drops the cursor). That box is `.is-picked` (filled), the person's others `.is-kin`;
+the fiche lights the créneau in « Sur l'exploit », which now has a « Retirer » per line. Suppr
+calls `deleteOrgaBox` (= `takeOrgaOut`, the place stays empty), selection back to the plain
+fiche. From the list or the search box no `shiftKey`, nothing lit. `npm run shots -- staff`.

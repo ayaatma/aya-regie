@@ -19,8 +19,13 @@ import type { PhaseId } from '../engine.ts';
 export type Selection =
   /** A bénévole, from a box on any of the three grids, from a pool or from the search box. */
   | { kind: 'benevole'; volunteerKey: string }
-  /** An orga, same three ways in. */
-  | { kind: 'orga'; organiserKey: string }
+  /**
+   * An orga, same three ways in.
+   *
+   * `shiftKey` is set when what was clicked was their box in that créneau of the exploit: the box
+   * is filled as a bénévole's picked box is, and Suppr takes them out of that créneau (2026-10-24).
+   */
+  | { kind: 'orga'; organiserKey: string; shiftKey?: string }
   /**
    * A créneau of the exploit.
    *

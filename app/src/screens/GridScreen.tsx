@@ -718,6 +718,27 @@ export function GridScreen({
     [edit, plan.organisers],
   );
 
+  /** A Staff / Responsable box clicked: that person, in that créneau, like a bénévole's box. */
+  const pickOrgaBox = useCallback((organiserKey: string, shiftKey: string) => {
+    // The cursor goes, or Suppr would still be aimed at the bénévole box it stood on.
+    setCursor(null);
+    setSelection({ kind: 'orga', organiserKey, shiftKey });
+  }, []);
+
+  /**
+   * Suppr on a picked Staff / Responsable box: out of that créneau, as the ✕ does. Their place
+   * stays, empty, and the fiche stays open on the person (2026-10-24).
+   */
+  const deleteOrgaBox = useCallback(
+    (organiserKey: string, shiftKey: string) => {
+      const who = plan.organisers.find((o) => o.key === organiserKey);
+      takeOrgaOut(organiserKey, shiftKey);
+      setSelection({ kind: 'orga', organiserKey });
+      setKeyNote(`${who ? organiserName(who) : 'Staff'} retiré·e de ce créneau. Ctrl+Z annule.`);
+    },
+    [plan.organisers, takeOrgaOut],
+  );
+
   const onToggleLock = useCallback(
     (volunteerKey: string, shiftKey: string) => {
       const locked = lockedKeys.has(`${volunteerKey}|${shiftKey}`);
@@ -889,6 +910,11 @@ export function GridScreen({
             if (!readOnly) deleteRole(selection.roleKey);
             return;
           }
+          if (selection?.kind === 'orga' && selection.shiftKey) {
+            event.preventDefault();
+            if (!readOnly) deleteOrgaBox(selection.organiserKey, selection.shiftKey);
+            return;
+          }
           if (!cursor) return;
           event.preventDefault();
           deleteAtCursor();
@@ -906,7 +932,7 @@ export function GridScreen({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [clearSelection, cursor, deleteAtCursor, deleteRole, editing, moveCursor, readOnly, selection]);
+  }, [clearSelection, cursor, deleteAtCursor, deleteOrgaBox, deleteRole, editing, moveCursor, readOnly, selection]);
 
   // Leaving the mode drops whatever it had under way.
   useEffect(() => {
@@ -1627,6 +1653,9 @@ export function GridScreen({
                                   volumeBands={volumeBands}
                                   selectedVolunteerKey={selected}
                                   selectedOrganiserKey={selectedOrga}
+                                  selectedOrganiserShiftKey={
+                                    selection?.kind === 'orga' ? (selection.shiftKey ?? null) : null
+                                  }
                                   buddyKeys={buddyKeys}
                                   teammateKeys={teammateKeys}
                                   dragActive={drag !== null}
@@ -1650,9 +1679,7 @@ export function GridScreen({
                                   onSelectShift={(shiftKey, fill) =>
                                     setSelection({ kind: 'creneau', shiftKey, fill })
                                   }
-                                  onSelectOrga={(organiserKey) =>
-                                    setSelection({ kind: 'orga', organiserKey })
-                                  }
+                                  onSelectOrga={pickOrgaBox}
                                   onRemoveOrga={takeOrgaOut}
                                   supportOnlyOrgaKeys={supportOnlyByShift.get(shift.key)}
                                   clashingOrgas={orgaClashes.byShift.get(shift.key)}

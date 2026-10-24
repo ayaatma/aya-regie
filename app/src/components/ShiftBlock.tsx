@@ -65,6 +65,8 @@ export interface ShiftBlockProps {
    * windows): their boxes are ringed like a bénévole's. Since 2026-10-24.
    */
   selectedOrganiserKey?: string | null;
+  /** The créneau of the orga box that was clicked, filled rather than ringed. */
+  selectedOrganiserShiftKey?: string | null;
   /** People the selected volunteer asked to work with. Highlighted in the buddy colour. */
   buddyKeys: ReadonlySet<string>;
   /** The selected volunteer's teammates, when the event works in teams. Ringed dashed. */
@@ -109,7 +111,8 @@ export interface ShiftBlockProps {
    * level, no volume and no signalement, so their rows are plain. Everything else about them
    * lives on their fiche, which this opens. See `OrganiserShift`.
    */
-  onSelectOrga(organiserKey: string): void;
+  /** A click on an orga's box: that person, standing in that créneau. */
+  onSelectOrga(organiserKey: string, shiftKey: string): void;
   onRemoveOrga(organiserKey: string, shiftKey: string): void;
   /**
    * Orgas in this créneau who are responsable of a pole that wants its responsable in support.
@@ -172,6 +175,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     volumeBands,
     selectedVolunteerKey,
     selectedOrganiserKey = null,
+    selectedOrganiserShiftKey = null,
     buddyKeys,
     teammateKeys,
     dragActive,
@@ -309,12 +313,15 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
       {report.orgas.map((orga) => {
         const inSupport = supportOnlyOrgaKeys?.has(orga.key) === true;
         const clash = clashingOrgas?.get(orga.key);
+        // Filled: the box that was clicked. Ringed: the same person's other boxes.
+        const kin = orga.key === selectedOrganiserKey;
+        const picked = kin && shift.key === selectedOrganiserShiftKey;
         return (
         <div
           key={`orga-${orga.key}`}
           className={
             `box is-orga-box${clash ? ' is-illegal' : inSupport ? ' is-warned' : ''}` +
-            (orga.key === selectedOrganiserKey ? ' is-kin' : '')
+            (picked ? ' is-picked' : kin ? ' is-kin' : '')
           }
           role="button"
           // Draggable since 2026-09-12, like a volunteer's box: an orga put on the wrong créneau
@@ -327,11 +334,13 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
             (inSupport
               ? "\nCe pôle attend son responsable en support, sans créneau. Rien n'a été retiré."
               : '') +
-            '\nCliquer pour voir sa fiche, glisser pour changer de créneau'
+            (readOnly
+              ? '\nCliquer pour voir sa fiche'
+              : '\nCliquer pour la sélectionner (Suppr la retire du créneau), glisser pour changer de créneau')
           }
           onClick={(event) => {
             event.stopPropagation();
-            onSelectOrga(orga.key);
+            onSelectOrga(orga.key, shift.key);
           }}
           onDragStart={(event) => {
             event.stopPropagation();

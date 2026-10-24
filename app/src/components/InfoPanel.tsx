@@ -175,7 +175,15 @@ function Body({
     case 'benevole':
       return <BenevoleBody volunteerKey={selection.volunteerKey} readOnly={readOnly} context={grid} />;
     case 'orga':
-      return <OrgaBody organiserKey={selection.organiserKey} onSelect={onSelect} readOnly={readOnly} context={grid} />;
+      return (
+        <OrgaBody
+          organiserKey={selection.organiserKey}
+          onSelect={onSelect}
+          readOnly={readOnly}
+          context={grid}
+          pickedShiftKey={selection.shiftKey ?? null}
+        />
+      );
     case 'creneau':
       return (
         <CreneauBody
@@ -297,6 +305,7 @@ function OrgaBody({
   readOnly,
   context,
   pickedRoleKey = null,
+  pickedShiftKey = null,
 }: {
   organiserKey: string;
   onSelect(selection: Selection | null): void;
@@ -304,6 +313,8 @@ function OrgaBody({
   context: 'exploit' | 'phase';
   /** The responsable window picked on a frise, lit in « Responsable de ». See `RoleBody`. */
   pickedRoleKey?: string | null;
+  /** The créneau whose box was clicked on the grid, lit in « Sur l'exploit ». */
+  pickedShiftKey?: string | null;
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const [editing, setEditing] = useState(false);
@@ -320,7 +331,9 @@ function OrgaBody({
         what={
           pickedRoleKey
             ? `Horaire de responsable · ${ORGANISER_ROLE_LABEL[organiserRoleOf(person)]}`
-            : ORGANISER_ROLE_LABEL[organiserRoleOf(person)]
+            : pickedShiftKey
+              ? `Case · ${ORGANISER_ROLE_LABEL[organiserRoleOf(person)]}`
+              : ORGANISER_ROLE_LABEL[organiserRoleOf(person)]
         }
         name={organiserName(person)}
         kind="orga"
@@ -413,8 +426,9 @@ function OrgaBody({
         ) : (
           shifts.map((shift) => {
             const found = index.shiftByKey.get(shift.shiftKey);
+            const picked = shift.shiftKey === pickedShiftKey;
             return (
-              <p key={shift.shiftKey}>
+              <p key={shift.shiftKey} className={picked ? 'panel-picked-row' : undefined}>
                 <button
                   className="link-button"
                   onClick={() => onSelect({ kind: 'creneau', shiftKey: shift.shiftKey, fill: false })}
@@ -424,6 +438,34 @@ function OrgaBody({
                 <span className="pool-item-meta">
                   {found ? `${index.label(found.start)} → ${index.label(found.end)}` : ''}
                 </span>
+                {!readOnly && (
+                  <>
+                    {' '}
+                    <button
+                      className="btn is-small"
+                      title={
+                        "Retirer cette personne de ce créneau. Sa place reste, à pourvoir." +
+                        (picked ? ' Touche Suppr.' : '')
+                      }
+                      onClick={() => {
+                        edit(
+                          (p) => removeOrganiserFromShift(p, organiserKey, shift.shiftKey),
+                          `${organiserName(person)} retiré·e d'un créneau`,
+                        );
+                        if (picked) onSelect({ kind: 'orga', organiserKey });
+                      }}
+                    >
+                      Retirer
+                    </button>
+                  </>
+                )}
+                {picked && (
+                  <span className="panel-picked-hint">
+                    {readOnly
+                      ? 'Case sélectionnée sur la grille.'
+                      : 'Case sélectionnée: la glisser change de créneau, Suppr la retire.'}
+                  </span>
+                )}
               </p>
             );
           })

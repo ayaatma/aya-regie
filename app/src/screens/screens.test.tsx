@@ -1863,6 +1863,17 @@ test("a picked responsable window shows the person's fiche with that window lit"
   assert.ok(!reader.includes('Suppr'), 'rien à retirer pour un lecteur');
 });
 
+test("a picked Staff box shows the person's fiche with that créneau lit", () => {
+  const html = infoOf(planWithOrga(), { kind: 'orga', organiserKey: 'o1', shiftKey: plan.shifts[0]!.key });
+  assert.ok(html.includes('Case · '), 'le volet dit que c’est une case');
+  assert.equal((html.match(/panel-picked-row/g) ?? []).length, 1, 'la ligne de ce créneau est éclairée');
+  assert.ok(html.includes('Suppr la retire'));
+
+  // Picked from the list or the search box, nothing is lit: no créneau was clicked.
+  const fiche = infoOf(planWithOrga(), { kind: 'orga', organiserKey: 'o1' });
+  assert.ok(!fiche.includes('panel-picked-row'));
+});
+
 /** Every band, as [top, height], read off the style the component writes. */
 const bandRows = (html: string): Array<[number, number]> =>
   [...html.matchAll(/class="organiser-band-item"[^>]*top:(\d+)px;height:(\d+)px/g)].map((m) => [

@@ -246,6 +246,30 @@ async function main() {
         console.log('responsable suppr:', JSON.stringify(after));
         await shot('24b-grille-responsable-suppr');
       }
+      if (want('staff')) {
+        // A Staff box selected like a bénévole's (2026-10-24): filled, fiche with the créneau lit,
+        // then Suppr takes them out of it.
+        await tab('Grille');
+        const count = () => page.evaluate(() => document.querySelectorAll('.box.is-orga-box').length);
+        const before = await count();
+        await page.evaluate(() =>
+          document.querySelector('.box.is-orga-box')?.scrollIntoView({ block: 'center', inline: 'center' }),
+        );
+        await sleep(300);
+        await page.click('.box.is-orga-box');
+        await sleep(400);
+        const picked = await page.evaluate(() => ({
+          picked: document.querySelectorAll('.box.is-orga-box.is-picked').length,
+          kin: document.querySelectorAll('.box.is-orga-box.is-kin').length,
+          row: !!document.querySelector('.panel-picked-row'),
+        }));
+        console.log('staff:', JSON.stringify({ before, ...picked }));
+        await shot('25-grille-staff');
+        await page.keyboard.press('Delete');
+        await sleep(400);
+        console.log('staff suppr:', JSON.stringify({ after: await count() }));
+        await shot('25b-grille-staff-suppr');
+      }
       if (want('edition')) {
         // Mode édition (2026-09-16): in, a place added, an edge pulled, a créneau created in the
         // void, Échap out; then the same on the montage, and leaving by changing tab. Each check
