@@ -49,7 +49,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { fmtHours, type PersonKind, type PhaseId } from '../engine.ts';
+import { fmtHours, organiserRoleOf, type OrganiserRole, type PhaseId } from '../engine.ts';
 import { useLoadedPlan } from '../store/store.tsx';
 import { DRAG_MIME, type DragPayload } from './drag.ts';
 import { PendingMark, PersonMark, pendingPeople } from './PersonMark.tsx';
@@ -63,6 +63,13 @@ export type Moment = 'exploit' | PhaseId;
 
 const ALL_KINDS = 'tous';
 const ALL_POLES = '';
+
+/**
+ * The « Qui » filter: a bénévole, or an orga by role. Since 2026-10-24 « Staff » no longer shows
+ * the Responsables, who have their own entry: the régisseur looks for one or the other, the
+ * Responsable to hold a pole and the Staff to hold a Staff place.
+ */
+type KindFilter = typeof ALL_KINDS | 'benevole' | OrganiserRole;
 
 /** The chip's word: « choix 2 » on a ranked event, « dans ses choix » on an unranked one. */
 const matchWord = (match: PoleMatch, ranked: boolean): string =>
@@ -126,7 +133,7 @@ export function PoolPanel(props: PoolPanelProps) {
   const { plan, index, report } = useLoadedPlan();
   const pendingKeys = useMemo(() => pendingPeople(plan), [plan]);
   const [dropHot, setDropHot] = useState(false);
-  const [kind, setKind] = useState<PersonKind | typeof ALL_KINDS>(ALL_KINDS);
+  const [kind, setKind] = useState<KindFilter>(ALL_KINDS);
   const [poleKey, setPoleKey] = useState<string>(ALL_POLES);
 
   const isPhase = moment !== 'exploit';
@@ -140,7 +147,12 @@ export function PoolPanel(props: PoolPanelProps) {
   const matchOf = (row: PoolRow): PoleMatch | null =>
     poleKey === ALL_POLES ? null : poleMatchOf(index, row.kind, row.personKey, poleKey);
 
-  const byKind = kind === ALL_KINDS ? all : all.filter((row) => row.kind === kind);
+  const kindOf = (row: PoolRow): KindFilter => {
+    if (row.kind === 'benevole') return 'benevole';
+    const orga = index.organiserByKey.get(row.personKey);
+    return orga ? organiserRoleOf(orga) : 'responsable';
+  };
+  const byKind = kind === ALL_KINDS ? all : all.filter((row) => kindOf(row) === kind);
   const available = poleKey === ALL_POLES ? byKind : byKind.filter((row) => matchOf(row) !== null);
   // The exploit's poles, in the order Réglages draws them, each by its full path.
   const poles = plan.poles;
@@ -202,7 +214,7 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
           title={
             isPhase
               ? "Les heures que ces personnes ont déclarées et que personne ne leur a encore attribuées. Glissez un nom sur un pôle: il prend les heures déclarées pour le jour visé. Déposez ici une case de la grille pour la retirer."
-              : "Tout le monde à qui il reste des heures à donner. Glissez un bénévole dans un créneau, ou déposez ici une case pour la retirer de son créneau. Le Staff se glisse dans un créneau pour y tenir une place, ou sur la frise d'un pôle pour en devenir responsable pendant 2 h."
+              : "Tout le monde à qui il reste des heures à donner. Glissez un bénévole dans un créneau, ou déposez ici une case pour la retirer de son créneau. Le Staff et les Responsables se glissent dans un créneau pour y tenir une place. Un Responsable se glisse aussi sur la frise d'un pôle pour le tenir pendant 2 h."
           }
         >
           Disponibles ({available.length})
@@ -253,10 +265,11 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
               value={kind}
               aria-label="Filtrer par type de personne"
               title="Qui"
-              onChange={(event) => setKind(event.target.value as PersonKind | typeof ALL_KINDS)}
+              onChange={(event) => setKind(event.target.value as KindFilter)}
             >
               <option value={ALL_KINDS}>Tout le monde</option>
-              <option value="orga">Staff</option>
+              <option value="responsable">Responsables</option>
+              <option value="staff">Staff</option>
               <option value="benevole">Bénévoles</option>
             </select>
             <select
@@ -347,12 +360,13 @@ En liste d'attente, ${fmtHours(entry.requestedTotalHours)} demandées
 }
 
 /** What an empty list says, which is never just "vide": it says why it is empty. */
-function emptyWord(tab: PanelTab, isPhase: boolean, kind: PersonKind | typeof ALL_KINDS): string {
+function emptyWord(tab: PanelTab, isPhase: boolean, kind: KindFilter): string {
   if (tab === 'attente') return "Personne en liste d'attente.";
   // The kind comes first, and on the exploit too since its list gained the orgas: "tout le monde a
-  // déjà le volume proposé" is a sentence about bénévoles, and reading it under "Orgas" would say
-  // an orga had a volume.
-  if (kind === 'orga') return 'Aucun orga à placer ici.';
+  // déjà le volume proposé" is a sentence about bénévoles, and reading it under "Staff" would say
+  // a Staff had a volume.
+  if (kind === 'responsable') return 'Aucun responsable à placer ici.';
+  if (kind === 'staff') return 'Aucun Staff à placer ici.';
   if (kind === 'benevole') return 'Aucun bénévole à placer ici.';
   if (!isPhase) return 'Tout le monde a déjà le volume proposé.';
   return 'Tout le monde est placé sur cette période.';

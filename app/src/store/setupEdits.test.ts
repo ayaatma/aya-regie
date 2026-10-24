@@ -744,6 +744,16 @@ test('a frise drop for somebody who is not an orga writes nothing', () => {
   assert.equal(nobody, plan, 'le plan est rendu tel quel');
 });
 
+test('a Staff is never given a pole, by a frise drop or by Réglages', () => {
+  const { plan: withOne, organiser } = oneOrganiser();
+  const staffed: Plan = {
+    ...withOne,
+    organisers: withOne.organisers.map((o) => (o.key === organiser.key ? { ...o, role: 'staff' } : o)),
+  };
+  assert.equal(assignOrganiserToPoleAt(staffed, organiser.key, aRoot.key, 0, 2), staffed, 'pas de rôle, pas de promotion');
+  assert.equal(assignOrganiserToPole(staffed, organiser.key, aRoot.key), staffed);
+});
+
 test('deleting a shift also takes off the orgas standing in it', () => {
   const target = plan.shifts[0]!;
   const other = plan.shifts[1]!;

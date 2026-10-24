@@ -600,11 +600,24 @@ export function GridScreen({
    * drop lands in its last two hours, so a band always has its full length and is always drawn.
    * Both edges are dragged afterwards, on the band itself. See `OrganiserBand`.
    */
+  /**
+   * Whether the person in flight may take a pole: a Responsable, never a Staff (2026-10-24). The
+   * dataTransfer only says « an orga », so the role is read from the session.
+   */
+  const holdsPoles = useCallback(
+    (session: DragSession | null): boolean => {
+      if (!session || session.payload.kind !== 'orga') return false;
+      const orga = index.organiserByKey.get(session.payload.personKey);
+      return orga !== undefined && organiserRoleOf(orga) === 'responsable';
+    },
+    [index],
+  );
+
   const onDropResponsable = useCallback(
     (poleKey: string, x: number) => {
       const session = drag;
       endDrag();
-      if (!session || readOnly || session.payload.kind !== 'orga') return;
+      if (!session || readOnly || !holdsPoles(session)) return;
       const { personKey, personName } = session.payload;
 
       const raw = Math.round(x / pxPerHour / RESPONSABLE_SNAP) * RESPONSABLE_SNAP;
@@ -617,7 +630,7 @@ export function GridScreen({
         `${personName} responsable de ${pole?.name ?? poleKey}`,
       );
     },
-    [drag, edit, endDrag, eventHours, plan.poles, pxPerHour, readOnly],
+    [drag, edit, endDrag, eventHours, holdsPoles, plan.poles, pxPerHour, readOnly],
   );
 
   /** An edge of a responsable's band let go. Not an assignment, so no rule is consulted. */
@@ -1357,6 +1370,13 @@ export function GridScreen({
                       className={`pole-group-axis ${dropPoleKey === group.key ? 'is-drop' : ''}`}
                       onDragOver={(event) => {
                         if (readOnly || !event.dataTransfer.types.includes(DRAG_MIME_ORGA)) return;
+                        // A Staff holds no pole: the frise never lights up, and the event stops
+                        // here so the grid's background does not read it as a drop on nothing
+                        // and take a Staff dragged from a créneau out of it.
+                        if (!holdsPoles(drag)) {
+                          event.stopPropagation();
+                          return;
+                        }
                         event.preventDefault();
                         event.dataTransfer.dropEffect = 'copy';
                         setDropPoleKey(group.key);
@@ -1364,6 +1384,7 @@ export function GridScreen({
                       onDragLeave={() => setDropPoleKey(null)}
                       onDrop={(event) => {
                         if (readOnly || !event.dataTransfer.types.includes(DRAG_MIME_ORGA)) return;
+                        if (!holdsPoles(drag)) return;
                         // A real target: the grid's background must not also read this as a
                         // drop on nothing and unplace the person. See `canDropVoid`.
                         event.stopPropagation();

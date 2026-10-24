@@ -18,7 +18,7 @@
  * tool must not do.
  */
 
-import { ORGANISER_CODE_LENGTH, VOLUNTEER_CODE_LENGTH, alignPhases, makeArtist, newAccessCode } from '../engine.ts';
+import { ORGANISER_CODE_LENGTH, VOLUNTEER_CODE_LENGTH, alignPhases, makeArtist, newAccessCode, organiserRoleOf } from '../engine.ts';
 import type { Artist, AvailabilityMode, Organiser, LeaderRole, Plan, Pole, SchedulingRules, Shift, VolumeSettings } from '../engine.ts';
 
 // ---------------------------------------------------------------------------
@@ -689,15 +689,16 @@ export function assignOrganiserToPoleAt(
 }
 
 /**
- * A role added, and its holder a Responsable: since 2026-10-23 only a Responsable holds a pole, so
- * giving one to a Staff is the régisseur making them Responsable, said in the journal by the caller.
+ * A role added, for a Responsable only: since 2026-10-23 only a Responsable holds a pole.
+ *
+ * A STAFF IS REFUSED, since 2026-10-24. Giving them a pole used to promote them on the spot, and
+ * the régisseur asked for the opposite: a Staff becomes Responsable from their fiche (« Statut »),
+ * never through a drop on a frise. The grid does not light the frise up for one.
  */
 function withLeaderRole(plan: Plan, organiserKey: string, created: LeaderRole): Plan {
-  return {
-    ...plan,
-    organisers: plan.organisers.map((o) => (o.key === organiserKey && o.role === 'staff' ? { ...o, role: 'responsable' } : o)),
-    leaderRoles: [...plan.leaderRoles, created],
-  };
+  const holder = plan.organisers.find((o) => o.key === organiserKey);
+  if (!holder || organiserRoleOf(holder) !== 'responsable') return plan;
+  return { ...plan, leaderRoles: [...plan.leaderRoles, created] };
 }
 
 /** Takes one pole off somebody, leaving the person and their other poles alone. */

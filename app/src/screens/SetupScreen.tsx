@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 
 import {
   fmtHours,
+  organiserRoleOf,
   staffSeatsOf,
   type Pole,
   type LeaderRole,
@@ -1052,11 +1053,12 @@ function Organisers({
   const organisers = index.leadersOn(poleKey);
 
   /*
-   * Everybody already recorded, offered for this pole. Nobody is excluded from the list, not
-   * even somebody who already runs this pole: a organiser present from 14h to 18h and again from
-   * 22h to 02h is two roles on one pole, and refusing the second would leave no way to say it.
+   * Every Responsable already recorded, offered for this pole. Nobody is excluded for already
+   * running this pole: a organiser present from 14h to 18h and again from 22h to 02h is two roles
+   * on one pole, and refusing the second would leave no way to say it. The Staff are left out
+   * since 2026-10-24: only a Responsable holds a pole, see `withLeaderRole`.
    */
-  const others = plan.organisers;
+  const others = plan.organisers.filter((o) => organiserRoleOf(o) === 'responsable');
 
   return (
     <div className="setup-organisers">

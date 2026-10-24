@@ -39,7 +39,11 @@ deploy the front, then `npx supabase functions deploy drive-photo` (it takes a `
    `orga` unless `TicketingSettings.responsablesGetStaffBracelets` is off (asked: parametrable).
    `CateringRules.organiserMealsFixed` (exploit meals fixed, phases by presence, asked).
    `convertPerson(plan, kind, key, role)`, `setOrganiserRole` (to Staff drops the poles held,
-   listed). Giving a pole to a Staff (drag on a frise) makes them Responsable (`withLeaderRole`).
+   listed). **Since 2026-10-24 a Staff is never given a pole** (régisseur's request, reversing the
+   promotion on a frise drop): `withLeaderRole` returns the plan unchanged, the frise does not
+   light up for a Staff (and stops the event, so a Staff box is not unplaced by the void drop),
+   Réglages' « Ajouter quelqu'un déjà enregistré » lists Responsables only. The pool's « Qui »
+   filter has « Responsables » and « Staff » apart (`KindFilter` in `PoolPanel`).
    Fiche « Statut »: Passer bénévole / Staff / Responsable, previewed.
 
 Deferred by the developer to « à voir »: live updates of a fiche edited by somebody else, the
