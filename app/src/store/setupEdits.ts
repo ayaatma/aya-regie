@@ -143,6 +143,7 @@ export function addPole(plan: Plan, name: string, parentKey: string | null): Pla
     allowAllDebutants: parent?.allowAllDebutants ?? false,
     minExperienced: parent?.minExperienced ?? 0,
     defaultHeadcount: parent?.defaultHeadcount ?? 2,
+    ...(parent?.defaultStaffHeadcount ? { defaultStaffHeadcount: parent.defaultStaffHeadcount } : {}),
     // A sub-pole takes its parent's length only when the parent was set by hand: otherwise both
     // follow the event, and copying the value would turn it into a choice nobody made.
     ...(parent && shiftHoursByHand(parent) ? { defaultShiftHours: parent.defaultShiftHours } : {}),
@@ -183,6 +184,7 @@ export function setPoleDefaults(
     Pick<
       Pole,
       | 'defaultHeadcount'
+      | 'defaultStaffHeadcount'
       | 'allowAllDebutants'
       | 'minExperienced'
       | 'leaderSupportOnly'
@@ -197,6 +199,7 @@ export function setPoleDefaults(
             ...p,
             ...over,
             defaultHeadcount: Math.max(0, Math.round(over.defaultHeadcount ?? p.defaultHeadcount)),
+            defaultStaffHeadcount: Math.max(0, Math.round(over.defaultStaffHeadcount ?? p.defaultStaffHeadcount ?? 0)),
             minExperienced: Math.max(0, Math.round(over.minExperienced ?? p.minExperienced)),
           }
         : p,
@@ -453,6 +456,18 @@ export function movePole(plan: Plan, poleKey: string, direction: -1 | 1): Plan {
 // ---------------------------------------------------------------------------
 
 /**
+ * The places a new créneau of this pole gets: the pole's two defaults, and one bénévole place
+ * when both are 0, since a créneau needing nobody is not one.
+ */
+function newShiftSeats(pole: Pole): Pick<Shift, 'headcount' | 'staffHeadcount'> {
+  const staffHeadcount = pole.defaultStaffHeadcount ?? 0;
+  return {
+    headcount: staffHeadcount > 0 ? pole.defaultHeadcount : Math.max(1, pole.defaultHeadcount),
+    ...(staffHeadcount > 0 ? { staffHeadcount } : {}),
+  };
+}
+
+/**
  * Adds a shift, taking its length and its headcount from the pole when not told otherwise.
  *
  * Both defaults are copied here, once, and never read again: that is the whole doctrine of a
@@ -471,7 +486,7 @@ export function addShift(plan: Plan, poleKey: string, start: number, end?: numbe
     poleKey,
     start,
     end: finish,
-    headcount: pole.defaultHeadcount,
+    ...newShiftSeats(pole),
   };
   return { ...plan, shifts: [...plan.shifts, created] };
 }
@@ -544,7 +559,7 @@ export function regenerateShifts(plan: Plan, poleKey: string, spec: ShiftPlanSpe
       poleKey,
       start,
       end: Math.min(start + spec.block, spec.to),
-      headcount: pole.defaultHeadcount,
+      ...newShiftSeats(pole),
     });
   }
 

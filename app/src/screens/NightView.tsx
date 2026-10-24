@@ -190,6 +190,7 @@ export function NightView({ onLeave }: { onLeave(): void }) {
                           <span className={`night-count ${missing > 0 ? 'is-gap' : ''}`}>
                             {shiftReport?.assigned ?? 0}/{shift.headcount}
                             {missing > 0 ? ` · manque ${missing}` : ''}
+                            {(shiftReport?.staffMissing ?? 0) > 0 ? ` · Staff à trouver: ${shiftReport?.staffMissing}` : ''}
                           </span>
                         </div>
                         <div className="night-people">

@@ -23,6 +23,8 @@ import {
   costsFor,
   fmtHours,
   isLegal,
+  seatsOf,
+  staffSeatsOf,
   type Pole,
   type Shift,
 } from '../engine.ts';
@@ -34,6 +36,7 @@ import {
   move,
   setHeadcount,
   setLocked,
+  setStaffHeadcount,
   swap,
   unassign,
 } from '../store/edits.ts';
@@ -60,6 +63,7 @@ import {
   LABEL_W,
   fitZoom,
   laneHeight,
+  shiftRows,
   volumeLabel,
   volumeMark,
 } from '../components/layout.ts';
@@ -944,10 +948,15 @@ export function GridScreen({
       const shiftReport = shiftReports.get(shiftKey);
       if (!shift || !shiftReport) return;
       const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
-      const cases = Math.max(shift.headcount, shiftReport.stars.length + shiftReport.orgas.length);
+      // The bénévole part of the créneau only: its places, or the people standing in them when
+      // there are more, a Staff beyond the Staff places included. The Staff places have their own
+      // « − », see `removeStaffPlace`.
+      const overflow = seatsOf(shift, shiftReport.orgas.length).overflow;
+      const cases = Math.max(shift.headcount, shiftReport.stars.length + overflow);
+      if (cases === 0) return;
       const headcount = Math.max(0, Math.min(shift.headcount, cases - 1));
 
-      if (cases <= 1) {
+      if (cases + staffSeatsOf(shift) <= 1) {
         let name: string | null = null;
         if (last?.kind === 'benevole') {
           name = index.volunteerName(last.key);
@@ -993,6 +1002,62 @@ export function GridScreen({
       setKeyNote(`${name} retiré·e du créneau avec sa place. Ctrl+Z annule.`);
     },
     [cursor, edit, index, lockedKeys, plan.organisers, selection, shiftReports],
+  );
+
+  const addStaffPlace = useCallback(
+    (shiftKey: string) => {
+      const shift = index.shiftByKey.get(shiftKey);
+      if (!shift) return;
+      const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
+      edit(
+        (p) => setStaffHeadcount(p, shiftKey, staffSeatsOf(shift) + 1),
+        `une place Staff de plus sur un créneau de ${where}`,
+      );
+    },
+    [edit, index],
+  );
+
+  /**
+   * « − » on the Staff row: one Staff place fewer. A place nobody holds goes first; when every one
+   * is held, the last Staff drawn leaves with it, as on the bénévole row. The last place of the
+   * créneau takes the créneau with it, same rule as `removePlace`.
+   */
+  const removeStaffPlace = useCallback(
+    (shiftKey: string) => {
+      const shift = index.shiftByKey.get(shiftKey);
+      const shiftReport = shiftReports.get(shiftKey);
+      const staff = shift ? staffSeatsOf(shift) : 0;
+      if (!shift || !shiftReport || staff === 0) return;
+      const where = index.poleByKey.get(shift.poleKey)?.path ?? shift.poleKey;
+      const lastOrga = shiftReport.staffMissing > 0 ? null : shiftReport.orgas[shiftReport.orgas.length - 1] ?? null;
+      const name = lastOrga?.name ?? null;
+
+      if (staff + shift.headcount <= 1 && shiftReport.stars.length === 0 && shiftReport.orgas.length <= 1) {
+        if (cursor?.shiftKey === shiftKey) setCursor(null);
+        if (selection?.kind === 'creneau' && selection.shiftKey === shiftKey) setSelection(null);
+        edit((p) => deleteShift(p, shiftKey), `créneau supprimé sur ${where}`);
+        setKeyNote(
+          name
+            ? `${name} retiré·e, et le créneau avec sa dernière place. Ctrl+Z annule.`
+            : 'Dernière place retirée: le créneau est supprimé. Ctrl+Z annule.',
+        );
+        return;
+      }
+      if (staff + shift.headcount <= 1) {
+        setKeyNote("C'est la dernière place du créneau et d'autres personnes y sont: retirez-les d'abord.");
+        return;
+      }
+      if (!lastOrga) {
+        edit((p) => setStaffHeadcount(p, shiftKey, staff - 1), `une place Staff de moins sur un créneau de ${where}`);
+        return;
+      }
+      edit(
+        (p) => setStaffHeadcount(removeOrganiserFromShift(p, lastOrga.key, shiftKey), shiftKey, staff - 1),
+        `place de ${lastOrga.name} retirée d'un créneau de ${where}`,
+      );
+      setKeyNote(`${lastOrga.name} retiré·e du créneau avec sa place. Ctrl+Z annule.`);
+    },
+    [cursor, edit, index, selection, shiftReports],
   );
 
   /** The pointer moving over a lane: where a click would create a créneau, if anywhere. */
@@ -1329,13 +1394,18 @@ export function GridScreen({
                   </div>
 
                   {lanes.map((lane) => {
-                    // Mode édition draws a « + » place under every créneau, so the lane grows a row.
+                    // Mode édition draws two rows of « + » and « − » under every créneau, one for
+                    // the bénévole places and one for the Staff's, so the lane grows two rows.
                     const height =
-                      laneHeight(lane.shifts, (key) => shiftReports.get(key)?.assigned ?? 0) +
-                      (editing ? BOX_H + BOX_GAP : 0);
+                      laneHeight(lane.shifts, (shift) => shiftRows(shift, shiftReports.get(shift.key))) +
+                      (editing ? 2 * (BOX_H + BOX_GAP) : 0);
                     const gap = lane.shifts.reduce(
                       (total, s) =>
                         total + (shiftReports.get(s.key)?.missing ?? 0) * (s.end - s.start),
+                      0,
+                    );
+                    const staffGap = lane.shifts.reduce(
+                      (total, s) => total + (shiftReports.get(s.key)?.staffMissing ?? 0),
                       0,
                     );
                     return (
@@ -1346,8 +1416,15 @@ export function GridScreen({
                               <span className="lane-label-parent">{lane.parentName}</span>
                             )}
                             <span className="lane-label-name">{lane.pole.name}</span>
-                            <span className={`lane-label-stat ${gap > 0 ? 'is-gap' : ''}`}>
-                              {gap > 0 ? `${fmtHours(gap)} à pourvoir` : 'complet'}
+                            <span className={`lane-label-stat ${gap > 0 || staffGap > 0 ? 'is-gap' : ''}`}>
+                              {gap > 0 || staffGap > 0
+                                ? [
+                                    gap > 0 ? `${fmtHours(gap)} à pourvoir` : '',
+                                    staffGap > 0 ? `${staffGap} Staff à trouver` : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')
+                                : 'complet'}
                             </span>
                           </div>
                           <div
@@ -1392,10 +1469,10 @@ export function GridScreen({
                                    * second time as an empty box, so a créneau of two with one
                                    * orga showed two holes and went red once both were filled.
                                    */
-                                  headcount: Math.max(
-                                    0,
-                                    shift.headcount - (shiftReports.get(shift.key)?.orgas.length ?? 0),
-                                  ),
+                                  headcount: seatsOf(
+                                    shift,
+                                    shiftReports.get(shift.key)?.orgas.length ?? 0,
+                                  ).benevoleSeats,
                                   assignees: (shiftReports.get(shift.key)?.stars ?? []).map(
                                     (star) => star.volunteerKey,
                                   ),
@@ -1462,6 +1539,8 @@ export function GridScreen({
                                   onBeginMove={beginMove}
                                   onAddPlace={addPlace}
                                   onRemovePlace={removePlace}
+                                  onAddStaffPlace={addStaffPlace}
+                                  onRemoveStaffPlace={removeStaffPlace}
                                 />
                               );
                               });

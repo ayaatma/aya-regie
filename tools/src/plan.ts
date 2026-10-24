@@ -34,7 +34,7 @@ import {
   type EquipmentItem,
   type MailSet,
 } from './model.js';
-import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, toLabel, toTimeOfDay } from './model.js';
+import { DEFAULT_APPLICATION_STEPS, DEFAULT_CATERING, DEFAULT_RULES, DEFAULT_TICKETING, DEFAULT_TRAVEL_RATES, seatsOf, toLabel, toTimeOfDay } from './model.js';
 import {
   DEFAULT_PHASE_OPTIONS,
   type Phase,
@@ -161,8 +161,10 @@ import {
  * 30: 2026-10-23, `Volunteer.formAnswers`: the raw form answers behind each correctable field, so
  *    a hand correction comes back « à relire » only when the person changed their answer; and
  *    `Plan.markers`, the repères of the timelines. A build that predates this writes both away.
+ * 31: 2026-10-24, the Staff places: `Shift.staffHeadcount` and `Pole.defaultStaffHeadcount`. A
+ *    build that predates this writes every Staff place away.
  */
-export const PLAN_FORMAT = 30;
+export const PLAN_FORMAT = 31;
 
 /** See `Plan.availabilityMode`. */
 export type AvailabilityMode = 'tranches' | 'plages';
@@ -616,9 +618,12 @@ export class PlanIndex {
    *
    * Never negative: three orgas in a two-place créneau is a decision the régisseur took, and it
    * asks for nobody rather than for minus one.
+   *
+   * SINCE 2026-10-24 THE ORGAS FILL THE STAFF PLACES FIRST (`Shift.staffHeadcount`), and only
+   * those beyond them take a bénévole place. See `seatsOf`.
    */
   headcountOf(shift: Shift): number {
-    return Math.max(0, shift.headcount - this.orgasOn(shift.key).length);
+    return seatsOf(shift, this.orgasOn(shift.key).length).benevoleSeats;
   }
 
   /**

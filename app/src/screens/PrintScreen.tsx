@@ -194,7 +194,7 @@ export function PrintScreen() {
               <p>
                 {toLabel(plan.startISO, 0)} à {toLabel(plan.startISO, plan.lengthHours)} ·{' '}
                 {roots.length} pôles · {plan.shifts.length} créneaux ·{' '}
-                {fmtHours(report.summary.assignedHours)} couvertes sur{' '}
+                {fmtHours(report.summary.filledHours)} bénévoles couvertes sur{' '}
                 {fmtHours(report.summary.demandHours)}
               </p>
               {markersIn(plan, 'exploit').length > 0 && (
@@ -292,7 +292,8 @@ function PoleSheet({ root, colour, phones }: { root: Pole; colour: string; phone
                 <tbody>
                   {shifts.map((shift) => {
                     const people = [...index.assigneesOf(shift.key)].sort(byName);
-                    const missing = shift.headcount - people.length;
+                    // The Staff standing in the créneau taken out, as everywhere else.
+                    const missing = index.headcountOf(shift) - people.length;
                     return (
                       <tr key={shift.key}>
                         <td className="print-col-when">

@@ -21,7 +21,7 @@
  * one click and an explicit change of mind.
  */
 
-import { EDITABLE_FIELDS, type Assignment, type EditableField, type FormMapping, type Plan, type Volunteer } from '../engine.ts';
+import { EDITABLE_FIELDS, staffSeatsOf, type Assignment, type EditableField, type FormMapping, type Plan, type Volunteer } from '../engine.ts';
 
 const sameAssignment = (a: Assignment, volunteerKey: string, shiftKey: string): boolean =>
   a.volunteerKey === volunteerKey && a.shiftKey === shiftKey;
@@ -173,10 +173,27 @@ export function setReserve(plan: Plan, volunteerKey: string, reserve: boolean): 
  * function's.
  */
 export function setHeadcount(plan: Plan, shiftKey: string, headcount: number): Plan {
-  const clamped = Math.max(0, Math.round(headcount));
   return {
     ...plan,
-    shifts: plan.shifts.map((s) => (s.key === shiftKey ? { ...s, headcount: clamped } : s)),
+    shifts: plan.shifts.map((s) =>
+      // Zero bénévole places only beside a Staff place: a créneau needing nobody is not one.
+      s.key === shiftKey ? { ...s, headcount: Math.max(staffSeatsOf(s) > 0 ? 0 : 1, Math.round(headcount)) } : s,
+    ),
+  };
+}
+
+/**
+ * The Staff places of one créneau (`Shift.staffHeadcount`). Same doctrine as `setHeadcount`:
+ * lowering it below the Staff already there only moves them onto bénévole places.
+ */
+export function setStaffHeadcount(plan: Plan, shiftKey: string, staffHeadcount: number): Plan {
+  return {
+    ...plan,
+    shifts: plan.shifts.map((s) =>
+      s.key === shiftKey
+        ? { ...s, staffHeadcount: Math.max(s.headcount > 0 ? 0 : 1, Math.round(staffHeadcount)) }
+        : s,
+    ),
   };
 }
 

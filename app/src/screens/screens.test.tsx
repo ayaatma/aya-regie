@@ -2006,7 +2006,7 @@ test('a pole can ask for its responsable in support, and says so when contradict
       eventHours={base.lengthHours}
       open
       onToggle={noop}
-      assignedOf={() => 0}
+      reportOf={() => undefined}
     />,
     base,
   );
@@ -2939,4 +2939,26 @@ test('a nickname shows in the Personnes list, beside the name on the fiche, and 
   // Without a nickname, nothing changes.
   const plain = peopleOf(plan, { kind: 'benevole', key: first!.key });
   assert.ok(!plain.includes(' · Titi') && !shows(plain, 'Sur le planning:'));
+});
+
+test('a créneau of Staff places draws its posts to find, and the Suivi counts them apart', () => {
+  const leaf = plan.poles.find((p) => !plan.poles.some((c) => c.parentKey === p.key) && p.key !== 'general')!;
+  const withStaff: Plan = {
+    ...plan,
+    shifts: [
+      ...plan.shifts,
+      { key: 'regie-1', poleKey: leaf.key, start: 0, end: plan.lengthHours, headcount: 0, staffHeadcount: 2 },
+    ],
+  };
+
+  const grid = render(<GridScreen onSolve={noop} solving={false} solveMode={null} />, withStaff);
+  assert.equal((grid.match(/class="box is-empty is-staff-hole"/g) ?? []).length, 2);
+  assert.ok(shows(grid, 'Staff à trouver'));
+
+  const board = render(<DashboardScreen onGoToRecruitment={noop} />, withStaff);
+  assert.ok(shows(board, 'Couverture bénévoles'));
+  assert.ok(/Postes Staff: (<!-- -->)?0(<!-- -->)? sur (<!-- -->)?2/.test(board), 'deux postes, aucun tenu');
+  assert.ok(shows(board, 'Responsables manquants'));
+  // The whole event in Staff places adds nothing to the bénévoles' gap.
+  assert.equal(validate(withStaff).summary.gapHours, validate(plan).summary.gapHours);
 });

@@ -20,6 +20,8 @@ export {
   DEFAULT_CATERING,
   shiftHours,
   demandHours,
+  seatsOf,
+  staffSeatsOf,
   toIso,
   toLabel,
   toClock,

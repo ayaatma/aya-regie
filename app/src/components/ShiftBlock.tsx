@@ -37,6 +37,7 @@ import {
   SHIFT_SCOPED,
   TIER2,
   fmtHours,
+  seatsOf,
   type ShiftReport,
   type Shift,
   type VolunteerColour,
@@ -143,6 +144,10 @@ export interface ShiftBlockProps {
    * needed. The grid does the edit and says out loud who was taken off.
    */
   onRemovePlace?(shiftKey: string, last: { kind: 'orga' | 'benevole'; key: string } | null): void;
+  /** The « + Staff » of the second row: one more Staff place on this créneau. */
+  onAddStaffPlace?(shiftKey: string): void;
+  /** The « − Staff »: one Staff place fewer, an unheld one first. The grid decides who leaves. */
+  onRemoveStaffPlace?(shiftKey: string): void;
 }
 
 function ShiftBlockImpl(props: ShiftBlockProps) {
@@ -185,6 +190,8 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     onBeginMove,
     onAddPlace,
     onRemovePlace,
+    onAddStaffPlace,
+    onRemoveStaffPlace,
   } = props;
 
   /*
@@ -239,9 +246,16 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
       ...Array.from({ length: report.missing }, () => null),
     ];
 
+  const seats = seatsOf(shift, report.orgas.length);
+  /*
+   * Rows: the Staff standing here, the Staff places nobody holds yet, then the bénévole places.
+   * `places` is already as long as the larger of the bénévole places and the bénévoles. In
+   * « mode édition », two more rows: the bénévole « + / − » and the Staff's.
+   */
   const height =
-    (Math.max(shift.headcount, places.length + report.orgas.length) + (editing ? 1 : 0)) *
-    (BOX_H + BOX_GAP);
+    (report.orgas.length + report.staffMissing + places.length + (editing ? 2 : 0)) * (BOX_H + BOX_GAP);
+  const staffNote =
+    report.staffHeadcount > 0 ? `, Staff ${report.staffHeadcount - report.staffMissing} sur ${report.staffHeadcount}` : '';
 
   // The headcount lives in the tooltip now that the counter strip is gone, along with whatever
   // is wrong with the shift, so the border always has its explanation one hover away.
@@ -251,7 +265,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
       style={{ left, width, height, '--pole': poleColour } as React.CSSProperties}
       title={
         `${report.polePath}\n${report.label}\n` +
-        `${fmtHours(shift.end - shift.start)}, ${report.assigned} sur ${shift.headcount}` +
+        `${fmtHours(shift.end - shift.start)}, bénévoles ${report.assigned} sur ${shift.headcount}${staffNote}` +
         shiftIssues.map((issue) => `\n${issue.message}`).join('')
       }
       onDragOver={(event) => {
@@ -337,6 +351,29 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
         </div>
         );
       })}
+
+      {/*
+        The Staff places nobody holds yet, right under the Staff who hold the others. Hatched and
+        named, so they never read as a bénévole hole: the solver will not fill these, a person will.
+      */}
+      {Array.from({ length: report.staffMissing }, (_, place) => (
+        <div
+          key={`staff-vide-${place}`}
+          className="box is-empty is-staff-hole"
+          role={readOnly ? undefined : 'button'}
+          title={readOnly ? 'Poste Staff à pourvoir' : "Poste Staff à pourvoir. Cliquer pour y mettre quelqu'un du Staff."}
+          onClick={
+            readOnly
+              ? undefined
+              : (event) => {
+                  event.stopPropagation();
+                  onSelectShift(shift.key, true);
+                }
+          }
+        >
+          Staff à trouver
+        </div>
+      ))}
 
       {places.map((who, place) => {
         if (who === null) {
@@ -521,11 +558,11 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
               +
             </div>
             {(() => {
-              const drawn = places.length + report.orgas.length;
-              const cases = Math.max(shift.headcount, drawn);
-              const hasEmpty = places.includes(null) || shift.headcount > drawn;
+              // The bénévole part only: a Staff counts here when standing beyond the Staff places.
+              const cases = Math.max(shift.headcount, report.stars.length + seats.overflow);
+              const hasEmpty = places.includes(null);
               const lastBenevole = [...places].reverse().find((who): who is string => who !== null);
-              const lastOrga = report.orgas[report.orgas.length - 1];
+              const lastOrga = seats.overflow > 0 ? report.orgas[report.orgas.length - 1] : undefined;
               const last = hasEmpty
                 ? null
                 : lastBenevole
@@ -534,7 +571,14 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
                     ? { kind: 'orga' as const, key: lastOrga.key, name: lastOrga.name }
                     : null;
               // The last place goes with the créneau itself: a créneau needing nobody is not one.
-              const lastPlace = cases <= 1;
+              const lastPlace = cases + report.staffHeadcount <= 1;
+              if (cases === 0) {
+                return (
+                  <div className="box is-add is-remove is-disabled" aria-disabled title="Aucune place bénévole à retirer">
+                    −
+                  </div>
+                );
+              }
               return (
                 <div
                   className="box is-add is-remove"
@@ -557,6 +601,41 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
                 </div>
               );
             })()}
+          </div>
+          {/*
+            The Staff places, on a row of their own so the two kinds of place never mix. A bare
+            « + » on the Staff hatching: a word does not fit in a two-hour créneau.
+          */}
+          <div className="edit-place-row is-staff">
+            <div
+              className="box is-add is-staff-hole"
+              role="button"
+              title="Ajouter une place Staff à ce créneau"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddStaffPlace?.(shift.key);
+              }}
+            >
+              +
+            </div>
+            <div
+              className={`box is-add is-remove is-staff-hole${report.staffHeadcount === 0 ? ' is-disabled' : ''}`}
+              role="button"
+              aria-disabled={report.staffHeadcount === 0}
+              title={
+                report.staffHeadcount === 0
+                  ? 'Aucune place Staff à retirer'
+                  : report.staffMissing > 0
+                    ? 'Retirer une place Staff vide'
+                    : `Retirer la dernière place Staff, et ${report.orgas[report.orgas.length - 1]?.name ?? ''} qui l'occupe`
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                if (report.staffHeadcount > 0) onRemoveStaffPlace?.(shift.key);
+              }}
+            >
+              −
+            </div>
           </div>
           <span
             className="shift-grip is-start"

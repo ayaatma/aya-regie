@@ -6235,3 +6235,38 @@ textarea.select,
 .trombi-empty {
   color: #555555;
 }
+
+/*
+ * Une place Staff que personne ne tient encore, depuis 2026-10-24. Le bord gauche épais de la case
+ * d'un Staff, en pointillé, sur des hachures: on lit « un poste pour le Staff », jamais un trou
+ * de bénévole. Le solveur ne la remplit pas, une personne le fera.
+ */
+.box.is-empty.is-staff-hole {
+  border-left-width: 3px;
+  border-color: var(--ink-faint);
+  color: var(--ink-soft);
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 5px,
+    color-mix(in srgb, var(--ink) 9%, transparent) 5px 7px
+  );
+  cursor: pointer;
+}
+
+.box.is-add.is-staff-hole {
+  border-left-width: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 5px,
+    color-mix(in srgb, var(--ink) 9%, transparent) 5px 7px
+  );
+}
+
+.box.is-add.is-staff-hole:not(.is-remove) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.box.is-add.is-staff-hole:not(.is-remove):hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}

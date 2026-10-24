@@ -1098,3 +1098,82 @@ test('an exploit of a day or less names its hours without the date, a longer one
   strictEqual(new PlanIndex(short).label(10), '22:00');
   strictEqual(new PlanIndex({ ...short, lengthHours: 30 }).label(10), '13/03 22:00');
 });
+
+// ---------------------------------------------------------------------------
+// Staff places, 2026-10-24. A créneau may ask for Staff as well as, or instead of, bénévoles;
+// the Staff standing in it fill those places first, and they are counted apart in the Suivi.
+// ---------------------------------------------------------------------------
+
+const staffShift = (key: string, poleKey: string, start: number, end: number, headcount: number, staff: number): Shift =>
+  ({ key, poleKey, start, end, headcount, staffHeadcount: staff });
+
+test('the Staff fill the Staff places first, and only the next one takes a bénévole place', () => {
+  const base = makePlan({
+    shifts: [staffShift('s1', 'alpha', 0, 2, 2, 1)],
+    organiserShifts: [{ key: 'os1', organiserKey: 'o1', shiftKey: 's1' }],
+  });
+  const one = new PlanIndex({ ...base, organisers: [orga('o1')] });
+  strictEqual(one.headcountOf(one.shiftByKey.get('s1')!), 2, 'la place Staff est tenue, les deux places bénévoles restent');
+
+  const two = new PlanIndex({
+    ...base,
+    organisers: [orga('o1'), orga('o2')],
+    organiserShifts: [...base.organiserShifts, { key: 'os2', organiserKey: 'o2', shiftKey: 's1' }],
+  });
+  strictEqual(two.headcountOf(two.shiftByKey.get('s1')!), 1, 'le second Staff tient une place de bénévole');
+});
+
+test('a créneau of Staff places only is no bénévole gap, and is listed as a post to find', () => {
+  const result = validate(makePlan({ shifts: [staffShift('regie', 'alpha', 0, 18, 0, 2)] }));
+  strictEqual(result.summary.gapHours, 0);
+  strictEqual(result.summary.demandHours, 0);
+  strictEqual(result.summary.shiftsEmpty, 0);
+  strictEqual(has(result, TIER2.creneauVide), false);
+  strictEqual(has(result, TIER2.creneauTropLong), false, "aucune règle d'heures ne vise le Staff");
+  strictEqual(result.summary.staffSeats, 2);
+  strictEqual(result.summary.staffFilled, 0);
+  deepStrictEqual(result.summary.staffOpen.map((o) => [o.shiftKey, o.missing]), [['regie', 2]]);
+  strictEqual(result.shifts[0]!.staffMissing, 2);
+});
+
+test('a bénévole on a créneau of Staff places only is over the effectif', () => {
+  const result = validate(makePlan({
+    shifts: [staffShift('regie', 'alpha', 0, 2, 0, 1)],
+    volunteers: [volunteer('v1')],
+    assignments: [assign('v1', 'regie')],
+  }));
+  ok(has(result, TIER1.sureffectif));
+});
+
+test('a bénévole place held by a Staff is no longer counted as a gap', () => {
+  // Two places of 2 h, one Staff in one of them: 2 h to fill, not 4. Until 2026-10-24 the
+  // summary said 4, because it took the bénévoles' hours away from every place.
+  const result = validate(withOrga(2));
+  strictEqual(result.summary.gapHours, 2);
+  strictEqual(result.summary.filledHours, 2);
+  strictEqual(result.summary.shiftsEmpty, 1);
+});
+
+test('the hours a pole runs without a Responsable are found, a parent role covering its sub-poles', () => {
+  const base = makePlan({
+    shifts: [
+      shift('b1', 'bar-service', 0, 4),
+      shift('b2', 'bar-service', 6, 8),
+      shift('s1', 'secu', 0, 2),
+      staffShift('t1', 'technique', 0, 18, 0, 1),
+    ],
+  });
+  const result = validate({
+    ...base,
+    organisers: [orga('o1')],
+    leaderRoles: [{ key: 'r1', organiserKey: 'o1', poleKey: 'bar', start: 0, end: 2 }],
+  });
+  deepStrictEqual(
+    result.summary.leaderGaps.map((g) => [g.poleKey, g.none, g.windows.map((w) => [w.start, w.end])]),
+    [
+      ['bar-service', false, [[2, 4], [6, 8]]],
+      ['secu', true, [[0, 2]]],
+    ],
+    'la technique, tenue par le Staff seul, ne demande pas de Responsable',
+  );
+});

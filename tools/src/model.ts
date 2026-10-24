@@ -476,6 +476,15 @@ export interface Pole {
    */
   defaultHeadcount: number;
   /**
+   * How many Staff places a new shift of this pole has, unless the shift says otherwise. Since
+   * 2026-10-24; absent means 0.
+   *
+   * Copied into a shift when it is created and never read again, like `defaultHeadcount`. A pole
+   * held by the Staff (Régie générale, Technique) is 0 bénévoles and N Staff; a pole with a
+   * bénévole runner beside its techs is both. See `Shift.staffHeadcount`.
+   */
+  defaultStaffHeadcount?: number;
+  /**
    * How long a new shift of this pole lasts, in hours, WHEN THE RÉGISSEUR SET IT BY HAND.
    *
    * Read when a créneau is created, and never again: changing it must not touch a single existing
@@ -519,6 +528,50 @@ export interface Shift {
    * rush hour can carry more people than a quiet one in the same pole.
    */
   headcount: number;
+  /**
+   * The Staff places of this créneau, since 2026-10-24. Absent means 0.
+   *
+   * WHY A SECOND FIGURE. Some créneaux are not the bénévoles' at all: the régie générale from the
+   * doors to the end, the techs doing ten hours in a row. Written as bénévole places they were a
+   * long gap nobody could fill, counted in every « à pourvoir » of the Suivi. A Staff place is a
+   * post to find somebody for, drawn on the grid, never offered to a bénévole by the solver, and
+   * counted apart, in posts rather than hours.
+   *
+   * WHO FILLS IT. Any `OrganiserShift` on the créneau, Staff or Responsable, fills the Staff places
+   * first; one beyond them takes a bénévole place, as before this field existed (a Staff on the
+   * bar at 2h is one bénévole fewer). See `seatsOf`.
+   *
+   * `headcount + staffHeadcount` is at least 1: a créneau needing nobody is not one.
+   */
+  staffHeadcount?: number;
+}
+
+/** A créneau's Staff places, absent read as 0. */
+export const staffSeatsOf = (shift: Pick<Shift, 'staffHeadcount'>): number => shift.staffHeadcount ?? 0;
+
+/**
+ * How a créneau's places are held, given how many orgas stand in it.
+ *
+ * THE ONE RULE, kept here so the engine and the grid cannot disagree: the orgas fill the Staff
+ * places first, and each one beyond them takes a bénévole place.
+ *
+ *   staffMissing   Staff places nobody holds yet.
+ *   overflow       orgas standing in bénévole places.
+ *   benevoleSeats  bénévole places left for bénévoles, never negative.
+ *   orgaRows       rows the orgas' part of the créneau draws: held places plus Staff holes.
+ */
+export function seatsOf(
+  shift: Pick<Shift, 'headcount' | 'staffHeadcount'>,
+  orgas: number,
+): { staffMissing: number; overflow: number; benevoleSeats: number; orgaRows: number } {
+  const staff = staffSeatsOf(shift);
+  const overflow = Math.max(0, orgas - staff);
+  return {
+    staffMissing: Math.max(0, staff - orgas),
+    overflow,
+    benevoleSeats: Math.max(0, shift.headcount - overflow),
+    orgaRows: Math.max(staff, orgas),
+  };
 }
 
 /**

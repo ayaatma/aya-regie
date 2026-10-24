@@ -396,7 +396,8 @@ export function groupProposals(before: Plan, proposals: readonly Proposal[]): Pr
   for (const [shiftKey, fills] of fillsOf) {
     const shift = index.shiftByKey.get(shiftKey);
     if (!shift) continue;
-    const slack = shift.headcount - index.assigneeCount(shiftKey);
+    // The places left for bénévoles, the Staff standing in the créneau taken out.
+    const slack = index.headcountOf(shift) - index.assigneeCount(shiftKey);
     if (fills.length <= slack) continue;
     for (const filler of fills) {
       for (const freer of freesOf.get(shiftKey) ?? []) {

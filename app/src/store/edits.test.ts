@@ -33,6 +33,7 @@ import {
   markReviewed,
   move,
   setHeadcount,
+  setStaffHeadcount,
   setLocked,
   setReserve,
   swap,
@@ -189,10 +190,22 @@ test('the reserve means zero hours, so joining it gives up every shift', () => {
   assert.equal(back.assignments.length, after.assignments.length, 'sortir de la réserve ne replace personne');
 });
 
-test('setHeadcount rounds and never goes below zero', () => {
+test('setHeadcount rounds, and goes to zero only beside a Staff place', () => {
   const shiftKey = basePlan.shifts[0]!.key;
-  assert.equal(setHeadcount(basePlan, shiftKey, -4).shifts.find((s) => s.key === shiftKey)!.headcount, 0);
-  assert.equal(setHeadcount(basePlan, shiftKey, 3.6).shifts.find((s) => s.key === shiftKey)!.headcount, 4);
+  const headcountOf = (p: typeof basePlan) => p.shifts.find((s) => s.key === shiftKey)!.headcount;
+  // A créneau needing nobody is not one: without a Staff place, one bénévole place stays.
+  assert.equal(headcountOf(setHeadcount(basePlan, shiftKey, -4)), 1);
+  assert.equal(headcountOf(setHeadcount(basePlan, shiftKey, 3.6)), 4);
+  assert.equal(headcountOf(setHeadcount(setStaffHeadcount(basePlan, shiftKey, 1), shiftKey, 0)), 0);
+});
+
+test('setStaffHeadcount rounds, and keeps one place on a créneau with no bénévole place', () => {
+  const shiftKey = basePlan.shifts[0]!.key;
+  const staffOf = (p: typeof basePlan) => p.shifts.find((s) => s.key === shiftKey)!.staffHeadcount;
+  assert.equal(staffOf(setStaffHeadcount(basePlan, shiftKey, 2.4)), 2);
+  assert.equal(staffOf(setStaffHeadcount(basePlan, shiftKey, -1)), 0);
+  const staffOnly = setHeadcount(setStaffHeadcount(basePlan, shiftKey, 1), shiftKey, 0);
+  assert.equal(staffOf(setStaffHeadcount(staffOnly, shiftKey, 0)), 1);
 });
 
 test('lowering a headcount under the people already placed is allowed and reported', () => {

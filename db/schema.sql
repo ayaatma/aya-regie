@@ -243,7 +243,10 @@ create table pole (
   -- Starting values for a new shift of this pole, not rules. They are copied into the shift at
   -- creation and never read again, so raising one later cannot silently rewrite the shifts the
   -- regisseur has already tuned by hand.
-  default_headcount    int     not null default 1 check (default_headcount > 0),
+  -- 0 since 2026-10-24: a pole held by the Staff has no bénévole place by default.
+  default_headcount    int     not null default 1 check (default_headcount >= 0),
+  -- The Staff places of a new shift of this pole, since 2026-10-24. Copied like the others.
+  default_staff_headcount int  not null default 0 check (default_staff_headcount >= 0),
   default_shift_hours  numeric(4,2),
   unique (event_id, key)
 );
@@ -336,11 +339,16 @@ create table shift (
   end_hours      numeric(6,2) not null,
   -- Per shift, always. The UI draws one box per unit, and a rush hour simply has more boxes than
   -- a quiet one in the same pole. Starts from pole.default_headcount, then diverges freely.
-  headcount      int not null check (headcount > 0),
+  headcount      int not null check (headcount >= 0),
+  -- The Staff places, since 2026-10-24: a post for a Staff or a Responsable, never offered to a
+  -- bénévole. Whoever of the Staff stands in the créneau fills these first, then bénévole places.
+  staff_headcount int not null default 0 check (staff_headcount >= 0),
   sort_order     int not null default 0,
   duration_hours numeric(6,2) generated always as (end_hours - start_hours) stored,
   unique (pole_id, key),
-  check (end_hours > start_hours)
+  check (end_hours > start_hours),
+  -- A créneau needing nobody is not one.
+  constraint shift_needs_somebody check (headcount + staff_headcount > 0)
 );
 
 create index on shift (pole_id);
@@ -1133,7 +1141,7 @@ create table app_setting (
 );
 
 insert into app_setting (name, number, note)
-values ('min_plan_format', 30,
+values ('min_plan_format', 31,
         'Le format de document que le navigateur doit déclarer pour avoir le droit d''écrire.');
 
 -- ---------------------------------------------------------------------------
@@ -1274,7 +1282,8 @@ as $fn$
                'locked',            p.locked,
                'leaderSupportOnly', p.leader_support_only,
                'requiredSkills',    to_jsonb(p.required_skills),
-               'defaultHeadcount',  p.default_headcount)
+               'defaultHeadcount',  p.default_headcount,
+               'defaultStaffHeadcount', p.default_staff_headcount)
              -- Optional in the engine's type, so absent rather than null when unset.
              || case when p.colour is null then '{}'::jsonb
                      else jsonb_build_object('colour', p.colour) end
@@ -1292,7 +1301,8 @@ as $fn$
              'poleKey',   p.key,
              'start',     s.start_hours,
              'end',       s.end_hours,
-             'headcount', s.headcount) order by s.sort_order, s.key), '[]'::jsonb) as j
+             'headcount', s.headcount,
+             'staffHeadcount', s.staff_headcount) order by s.sort_order, s.key), '[]'::jsonb) as j
     from shift s join pole p on p.id = s.pole_id
     where p.event_id = p_event_id
   ),
@@ -1973,13 +1983,14 @@ begin
   -- sub-pole before its parent.
   insert into pole (event_id, key, name, colour, sort_order, allow_all_debutants,
                     min_experienced, locked, leader_support_only, default_headcount,
-                    default_shift_hours, required_skills)
+                    default_staff_headcount, default_shift_hours, required_skills)
   select p_event_id, x->>'key', x->>'name', x->>'colour', (ord - 1)::int,
          coalesce((x->>'allowAllDebutants')::boolean, false),
          coalesce((x->>'minExperienced')::int, 0),
          coalesce((x->>'locked')::boolean, false),
          coalesce((x->>'leaderSupportOnly')::boolean, false),
          coalesce((x->>'defaultHeadcount')::int, 1),
+         coalesce((x->>'defaultStaffHeadcount')::int, 0),
          (x->>'defaultShiftHours')::numeric,
          coalesce((select array_agg(k #>> '{}')
                    from jsonb_array_elements(case when jsonb_typeof(x->'requiredSkills') = 'array'
@@ -2020,9 +2031,9 @@ begin
          coalesce((x->>'soundcheckEngineer')::boolean, false)
   from jsonb_array_elements(coalesce(p_plan->'artists', '[]'::jsonb)) with ordinality as t(x, ord);
 
-  insert into shift (pole_id, key, start_hours, end_hours, headcount, sort_order)
+  insert into shift (pole_id, key, start_hours, end_hours, headcount, staff_headcount, sort_order)
   select p.id, x->>'key', (x->>'start')::numeric, (x->>'end')::numeric,
-         (x->>'headcount')::int, (ord - 1)::int
+         (x->>'headcount')::int, coalesce((x->>'staffHeadcount')::int, 0), (ord - 1)::int
   from jsonb_array_elements(coalesce(p_plan->'shifts', '[]'::jsonb)) with ordinality as t(x, ord)
   join pole p on p.event_id = p_event_id and p.key = x->>'poleKey';
 

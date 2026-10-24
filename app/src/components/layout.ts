@@ -6,7 +6,7 @@
  * built on fixed columns would be wrong the first time somebody creates a 90-minute shift.
  */
 
-import type { Shift, SkillLevel } from '../engine.ts';
+import { seatsOf, type Shift, type ShiftReport, type SkillLevel } from '../engine.ts';
 
 /** One box, one volunteer needed. Matches `.box` in the stylesheet. */
 export const BOX_H = 24;
@@ -77,14 +77,22 @@ export const volumeMark = (band: string): string =>
 export const volumeLabel = (band: string): string =>
   band === 'orange-fonce' ? 'Journée très longue' : band === 'orange-clair' ? 'Journée longue' : '';
 
+/**
+ * How many rows a créneau draws: the Staff standing in it and its Staff places still to fill,
+ * then its bénévole places, or its bénévoles when there are more of them.
+ *
+ * A shift over its headcount still draws every person in it: hiding somebody to respect a figure
+ * is exactly the silent drop this tool must never do.
+ */
+export function shiftRows(shift: Shift, report: Pick<ShiftReport, 'assigned' | 'orgas'> | undefined): number {
+  const seats = seatsOf(shift, report?.orgas.length ?? 0);
+  return seats.orgaRows + Math.max(seats.benevoleSeats, report?.assigned ?? 0);
+}
+
 /** How tall a lane must be to hold its fullest shift, boxes and chrome included. */
-export function laneHeight(shifts: readonly Shift[], assignedCount: (key: string) => number): number {
+export function laneHeight(shifts: readonly Shift[], rowsOf: (shift: Shift) => number): number {
   let boxes = 0;
-  for (const shift of shifts) {
-    // A shift over its headcount still draws every person in it: hiding somebody to respect a
-    // figure is exactly the silent drop this tool must never do.
-    boxes = Math.max(boxes, Math.max(shift.headcount, assignedCount(shift.key)));
-  }
+  for (const shift of shifts) boxes = Math.max(boxes, rowsOf(shift));
   const inner = boxes * BOX_H + Math.max(0, boxes - 1) * BOX_GAP;
   return Math.max(LANE_MIN_H, inner + SHIFT_CHROME);
 }

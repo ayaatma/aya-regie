@@ -19,11 +19,13 @@ import { useMemo, useState } from 'react';
 
 import {
   fmtHours,
+  staffSeatsOf,
   type Pole,
   type LeaderRole,
   type Shift,
+  type ShiftReport,
 } from '../engine.ts';
-import { setHeadcount, setPoleColour } from '../store/edits.ts';
+import { setHeadcount, setPoleColour, setStaffHeadcount } from '../store/edits.ts';
 import {
   addLeaderOnPole,
   assignOrganiserToPole,
@@ -334,7 +336,7 @@ export function SetupScreen({ part = 'reglages' }: { part?: SetupPart }) {
                     eventHours={eventHours}
                     open={openPole === pole.key}
                     onToggle={() => setOpenPole(openPole === pole.key ? null : pole.key)}
-                    assignedOf={(key) => shiftReports.get(key)?.assigned ?? 0}
+                    reportOf={(key) => shiftReports.get(key)}
                   />
                 ))}
               </div>
@@ -391,7 +393,7 @@ export function PoleRow({
   eventHours,
   open,
   onToggle,
-  assignedOf,
+  reportOf,
 }: {
   pole: Pole;
   isRoot: boolean;
@@ -399,10 +401,11 @@ export function PoleRow({
   eventHours: number;
   open: boolean;
   onToggle(): void;
-  assignedOf(shiftKey: string): number;
+  reportOf(shiftKey: string): ShiftReport | undefined;
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const need = shifts.reduce((total, s) => total + s.headcount * (s.end - s.start), 0);
+  const staffPosts = shifts.reduce((total, s) => total + staffSeatsOf(s), 0);
 
   return (
     <div className="setup-pole">
@@ -411,7 +414,8 @@ export function PoleRow({
           <span className="setup-caret">{open ? '▾' : '▸'}</span>
           <span className="setup-pole-name">{isRoot ? 'Créneaux du pôle' : pole.name}</span>
           <span className="people-meta">
-            {shifts.length} créneaux · {fmtHours(need)} nécessaires
+            {shifts.length} créneaux · {fmtHours(need)} bénévoles
+            {staffPosts > 0 ? ` · ${staffPosts} poste${staffPosts > 1 ? 's' : ''} Staff` : ''}
           </span>
         </button>
         {!isRoot && (
@@ -442,7 +446,7 @@ export function PoleRow({
             )}
 
             <label className="rule is-inline">
-              <span className="rule-label">Effectif par défaut</span>
+              <span className="rule-label">Bénévoles par défaut</span>
               <input
                 type="number"
                 min={0}
@@ -458,6 +462,27 @@ export function PoleRow({
               <span className="rule-hint">
                 Copié dans un créneau à sa création, et plus jamais relu: changer ce chiffre ne
                 réécrit pas les créneaux déjà réglés à la main.
+              </span>
+            </label>
+
+            <label className="rule is-inline">
+              <span className="rule-label">Staff par défaut</span>
+              <input
+                type="number"
+                min={0}
+                max={40}
+                value={pole.defaultStaffHeadcount ?? 0}
+                onChange={(event) =>
+                  edit(
+                    (p) => setPoleDefaults(p, pole.key, { defaultStaffHeadcount: Number(event.target.value) }),
+                    `places Staff par défaut de ${pole.name}`,
+                  )
+                }
+              />
+              <span className="rule-hint">
+                Des postes pour le Staff ou les Responsables, jamais proposés aux bénévoles et
+                comptés à part dans le Suivi. Un pôle tenu par le Staff (régie, technique) met 0
+                bénévole et 1 ou plus ici.
               </span>
             </label>
 
@@ -585,13 +610,17 @@ export function PoleRow({
                 <th>Fin</th>
                 <th>Durée</th>
                 <th>Placés</th>
-                <th>Nécessaire</th>
+                <th>Bénévoles</th>
+                <th>Staff</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {shifts.map((shift) => {
-                const assigned = assignedOf(shift.key);
+                const report = reportOf(shift.key);
+                const assigned = report?.assigned ?? 0;
+                const placed = assigned + (report?.orgas.length ?? 0);
+                const short = (report?.missing ?? 0) > 0 || (report?.staffMissing ?? 0) > 0;
                 return (
                   <tr key={shift.key}>
                     <td>
@@ -633,7 +662,12 @@ export function PoleRow({
                       />
                     </td>
                     <td>{fmtHours(shift.end - shift.start)}</td>
-                    <td className={assigned === shift.headcount ? '' : 'is-bad'}>{assigned}</td>
+                    <td
+                      className={short || assigned > (report?.headcount ?? 0) ? 'is-bad' : ''}
+                      title={`${assigned} bénévole${assigned > 1 ? 's' : ''}, ${placed - assigned} du Staff`}
+                    >
+                      {placed}
+                    </td>
                     <td>
                       <input
                         className="setup-number"
@@ -647,6 +681,23 @@ export function PoleRow({
                           edit(
                             (p) => setHeadcount(p, shift.key, value),
                             `effectif du créneau ${index.shiftLabel(shift)}`,
+                          );
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="setup-number"
+                        type="number"
+                        min={0}
+                        max={40}
+                        value={staffSeatsOf(shift)}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          if (!Number.isFinite(value)) return;
+                          edit(
+                            (p) => setStaffHeadcount(p, shift.key, value),
+                            `places Staff du créneau ${index.shiftLabel(shift)}`,
                           );
                         }}
                       />

@@ -488,8 +488,10 @@ function CreneauBody({
     <>
       <Head what="Créneau" name={detail.polePath} />
       <p className="panel-sub">
-        {detail.label} · {fmtHours(shift.end - shift.start)} · {detail.assigned} sur{' '}
+        {detail.label} · {fmtHours(shift.end - shift.start)} · bénévoles {detail.assigned} sur{' '}
         {shift.headcount}
+        {detail.staffHeadcount > 0 &&
+          ` · Staff ${detail.staffHeadcount - detail.staffMissing} sur ${detail.staffHeadcount}`}
       </p>
 
       {inSupport.length > 0 && (
@@ -557,9 +559,14 @@ function CreneauBody({
             </button>
           </p>
         ))}
+        {detail.staffMissing > 0 && (
+          <p className="pool-item-meta">
+            {detail.staffMissing} poste{detail.staffMissing > 1 ? 's' : ''} Staff à pourvoir
+          </p>
+        )}
         {detail.missing > 0 && (
           <p className="pool-item-meta">
-            {detail.missing} place{detail.missing > 1 ? 's' : ''} à pourvoir
+            {detail.missing} place{detail.missing > 1 ? 's' : ''} bénévole{detail.missing > 1 ? 's' : ''} à pourvoir
           </p>
         )}
       </div>
@@ -583,10 +590,10 @@ function CreneauBody({
             {fill ? "Mettre quelqu'un du Staff à cette place" : "Ajouter quelqu'un du Staff à ce créneau"}
           </p>
           <p className="panel-sub">
-            Une personne du Staff placée ici tient une place comme un bénévole et ne compte dans
-            aucune règle d'heures. Un bénévole se glisse depuis la liste des disponibles; le Staff
+            Une personne du Staff placée ici tient d'abord une place Staff, puis une place de
+            bénévole, et ne compte dans aucune règle d'heures. Un bénévole se glisse depuis la liste des disponibles; le Staff
             se glisse de la même façon, ou se choisit ci-dessous.
-            {detail.missing === 0 &&
+            {detail.missing === 0 && detail.staffMissing === 0 &&
               ' Ce créneau est déjà complet: une personne de plus y sera dessinée en sureffectif.'}
           </p>
           {plan.organisers.length === 0 && (

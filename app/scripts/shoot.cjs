@@ -180,6 +180,27 @@ async function main() {
         await page.evaluate(() => document.querySelector('.panel-unfold')?.click());
         await sleep(300);
       }
+      if (want('staff')) {
+        // Les places Staff (2026-10-24): the fixture's régie générale, one post held and one to
+        // find, then the same lane in mode édition with its « + Staff » row.
+        await tab('Grille');
+        const toRegie = () =>
+          page.evaluate(() =>
+            [...document.querySelectorAll('.lane-label-name')]
+              .find((el) => el.textContent === 'Régie générale')
+              ?.scrollIntoView({ block: 'center' }),
+          );
+        await toRegie();
+        await sleep(400);
+        await shot('22-grille-staff');
+        await page.click('.btn-emoji.is-framed');
+        await sleep(400);
+        await toRegie();
+        await sleep(400);
+        await shot('22b-grille-staff-edition');
+        await page.keyboard.press('Escape');
+        await sleep(300);
+      }
       if (want('edition')) {
         // Mode édition (2026-09-16): in, a place added, an edge pulled, a créneau created in the
         // void, Échap out; then the same on the montage, and leaving by changing tab. Each check

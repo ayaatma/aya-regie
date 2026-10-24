@@ -31,7 +31,9 @@
 
 import {
   demandHours,
+  seatsOf,
   shiftHours,
+  staffSeatsOf,
   statusOf,
   type ApplicationStatus,
   type Artist,
@@ -687,6 +689,10 @@ export interface ShiftReport {
   assigned: number;
   /** Places still to fill with volunteers: `headcount` minus the orgas minus the assignees. */
   missing: number;
+  /** The créneau's Staff places (`Shift.staffHeadcount`), 0 when it has none. */
+  staffHeadcount: number;
+  /** Staff places nobody holds yet. Drawn as « Staff à trouver », counted apart from `missing`. */
+  staffMissing: number;
   /**
    * Orgas the régisseur put in this créneau by hand.
    *
@@ -733,10 +739,33 @@ export interface ArtistReport {
 }
 
 export interface PlanSummary {
+  /** Person-hours of the bénévole places. The Staff places are counted apart, in posts. */
   demandHours: number;
   assignedHours: number;
   offeredHours: number;
+  /**
+   * Person-hours of bénévole places still to fill: every créneau's `missing` times its length.
+   *
+   * Was `demandHours - assignedHours` until 2026-10-24, which counted a place held by a Staff as
+   * a gap, and let a créneau in sureffectif hide the gap of another.
+   */
   gapHours: number;
+  /** Person-hours of bénévole places held, by a bénévole or by a Staff standing in one. */
+  filledHours: number;
+
+  /** Staff places over the whole exploit, held and not. */
+  staffSeats: number;
+  staffFilled: number;
+  /** Every créneau with a Staff place nobody holds, in time order. */
+  staffOpen: Array<{ shiftKey: string; poleKey: string; path: string; label: string; start: number; end: number; missing: number }>;
+  /**
+   * When a pole with bénévole places has no Responsable in charge, by pole.
+   *
+   * Computed, never entered: the hours a pole's bénévole créneaux span, minus the windows of the
+   * `LeaderRole`s held on that pole or on a pole above it. A role with no hours covers it all.
+   * `none` is a pole nobody runs at all.
+   */
+  leaderGaps: Array<{ poleKey: string; path: string; none: boolean; windows: Array<{ start: number; end: number }> }>;
 
   shiftsTotal: number;
   shiftsFilled: number;
@@ -860,8 +889,9 @@ export function validate(plan: Plan): ValidationResult {
 
   // --- Reference data. A shift longer than the consecutive cap can never be staffed legally. -
   // Only while the cap blocks: priced, a long créneau can be held, at a cost the solver weighs.
+  // A créneau of Staff places only is not concerned: no rule of hours applies to the Staff.
   for (const shift of c.maxConsecutive.mode === 'block' ? plan.shifts : []) {
-    if (shiftHours(shift) > rules.maxConsecutiveHours + 1e-9) {
+    if (shift.headcount > 0 && shiftHours(shift) > rules.maxConsecutiveHours + 1e-9) {
       add(2, TIER2.creneauTropLong,
         `Créneau de ${fmtHours(shiftHours(shift))} alors que le maximum d'affilée est ` +
         `${rules.maxConsecutiveHours}h: aucun bénévole ne peut le tenir en entier. À découper.`,
@@ -1114,6 +1144,61 @@ export function validate(plan: Plan): ValidationResult {
 // ---------------------------------------------------------------------------
 // Reports and summary
 // ---------------------------------------------------------------------------
+
+type Span = { start: number; end: number };
+
+/** Sorted, overlapping or touching spans joined into one. */
+function mergeSpans(spans: readonly Span[]): Span[] {
+  const merged: Span[] = [];
+  for (const span of [...spans].sort((a, b) => a.start - b.start)) {
+    const last = merged[merged.length - 1];
+    if (last && span.start <= last.end + 1e-9) last.end = Math.max(last.end, span.end);
+    else merged.push({ ...span });
+  }
+  return merged;
+}
+
+/**
+ * The hours a pole with bénévole places runs without a Responsable. See `PlanSummary.leaderGaps`.
+ *
+ * Per pole holding the créneaux, because that is where the hole is: a Responsable of « Bar »
+ * covers « Bar / Service » and « Bar / Plonge », one of « Bar / Plonge » covers the plonge only.
+ * Only bénévole places count: a créneau of Staff alone is run by its own people.
+ */
+function leaderGaps(index: PlanIndex, shifts: readonly ShiftReport[]): PlanSummary['leaderGaps'] {
+  const spansByPole = new Map<string, Span[]>();
+  for (const s of shifts) {
+    if (s.headcount === 0) continue;
+    spansByPole.set(s.poleKey, [...(spansByPole.get(s.poleKey) ?? []), { start: s.start, end: s.end }]);
+  }
+
+  const gaps: PlanSummary['leaderGaps'] = [];
+  for (const pole of index.plan.poles) {
+    const spans = spansByPole.get(pole.key);
+    if (!spans) continue;
+    const covers: Span[] = [];
+    for (let key: string | null = pole.key; key; key = index.poleByKey.get(key)?.parentKey ?? null) {
+      for (const { role } of index.leadersOn(key)) {
+        covers.push({ start: role.start ?? -Infinity, end: role.end ?? Infinity });
+      }
+    }
+    const covered = mergeSpans(covers);
+    const windows: Span[] = [];
+    for (const span of mergeSpans(spans)) {
+      let from = span.start;
+      for (const c of covered) {
+        if (c.end <= from || c.start >= span.end) continue;
+        if (c.start > from) windows.push({ start: from, end: c.start });
+        from = Math.max(from, c.end);
+      }
+      if (from < span.end - 1e-9) windows.push({ start: from, end: span.end });
+    }
+    if (windows.length > 0) {
+      gaps.push({ poleKey: pole.key, path: index.polePath(pole.key), none: covered.length === 0, windows });
+    }
+  }
+  return gaps;
+}
 
 function diagnoseGap(index: PlanIndex, shift: Shift, missing: number): GapDiagnosis {
   let disponibles = 0;
@@ -1369,6 +1454,8 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
       headcount: shift.headcount,
       assigned: assignees.length,
       missing,
+      staffHeadcount: staffSeatsOf(shift),
+      staffMissing: seatsOf(shift, index.orgasOn(shift.key).length).staffMissing,
       orgas: index.orgasOn(shift.key).map((o) => ({
         key: o.key,
         name: `${o.firstName} ${o.lastName}`.trim(),
@@ -1429,6 +1516,12 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
   }
 
   const demand = demandHours(plan.shifts);
+  const gapHours = shifts.reduce((total, s) => total + (s.end - s.start) * s.missing, 0);
+  // The volunteer counts below are about créneaux that want bénévoles: one held by the Staff alone
+  // is neither empty nor full for them.
+  const forBenevoles = shifts.filter((s) => s.headcount > 0);
+  const staffShifts = shifts.filter((s) => s.staffHeadcount > 0);
+  const staffSeats = staffShifts.reduce((total, s) => total + s.staffHeadcount, 0);
   // The cancelled are out of every figure below: they offer nothing and nobody is owed to them.
   const coming = volunteers.filter((v) => v.status !== 'annule');
   const offered = coming.reduce((total, v) => total + v.requestedTotalHours, 0);
@@ -1440,12 +1533,29 @@ function buildResult(index: PlanIndex, issues: ValidationIssue[]): ValidationRes
     demandHours: demand,
     assignedHours,
     offeredHours: offered,
-    gapHours: demand - assignedHours,
+    gapHours,
+    filledHours: demand - gapHours,
 
-    shiftsTotal: shifts.length,
-    shiftsFilled: shifts.filter((s) => s.missing === 0).length,
-    shiftsPartial: shifts.filter((s) => s.missing > 0 && s.assigned > 0).length,
-    shiftsEmpty: shifts.filter((s) => s.assigned === 0).length,
+    staffSeats,
+    staffFilled: staffSeats - staffShifts.reduce((total, s) => total + s.staffMissing, 0),
+    staffOpen: staffShifts
+      .filter((s) => s.staffMissing > 0)
+      .sort((a, b) => a.start - b.start || a.polePath.localeCompare(b.polePath))
+      .map((s) => ({
+        shiftKey: s.key,
+        poleKey: s.poleKey,
+        path: s.polePath,
+        label: s.label,
+        start: s.start,
+        end: s.end,
+        missing: s.staffMissing,
+      })),
+    leaderGaps: leaderGaps(index, shifts),
+
+    shiftsTotal: forBenevoles.length,
+    shiftsFilled: forBenevoles.filter((s) => s.missing === 0).length,
+    shiftsPartial: forBenevoles.filter((s) => s.missing > 0 && s.assigned > 0).length,
+    shiftsEmpty: forBenevoles.filter((s) => s.missing > 0 && s.assigned === 0).length,
 
     volunteersTotal: coming.length,
     volunteersCancelled: volunteers.length - coming.length,

@@ -29,8 +29,10 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
   const ranked = index.plan.poleChoicesRanked !== false;
   const summary = report.summary;
 
+  // Held bénévole places, a Staff standing in one included: a place held is a place held.
   const coverage =
-    summary.demandHours > 0 ? (summary.assignedHours / summary.demandHours) * 100 : 100;
+    summary.demandHours > 0 ? (summary.filledHours / summary.demandHours) * 100 : 100;
+  const span = (start: number, end: number) => `${index.label(start)} à ${index.label(end)}`;
 
   const unhonoured = report.volunteers
     .flatMap((v) => v.buddies.filter((b) => !b.honoured).map((b) => ({ from: v.name, to: b.toName })))
@@ -51,7 +53,7 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
   return (
     <div className="board">
       <section className="board-card is-span2">
-        <h2>Couverture</h2>
+        <h2>Couverture bénévoles</h2>
         <div className="stat-row">
           {/*
             The headcount comes first, because every other figure on this card is meaningless
@@ -84,6 +86,58 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
             </button>
           </p>
         )}
+      </section>
+
+      {/*
+        THE STAFF, COUNTED APART since 2026-10-24, and in posts rather than hours: a régie
+        générale from the doors to the end is one person to find, not eighteen hours of gap.
+      */}
+      <section className="board-card">
+        <h2>
+          Postes Staff: {summary.staffFilled} sur {summary.staffSeats}
+        </h2>
+        {summary.staffSeats === 0 && (
+          <p className="board-empty">
+            Aucune place Staff. Elles se règlent par créneau, ou par pôle dans Réglages.
+          </p>
+        )}
+        {summary.staffSeats > 0 && summary.staffOpen.length === 0 && (
+          <p className="board-empty">Tous les postes Staff sont tenus.</p>
+        )}
+        <ul className="people">
+          {summary.staffOpen.map((entry) => (
+            <li key={entry.shiftKey}>
+              <strong>{entry.path}</strong>
+              <span className="people-meta">
+                {span(entry.start, entry.end)} ({fmtHours(entry.end - entry.start)})
+                {entry.missing > 1 ? `, ${entry.missing} postes` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="board-card">
+        <h2>Responsables manquants</h2>
+        <p className="board-note">
+          Les heures où un pôle a des bénévoles sans Responsable en charge, d'après les bandeaux
+          Responsable de la grille. Un Responsable d'un pôle couvre ses sous-pôles.
+        </p>
+        {summary.leaderGaps.length === 0 && (
+          <p className="board-empty">Chaque pôle a un Responsable sur toutes ses heures.</p>
+        )}
+        <ul className="people">
+          {summary.leaderGaps.map((entry) => (
+            <li key={entry.poleKey}>
+              <strong>{entry.path}</strong>
+              <span className="people-meta">
+                {entry.none
+                  ? 'aucun Responsable'
+                  : entry.windows.map((w) => span(w.start, w.end)).join(', ')}
+              </span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="board-card">
@@ -142,7 +196,7 @@ export function DashboardScreen({ onGoToRecruitment }: { onGoToRecruitment(): vo
           </p>
         )}
         <dl className="kv">
-          <dt>Heures nécessaires</dt>
+          <dt>Heures bénévoles nécessaires</dt>
           <dd>{fmtHours(summary.demandHours)}</dd>
           <dt>Heures proposées par les inscrits</dt>
           <dd>{fmtHours(summary.offeredHours)}</dd>

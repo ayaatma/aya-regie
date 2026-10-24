@@ -464,6 +464,30 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
       { key: 'livraison', label: 'Livraison scène', moment: 'montage', start: 2, end: 4 },
     ],
     organisers,
+    // The Staff places of 2026-10-24: a régie générale held by the Staff alone from the doors to
+    // the end, one of its two posts taken; and a Responsable on the first root pole for its first
+    // hours only, so « Responsables manquants » has something to say.
+    poles: [
+      ...plan.poles,
+      {
+        key: 'regie', name: 'Régie générale', parentKey: null, path: 'Régie générale',
+        allowAllDebutants: false, minExperienced: 0, defaultHeadcount: 0, defaultStaffHeadcount: 2,
+      },
+    ],
+    shifts: [
+      ...plan.shifts,
+      { key: 'regie-0', poleKey: 'regie', start: 0, end: plan.lengthHours, headcount: 0, staffHeadcount: 2 },
+    ],
+    organiserShifts: [
+      ...plan.organiserShifts,
+      ...(lead ? [{ key: 'regie-lead', organiserKey: lead.key, shiftKey: 'regie-0' }] : []),
+    ],
+    leaderRoles: [
+      ...plan.leaderRoles,
+      ...(organisers[1] && plan.poles[1]
+        ? [{ key: 'lead-first', organiserKey: organisers[1].key, poleKey: plan.poles.find((x) => x.parentKey === null && x.key !== GENERAL_POLE_KEY)!.key, start: 0, end: 6 }]
+        : []),
+    ],
     artists,
     montage,
     demontage,
