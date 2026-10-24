@@ -29,7 +29,6 @@
 import { useState } from 'react';
 
 import {
-  APPLICATION_STATUSES,
   APPLICATION_STATUS_LABEL,
   audienceLabel,
   followUpOf,
@@ -53,10 +52,16 @@ export function RegistrationSection({
   kind,
   personKey,
   readOnly = false,
+  part = 'all',
 }: {
   kind: RegistrantKind;
   personKey: string;
   readOnly?: boolean;
+  /**
+   * Since 2026-10-24 a folded fiche shows the status at its top and the mails in « Suivi »: two
+   * blocks, each with its own window. The other kinds of person keep both in one.
+   */
+  part?: 'all' | 'status' | 'mails';
 }) {
   const { plan, edit } = useLoadedPlan();
   const { id: eventId } = usePlan();
@@ -139,45 +144,48 @@ export function RegistrationSection({
     </div>
   );
 
-  if (readOnly) return <div className="panel-section">{banner}</div>;
+  if (readOnly) return part === 'mails' ? null : <div className="panel-section">{banner}</div>;
+
+  const showStatus = part !== 'mails';
+  const showMails = part !== 'status';
 
   return (
     <div className="panel-section registration-section">
-      {banner}
+      {showStatus && banner}
 
-      {confirming === null && (
+      {/*
+        TWO BUTTONS RATHER THAN A LIST, 2026-10-24, the régisseur's design: « Valider » in green and
+        « Annuler » in red while the person is an inscription, then one neutral button to bring
+        them back to it. Validating and cancelling still go through the window and its mail.
+      */}
+      {confirming === null && (showStatus || status === 'valide') && (
         <div className="registration-actions">
-          {status !== 'valide' && (
-            <button type="button" className="btn is-primary" onClick={() => open('validation')}>
-              Valider
+          {showStatus && status === 'candidature' && (
+            <>
+              <button type="button" className="btn is-ok" onClick={() => open('validation')}>
+                Valider
+              </button>
+              <button type="button" className="btn is-danger" onClick={() => open('annulation')}>
+                Annuler
+              </button>
+            </>
+          )}
+          {showStatus && status !== 'candidature' && (
+            <button
+              type="button"
+              className="btn is-small"
+              title="Repasse en inscription, sans envoyer de mail"
+              aria-label={`Remettre ${who} en inscription`}
+              onClick={() => setStatus('candidature')}
+            >
+              Remettre en inscription
             </button>
           )}
-          {status === 'valide' && (
+          {showMails && status === 'valide' && (
             <button type="button" className="btn is-small" onClick={() => open('renvoi')} disabled={!isMailAddress(person.email)}>
               {last ? 'Renvoyer le mail' : 'Envoyer le mail'}
             </button>
           )}
-          <label className="registration-select">
-            <select
-              className="select"
-              name={`registration-status-${kind}-${personKey}`}
-              value={status}
-              aria-label={`Statut de ${who}`}
-              onChange={(event) => {
-                const next = event.target.value as ApplicationStatus;
-                // Validating and cancelling go through the window, whichever control asked.
-                if (next === 'valide') open('validation');
-                else if (next === 'annule') open('annulation');
-                else setStatus(next);
-              }}
-            >
-              {APPLICATION_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {APPLICATION_STATUS_LABEL[s]}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       )}
 
@@ -254,25 +262,29 @@ export function RegistrationSection({
       )}
       {sending && <p className="people-meta">Envoi…</p>}
 
-      {log.error && <p className="people-meta is-bad">{log.error}</p>}
-      {last ? (
-        <MailLine entry={last} stepLabels={stepLabels} />
-      ) : (
-        !log.loading && <p className="people-meta">Aucun mail de validation envoyé.</p>
-      )}
-      {history.length > (last ? 1 : 0) && (
+      {showMails && (
         <>
-          <button type="button" className="btn is-link is-small" onClick={() => setShowHistory((v) => !v)}>
-            {showHistory ? "Masquer l'historique" : `Tous les mails (${history.length})`}
-          </button>
-          {showHistory && (
-            <ul className="registration-history">
-              {history.filter((entry) => entry !== last).map((entry) => (
-                <li key={entry.id}>
-                  <MailLine entry={entry} stepLabels={stepLabels} />
-                </li>
-              ))}
-            </ul>
+          {log.error && <p className="people-meta is-bad">{log.error}</p>}
+          {last ? (
+            <MailLine entry={last} stepLabels={stepLabels} />
+          ) : (
+            !log.loading && <p className="people-meta">Aucun mail de validation envoyé.</p>
+          )}
+          {history.length > (last ? 1 : 0) && (
+            <>
+              <button type="button" className="btn is-link is-small" onClick={() => setShowHistory((v) => !v)}>
+                {showHistory ? "Masquer l'historique" : `Tous les mails (${history.length})`}
+              </button>
+              {showHistory && (
+                <ul className="registration-history">
+                  {history.filter((entry) => entry !== last).map((entry) => (
+                    <li key={entry.id}>
+                      <MailLine entry={entry} stepLabels={stepLabels} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </>
       )}

@@ -17,7 +17,11 @@
  * `PersonPanel`), one person at a time, on purpose.
  */
 
+import type { ReactNode } from 'react';
+
 import {
+  isNoAllergy,
+  isStandardDiet,
   phaseDayParts,
   toLabel,
   type Organiser,
@@ -33,11 +37,16 @@ import { organiserName } from './labels.ts';
 import { FicheText } from './FicheText.tsx';
 import { PersonPhoto } from './PersonPhoto.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
+import { FOLD_IDS, FicheFold, FoldAll } from './FicheFold.tsx';
+import type { FicheContext } from './VolunteerFiche.tsx';
 
 export function OrganiserFiche({
   organiserKey,
   editing = false,
   readOnly = false,
+  context = 'personnes',
+  practical,
+  trailing,
 }: {
   organiserKey: string;
   /**
@@ -47,6 +56,15 @@ export function OrganiserFiche({
   editing?: boolean;
   /** An orga's code reading the planning: the facts, never the fields, and no photo. */
   readOnly?: boolean;
+  /**
+   * Folded in categories on the Personnes tab, open and reduced to what placing them needs beside
+   * a grid, since 2026-10-24, as a bénévole's fiche. See `FicheContext`.
+   */
+  context?: FicheContext;
+  /** Drawn at the end of « Pratique et formulaire »: the door's fields, on the Personnes tab. */
+  practical?: ReactNode;
+  /** Categories drawn after the fiche's own, under the same « Tout déplier ». */
+  trailing?: ReactNode;
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const person = plan.organisers.find((o) => o.key === organiserKey);
@@ -55,6 +73,7 @@ export function OrganiserFiche({
   const who = organiserName(person) || 'cette personne';
   const roles = index.polesLedBy(person.key);
   const live = editing && !readOnly;
+  const folded = context === 'personnes';
 
   const field = (
     label: string,
@@ -85,48 +104,49 @@ export function OrganiserFiche({
       </>
     );
 
-  return (
-    <div className="orga-fiche">
-      <RegistrationSection kind="orga" personKey={person.key} readOnly={readOnly} />
-      <PersonPhoto personKey={person.key} name={who} readOnly={readOnly} editing={live} />
-      {live ? (
-        <>
-          <div className="rules-grid">
-            {field('Prénom', 'firstName', { autoComplete: 'given-name' })}
-            {field('Nom', 'lastName', { autoComplete: 'family-name' })}
-            {field('Adresse e-mail', 'email', { type: 'email', autoComplete: 'email' })}
-            {field('Téléphone', 'phone', { type: 'tel', autoComplete: 'tel' })}
-            {field('Régime alimentaire', 'diet')}
-            {field('Allergies', 'allergies')}
-            {/* Field data, 2026-09-15: the régie and the responsables only read them. */}
-            {field("Contact d'urgence", 'emergencyContact')}
-            {field('Santé, besoins', 'healthNote')}
-          </div>
-          <label className="rule">
-            <span className="rule-label">Remarques</span>
-            <FicheText
-              name={`orga-note-${person.key}`}
-              value={person.note}
-              ariaLabel={`Remarques sur ${who}`}
-              onCommit={(note) => edit((p) => updateOrganiser(p, person.key, { note }), `remarques sur ${who}`)}
-            />
-            <span className="rule-hint">
-              Ce que le formulaire a répondu sur le montage et les pôles atterrit ici, mot pour mot.
-            </span>
-          </label>
-        </>
-      ) : (
-        <dl className="kv is-near">
-          {fact('Téléphone', person.phone)}
-          {fact('E-mail', person.email)}
-          {fact('Régime', person.diet)}
-          {fact('Allergies', person.allergies)}
-          {fact("Contact d'urgence", person.emergencyContact)}
-          {fact('Santé, besoins', person.healthNote)}
-          {fact('Remarques', person.note)}
-        </dl>
-      )}
+  // The beside-the-grid pane lists the overlaps itself (`OrgaBody`); the Personnes tab says them here.
+  const clashes = folded ? index.organiserConflicts().filter((c) => c.organiser.key === person.key) : [];
 
+  const head = (
+    <>
+      <PersonPhoto personKey={person.key} name={who} readOnly={readOnly} editing={live} compact={!folded} />
+      {live && (
+        <div className="rules-grid">
+          {field('Prénom', 'firstName', { autoComplete: 'given-name' })}
+          {field('Nom', 'lastName', { autoComplete: 'family-name' })}
+        </div>
+      )}
+      <RegistrationSection kind="orga" personKey={person.key} readOnly={readOnly || !folded} part="status" />
+      {clashes.length > 0 && (
+        <div className="fiche-review is-bad">
+          <details className="fiche-warning">
+            <summary className="fiche-warning-line">
+              ⚠️ {clashes.length} chevauchement{clashes.length > 1 ? 's' : ''}
+            </summary>
+            {clashes.map((conflict, i) => (
+              <div key={i} className="issue">
+                <span className="issue-code">chevauchement</span>
+                {index.describeConflict(conflict)}
+              </div>
+            ))}
+          </details>
+        </div>
+      )}
+    </>
+  );
+
+  const rolesLine = !readOnly && (
+    <p className="people-meta">
+      {roles.length === 0
+        ? "Responsable d'aucun pôle."
+        : `Responsable de ${roles.map((r) => index.poleByKey.get(r.poleKey)?.path ?? r.poleKey).join(', ')}.`}{' '}
+      Cela se change sur le pôle lui-même, dans Réglages.
+    </p>
+  );
+
+  const role = (
+    <>
+      {folded && rolesLine}
       {plan.skills.length > 0 && (
         <div className="rule">
           <span className="rule-label">Compétences</span>
@@ -156,20 +176,132 @@ export function OrganiserFiche({
           />
         </div>
       )}
+    </>
+  );
 
+  const phases = (
+    <>
       <PhasePresenceRow organiserKey={person.key} id="montage" readOnly={!live} />
       <PhasePresenceRow organiserKey={person.key} id="demontage" readOnly={!live} />
+    </>
+  );
 
-      {!readOnly && (
-        <p className="people-meta">
-          {roles.length === 0
-            ? "Responsable d'aucun pôle."
-            : `Responsable de ${roles
-                .map((r) => index.poleByKey.get(r.poleKey)?.path ?? r.poleKey)
-                .join(', ')}.`}{' '}
-          Cela se change sur le pôle lui-même, dans Réglages.
-        </p>
+  const remarks = live ? (
+    <label className="rule">
+      <span className="rule-label">Remarques</span>
+      <FicheText
+        name={`orga-note-${person.key}`}
+        value={person.note}
+        ariaLabel={`Remarques sur ${who}`}
+        onCommit={(note) => edit((p) => updateOrganiser(p, person.key, { note }), `remarques sur ${who}`)}
+      />
+      <span className="rule-hint">
+        Ce que le formulaire a répondu sur le montage et les pôles atterrit ici, mot pour mot.
+      </span>
+    </label>
+  ) : (
+    person.note.trim() !== '' && (
+      <dl className="kv is-near">
+        {fact('Remarques', person.note)}
+      </dl>
+    )
+  );
+
+  const pratique = (
+    <>
+      {live ? (
+        <div className="rules-grid">
+          {field('Adresse e-mail', 'email', { type: 'email', autoComplete: 'email' })}
+          {field('Téléphone', 'phone', { type: 'tel', autoComplete: 'tel' })}
+          {field('Régime alimentaire', 'diet')}
+          {field('Allergies', 'allergies')}
+          {/* Field data, 2026-09-15: the régie and the responsables only read them. */}
+          {field("Contact d'urgence", 'emergencyContact')}
+          {field('Santé, besoins', 'healthNote')}
+        </div>
+      ) : (
+        <dl className="kv is-near">
+          {fact('Téléphone', person.phone)}
+          {fact('E-mail', person.email)}
+          {fact('Régime', person.diet)}
+          {fact('Allergies', person.allergies)}
+          {fact("Contact d'urgence", person.emergencyContact)}
+          {fact('Santé, besoins', person.healthNote)}
+        </dl>
       )}
+      {folded && remarks}
+      {practical}
+    </>
+  );
+
+  const presentPhases = (['montage', 'demontage'] as const).filter((id) => {
+    const phase = id === 'montage' ? plan.montage : plan.demontage;
+    return phase.enabled && (id === 'montage' ? person.montageFrom : person.demontageUntil) !== null;
+  });
+  // « Non », « aucune »: the same reading as a bénévole's (`isNoAllergy`), never a red « Allergie: Non ».
+  const allergic = !isNoAllergy(person.allergies ?? '');
+  const hasPhases = plan.montage.enabled || plan.demontage.enabled;
+  const summaries = {
+    role: [
+      roles.length > 0 ? roles.map((r) => index.poleByKey.get(r.poleKey)?.path ?? r.poleKey).join(', ') : '',
+      ...(person.skills ?? []).map((key) => plan.skills.find((s) => s.key === key)?.label ?? ''),
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    phases:
+      presentPhases
+        .map((id) => {
+          const phase = id === 'montage' ? plan.montage : plan.demontage;
+          return phase.label || (id === 'montage' ? 'Montage' : 'Démontage');
+        })
+        .join(' · ') || 'Pas là',
+    pratique: [person.phone, isStandardDiet(person.diet ?? '') ? '' : (person.diet ?? '').trim(), allergic ? `Allergie: ${(person.allergies ?? '').trim()}` : '']
+      .filter(Boolean)
+      .join(' · '),
+  };
+  const pratiqueFold = (
+    <FicheFold id={FOLD_IDS.pratique} title="Pratique et formulaire" summary={summaries.pratique} tone={allergic ? 'bad' : ''}>
+      {pratique}
+    </FicheFold>
+  );
+
+  if (!folded) {
+    return (
+      <div className="orga-fiche">
+        {head}
+        {role}
+        {context === 'phase' && phases}
+        {remarks}
+        {pratiqueFold}
+      </div>
+    );
+  }
+
+  const ids = [
+    FOLD_IDS.role,
+    ...(hasPhases ? [FOLD_IDS.phases] : []),
+    FOLD_IDS.suivi,
+    FOLD_IDS.pratique,
+    ...(trailing ? [FOLD_IDS.statut] : []),
+  ];
+
+  return (
+    <div className="orga-fiche">
+      {head}
+      <FoldAll ids={ids} />
+      <FicheFold id={FOLD_IDS.role} title="Rôle et compétences" summary={summaries.role}>
+        {role}
+      </FicheFold>
+      {hasPhases && (
+        <FicheFold id={FOLD_IDS.phases} title="Montage et démontage" summary={summaries.phases}>
+          {phases}
+        </FicheFold>
+      )}
+      <FicheFold id={FOLD_IDS.suivi} title="Suivi">
+        <RegistrationSection kind="orga" personKey={person.key} readOnly={readOnly} part="mails" />
+      </FicheFold>
+      {pratiqueFold}
+      {trailing}
     </div>
   );
 }

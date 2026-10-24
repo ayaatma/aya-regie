@@ -89,10 +89,16 @@ export function InfoPanel({
   selection,
   onSelect,
   readOnly = false,
+  grid = 'exploit',
 }: {
   selection: Selection | null;
   onSelect(selection: Selection | null): void;
   readOnly?: boolean;
+  /**
+   * Which grid the pane stands beside, since 2026-10-24: a person's fiche here shows only what
+   * placing them on THAT grid needs. See `FicheContext`.
+   */
+  grid?: 'exploit' | 'phase';
 }) {
   const [collapsed, setCollapsed] = useCollapsed();
 
@@ -147,7 +153,7 @@ export function InfoPanel({
             ou un nom dans la liste à gauche. Ce qui est sélectionné est décrit ici.
           </p>
         ) : (
-          <Body selection={selection} onSelect={onSelect} readOnly={readOnly} />
+          <Body selection={selection} onSelect={onSelect} readOnly={readOnly} grid={grid} />
         )}
       </div>
     </aside>
@@ -158,16 +164,18 @@ function Body({
   selection,
   onSelect,
   readOnly,
+  grid,
 }: {
   selection: Selection;
   onSelect(selection: Selection | null): void;
   readOnly: boolean;
+  grid: 'exploit' | 'phase';
 }) {
   switch (selection.kind) {
     case 'benevole':
-      return <BenevoleBody volunteerKey={selection.volunteerKey} readOnly={readOnly} />;
+      return <BenevoleBody volunteerKey={selection.volunteerKey} readOnly={readOnly} context={grid} />;
     case 'orga':
-      return <OrgaBody organiserKey={selection.organiserKey} onSelect={onSelect} readOnly={readOnly} />;
+      return <OrgaBody organiserKey={selection.organiserKey} onSelect={onSelect} readOnly={readOnly} context={grid} />;
     case 'creneau':
       return (
         <CreneauBody
@@ -228,7 +236,15 @@ function Head({
   );
 }
 
-function BenevoleBody({ volunteerKey, readOnly }: { volunteerKey: string; readOnly: boolean }) {
+function BenevoleBody({
+  volunteerKey,
+  readOnly,
+  context,
+}: {
+  volunteerKey: string;
+  readOnly: boolean;
+  context: 'exploit' | 'phase';
+}) {
   const { index } = useLoadedPlan();
   const [editing, setEditing] = useState(false);
   const volunteer = index.volunteerByKey.get(volunteerKey);
@@ -243,7 +259,7 @@ function BenevoleBody({ volunteerKey, readOnly }: { volunteerKey: string; readOn
         action={!readOnly && <FicheEditButton editing={editing} onToggle={() => setEditing(!editing)} />}
       />
       {!readOnly && <OpenInPeople kind="benevole" personKey={volunteerKey} />}
-      <VolunteerFiche volunteerKey={volunteerKey} readOnly={readOnly} editing={editing} />
+      <VolunteerFiche volunteerKey={volunteerKey} readOnly={readOnly} editing={editing} context={context} />
     </>
   );
 }
@@ -279,10 +295,12 @@ function OrgaBody({
   organiserKey,
   onSelect,
   readOnly,
+  context,
 }: {
   organiserKey: string;
   onSelect(selection: Selection | null): void;
   readOnly: boolean;
+  context: 'exploit' | 'phase';
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const [editing, setEditing] = useState(false);
@@ -355,7 +373,7 @@ function OrgaBody({
         reading the montage needs to know who this is and how to reach them; what they must not get
         is a form that would silently fail, since their session has no write access at all.
       */}
-      <OrganiserFiche organiserKey={organiserKey} readOnly={readOnly} editing={editing} />
+      <OrganiserFiche organiserKey={organiserKey} readOnly={readOnly} editing={editing} context={context} />
 
       <div className="panel-section">
         <p className="panel-section-title">Sur l'exploit</p>
@@ -823,9 +841,9 @@ function CaseBody({
       {/* The person themselves, in full, which is what a click on a box is usually asking for. */}
       <div className="panel-section panel-divider">
         {box.personKind === 'orga' ? (
-          <OrgaBody organiserKey={box.personKey} onSelect={onSelect} readOnly={readOnly} />
+          <OrgaBody organiserKey={box.personKey} onSelect={onSelect} readOnly={readOnly} context="phase" />
         ) : (
-          <BenevoleBody volunteerKey={box.personKey} readOnly={readOnly} />
+          <BenevoleBody volunteerKey={box.personKey} readOnly={readOnly} context="phase" />
         )}
       </div>
     </>

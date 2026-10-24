@@ -1462,7 +1462,7 @@ Repère, ${toClock(phase.startISO, m.marker.start)} à ${toClock(phase.startISO,
         readOnly={readOnly || editing}
       />
 
-      <InfoPanel selection={selection} onSelect={setSelection} readOnly={readOnly} />
+      <InfoPanel selection={selection} onSelect={setSelection} readOnly={readOnly} grid="phase" />
 
       {/* The same bin the exploit has, for the same reason: the pane is a narrow strip on the far
           right and finding it while holding a box across a wide grid is work. */}

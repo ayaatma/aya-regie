@@ -40,6 +40,7 @@ export function PersonPhoto({
   readOnly = false,
   formFileId = null,
   editing = true,
+  compact = false,
 }: {
   personKey: string;
   name: string;
@@ -48,6 +49,8 @@ export function PersonPhoto({
   formFileId?: string | null;
   /** The fiche's mode édition: the buttons, the drop, the click that crops. */
   editing?: boolean;
+  /** The planning's panes, since 2026-10-24: the small square even with a photo, the grid needs the room. */
+  compact?: boolean;
 }) {
   const { id: eventId } = usePlan();
   const { url, source, loading, error } = usePhoto(readOnly ? null : eventId, personKey);
@@ -128,7 +131,7 @@ export function PersonPhoto({
 
   return (
     <div
-      className={`person-photo${over ? ' is-over' : ''}${url ? ' is-large' : ''}${editing ? ' is-editing' : ''}`}
+      className={`person-photo${over ? ' is-over' : ''}${url && !compact ? ' is-large' : ''}${editing ? ' is-editing' : ''}`}
       onDragOver={(event) => {
         if (!editing || ![...event.dataTransfer.types].includes('Files')) return;
         event.preventDefault();

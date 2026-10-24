@@ -356,6 +356,21 @@ button {
   border-color: var(--rouge);
 }
 
+/* « Valider » d'une inscription: vert, à côté d'« Annuler » en rouge. */
+.btn.is-ok {
+  background: var(--ok);
+  border-color: var(--ok);
+  /* The surface's colour, not white: the dark scheme's green is light, and white on it unreadable. */
+  color: var(--surface);
+  font-weight: 600;
+}
+
+.btn.is-ok:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
 .btn.is-icon {
   padding: 5px 8px;
   font-variant-numeric: tabular-nums;
@@ -6357,4 +6372,123 @@ textarea.select,
 .drag-readout-warning {
   display: block;
   font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   Les catégories repliées d'une fiche (FicheFold), 2026-10-24
+   -------------------------------------------------------------------------- */
+
+.fiche-fold {
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.fiche-fold.is-bad {
+  border-left-color: var(--rouge);
+}
+
+.fiche-fold.is-warn {
+  border-left-color: var(--orange-fonce);
+}
+
+.fiche-fold.is-ok {
+  border-left-color: var(--ok);
+}
+
+.fiche-fold-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.fiche-fold-head::-webkit-details-marker {
+  display: none;
+}
+
+.fiche-fold-head::before {
+  content: '▸';
+  flex: none;
+  color: var(--ink-faint);
+  transition: transform 0.12s;
+}
+
+.fiche-fold[open] > .fiche-fold-head::before {
+  transform: rotate(90deg);
+}
+
+.fiche-fold-head:hover {
+  background: var(--surface-sunken);
+}
+
+.fiche-fold-title {
+  flex: none;
+  font-weight: 600;
+}
+
+.fiche-fold-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.fiche-fold.is-bad .fiche-fold-summary {
+  color: var(--rouge);
+}
+
+.fiche-fold.is-warn .fiche-fold-summary {
+  color: var(--orange-fonce);
+}
+
+.fiche-fold-body {
+  padding: 2px 10px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.fiche-fold-body > :first-child,
+.fiche-fold-body > .panel-section:first-child {
+  margin-top: 8px;
+}
+
+.fiche-fold-all {
+  margin: 12px 0 0;
+  text-align: right;
+}
+
+/* Mineur·e, Réserve: ce qui se voit sous le statut, sans rien déplier. */
+.fiche-head-marks {
+  margin: 6px 0 0;
+}
+
+/* L'avertissement de tête: la ligne se lit, le détail se déplie. */
+.fiche-review.is-bad {
+  border-color: var(--rouge);
+  background: var(--rouge-bg);
+}
+
+.fiche-review > * + * {
+  margin-top: 6px;
+}
+
+.fiche-warning-line {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--orange-fonce);
+}
+
+.fiche-review.is-bad .fiche-warning-line {
+  color: var(--rouge);
+}
+
+.fiche-warning[open] > .fiche-warning-line {
+  margin-bottom: 8px;
 }

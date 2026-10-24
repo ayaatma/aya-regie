@@ -2,7 +2,9 @@
  * « Suivi » on a bénévole's fiche, 2026-09-15: the steps ticked, the régisseur's note, and the two
  * answers that go with them (the Réserve, the stamina). The status itself moved to
  * `RegistrationSection` on 2026-10-22, one block for every kind of person, with the validation
- * mail; what stays here is what only a bénévole has, and freeing the places of a cancelled one.
+ * mail; what stays here is what only a bénévole has. Since 2026-10-24 it is the body of the
+ * « Suivi » category of the fiche, and freeing the places of a cancelled one is `ReleasePlaces`,
+ * in the warning at the top of the fiche.
  *
  * At the top of the fiche because it is what the régisseur works through first, person by person,
  * in the weeks before an event: who is in, who was told, who withdrew.
@@ -19,6 +21,7 @@ import {
   fmtHours,
   statusOf,
   type EnergyProfile,
+  type Plan,
   type Volunteer,
   type VolunteerReport,
 } from '../engine.ts';
@@ -50,13 +53,9 @@ export function ApplicationSection({
 }) {
   const { plan, index, edit } = useLoadedPlan();
   const name = index.volunteerName(volunteer.key);
-  const status = statusOf(volunteer);
   const [note, setNote] = useState(volunteer.regieNote ?? '');
   // Another person selected, or the note changed by an undo: the draft follows the fiche.
   useEffect(() => setNote(volunteer.regieNote ?? ''), [volunteer.key, volunteer.regieNote]);
-
-  const held = placesHeld(plan, volunteer.key);
-  const holding = held.shifts + held.phaseBoxes;
 
   if (readOnly) {
     return (
@@ -76,27 +75,6 @@ export function ApplicationSection({
 
   return (
     <div className="panel-section fiche-edit">
-      <p className="panel-section-title">Suivi</p>
-
-      {status === 'annule' && holding > 0 && (
-        <div className="fiche-review">
-          <p className="fiche-review-reason">
-            Occupe encore{' '}
-            {[
-              held.shifts > 0 ? `${held.shifts} créneau${held.shifts > 1 ? 'x' : ''} (${fmtHours(detail.assignedHours)})` : '',
-              held.phaseBoxes > 0 ? `${held.phaseBoxes} case${held.phaseBoxes > 1 ? 's' : ''} de montage ou démontage` : '',
-            ].filter(Boolean).join(' et ')}
-            {held.locked > 0 ? `, dont ${held.locked} verrouillé${held.locked > 1 ? 's' : ''}` : ''}.
-          </p>
-          <button
-            type="button"
-            className="btn is-danger"
-            onClick={() => edit((p) => releasePlaces(p, volunteer.key), `places de ${name} libérées (annulation)`)}
-          >
-            Libérer ses places
-          </button>
-        </div>
-      )}
 
       {!editing && (volunteer.teamKey || volunteer.energy) && (
         <p>
@@ -185,5 +163,42 @@ export function ApplicationSection({
         }}
       />
     </div>
+  );
+}
+
+/** Whether a cancelled bénévole still holds places: the warning at the top of the fiche says so. */
+export function holdsPlacesCancelled(plan: Plan, volunteer: Volunteer): boolean {
+  const held = placesHeld(plan, volunteer.key);
+  return statusOf(volunteer) === 'annule' && held.shifts + held.phaseBoxes > 0;
+}
+
+/**
+ * « Libérer ses places », for a cancelled bénévole still holding some, 2026-09-15. In the warning
+ * at the top of the fiche since 2026-10-24: folded under « Suivi » it would be missed, and a
+ * cancelled person still on the grid is exactly what must not be missed.
+ */
+export function ReleasePlaces({ volunteer, detail }: { volunteer: Volunteer; detail: VolunteerReport }) {
+  const { plan, index, edit } = useLoadedPlan();
+  if (!holdsPlacesCancelled(plan, volunteer)) return null;
+  const held = placesHeld(plan, volunteer.key);
+  const name = index.volunteerName(volunteer.key);
+  return (
+    <>
+      <p className="fiche-review-reason">
+        Annulé·e, occupe encore{' '}
+        {[
+          held.shifts > 0 ? `${held.shifts} créneau${held.shifts > 1 ? 'x' : ''} (${fmtHours(detail.assignedHours)})` : '',
+          held.phaseBoxes > 0 ? `${held.phaseBoxes} case${held.phaseBoxes > 1 ? 's' : ''} de montage ou démontage` : '',
+        ].filter(Boolean).join(' et ')}
+        {held.locked > 0 ? `, dont ${held.locked} verrouillé${held.locked > 1 ? 's' : ''}` : ''}.
+      </p>
+      <button
+        type="button"
+        className="btn is-danger"
+        onClick={() => edit((p) => releasePlaces(p, volunteer.key), `places de ${name} libérées (annulation)`)}
+      >
+        Libérer ses places
+      </button>
+    </>
   );
 }

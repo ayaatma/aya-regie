@@ -50,6 +50,7 @@ import { FicheEditButton } from './FicheEditButton.tsx';
 import { RegistrationSection } from './RegistrationSection.tsx';
 import { useNavigation, type PersonRef } from './personNav.ts';
 import { VolunteerFiche } from './VolunteerFiche.tsx';
+import { FOLD_IDS, FicheFold } from './FicheFold.tsx';
 import { movePhoto, photosAvailable } from '../photos/photoStore.ts';
 
 export function PersonPanel({
@@ -120,6 +121,23 @@ function PersonBody({
   const nickname = row.kind === 'benevole' ? index.volunteerByKey.get(row.key)?.nickname : undefined;
   const mark = row.kind === 'orga' || row.kind === 'benevole' || row.kind === 'artiste' ? row.kind : null;
 
+  // A bénévole's and a Staff / Responsable's fiche fold in categories since 2026-10-24: the door
+  // goes into « Pratique et formulaire », the status and the code into a last category of their own.
+  const folded = row.kind === 'benevole' || row.kind === 'orga';
+  // A bénévole's or an orga's door is read out of the mode édition; the others have no such mode.
+  const door = <DoorSection row={row} report={report} who={who} editing={editing || !folded} />;
+  const statusFold = (row.kind === 'benevole' || row.kind === 'orga') && (
+    <FicheFold
+      id={FOLD_IDS.statut}
+      title={row.kind === 'orga' ? 'Statut et code responsable' : 'Statut'}
+      summary={row.statuses.map((s) => s.label).join(' · ')}
+    >
+      <ActsOf row={row} />
+      <StatusSection kind={row.kind} personKey={row.key} who={who} onFocus={onFocus} />
+      {row.kind === 'orga' && <AccessSection organiserKey={row.key} who={who} onDeleted={onClose} />}
+    </FicheFold>
+  );
+
   return (
     <>
       <div className="fiche-head">
@@ -135,21 +153,17 @@ function PersonBody({
         )}
       </div>
 
-      {row.kind === 'benevole' && <VolunteerFiche volunteerKey={row.key} editing={editing} />}
-      {row.kind === 'orga' && <OrganiserFiche organiserKey={row.key} editing={editing} />}
-      {row.kind === 'orga' && <AccessSection organiserKey={row.key} who={who} onDeleted={onClose} />}
+      {row.kind === 'benevole' && (
+        <VolunteerFiche volunteerKey={row.key} editing={editing} practical={door} trailing={statusFold} />
+      )}
+      {row.kind === 'orga' && (
+        <OrganiserFiche organiserKey={row.key} editing={editing} practical={door} trailing={statusFold} />
+      )}
       {row.kind === 'artiste' && <MemberFiche memberKey={row.key} />}
       {row.kind === 'invite' && <GuestFiche guestKey={row.key} />}
       {row.kind === 'extra' && <ExtraFiche extraKey={row.key} onDeleted={onClose} />}
 
-      {(row.kind === 'benevole' || row.kind === 'orga') && <ActsOf row={row} />}
-
-      {/* A bénévole's or an orga's door is read out of the mode édition; the others have no such mode. */}
-      <DoorSection row={row} report={report} who={who} editing={editing || (row.kind !== 'benevole' && row.kind !== 'orga')} />
-
-      {(row.kind === 'benevole' || row.kind === 'orga') && (
-        <StatusSection kind={row.kind} personKey={row.key} who={who} onFocus={onFocus} />
-      )}
+      {!folded && door}
     </>
   );
 }

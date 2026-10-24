@@ -1469,9 +1469,9 @@ test('the waiting list tab lists the reserve, and placing somebody takes them of
   assert.ok(!placed.reserve.includes(target.key), "placée, elle sort de la liste d'attente");
   assert.ok(!shows(poolOf(placed, 'attente'), target.firstName), "et quitte l'onglet");
 
-  // Somebody the importer read without hesitating carries no banner at all.
+  // Somebody the importer read without hesitating carries no « à relire » (a signalement may still warn).
   const calm = plan.volunteers.find((v) => !v.needsReview)!;
-  assert.ok(!infoOf(plan, { kind: 'benevole', volunteerKey: calm.key }).includes('fiche-review'));
+  assert.ok(!shows(infoOf(plan, { kind: 'benevole', volunteerKey: calm.key }), 'Fiche à relire'));
 });
 
 test('a read-only fiche offers no way to change anything', () => {
@@ -2494,8 +2494,10 @@ test('a fiche carries the application, and a cancelled person still placed is of
     volunteers: plan.volunteers.map((v) =>
       v.key === held ? { ...v, status: 'annule' as const, statusSteps: ['confirmation'], energy: 'fatigable' as const } : v),
   };
-  const html = infoOf(cancelled, { kind: 'benevole', volunteerKey: held });
+  // The Personnes fiche since 2026-10-24: the grid's pane keeps what placing somebody needs.
+  const html = peopleOf(cancelled, { kind: 'benevole', key: held });
   assert.ok(shows(html, 'Suivi'));
+  assert.ok(html.includes('>Remettre en inscription</button>'), 'annulée, un seul bouton pour revenir en inscription');
   assert.ok(html.includes('>Libérer ses places</button>'), 'le bouton explicite, rien de retiré tout seul');
   assert.ok(shows(html, 'Mail de confirmation envoyé'));
   assert.ok(shows(html, 'Fatigue vite'));
@@ -2508,15 +2510,24 @@ test('a fiche carries the application, and a cancelled person still placed is of
 test('a fiche says at once whether the person is validated, and offers to validate an inscription', () => {
   const key = plan.volunteers[0]!.key;
   const pending: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'candidature' as const } : v)) };
-  const html = infoOf(pending, { kind: 'benevole', volunteerKey: key });
+  const html = peopleOf(pending, { kind: 'benevole', key });
   assert.ok(html.includes('registration is-candidature'));
   assert.ok(shows(html, 'pas encore validée'));
-  assert.ok(html.includes('>Valider</button>'));
+  // Two buttons since 2026-10-24, green and red, in place of the list of statuses.
+  assert.ok(html.includes('class="btn is-ok">Valider</button>'));
+  assert.ok(html.includes('class="btn is-danger">Annuler</button>'));
+  assert.ok(!html.includes('registration-status-benevole'), 'plus de liste déroulante');
+
+  // Beside the grid the status is read, never changed.
+  const pane = infoOf(pending, { kind: 'benevole', volunteerKey: key });
+  assert.ok(pane.includes('registration is-candidature'));
+  assert.ok(!pane.includes('>Valider</button>'));
 
   const validated: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'valide' as const } : v)) };
-  const done = infoOf(validated, { kind: 'benevole', volunteerKey: key });
+  const done = peopleOf(validated, { kind: 'benevole', key });
   assert.ok(done.includes('registration is-valide'));
   assert.ok(!done.includes('>Valider</button>'));
+  assert.ok(done.includes('>Remettre en inscription</button>'));
   assert.ok(shows(done, 'Aucun mail de validation envoyé.'));
 
   const reading = infoOf(pending, { kind: 'benevole', volunteerKey: key }, true);
@@ -2761,7 +2772,7 @@ test('the Mails tab offers to validate everybody placed, and a card per step wit
 test('a validated bénévole’s fiche lists the follow-up steps, and the list filters on them', () => {
   const key = plan.assignments[0]!.volunteerKey;
   const validated: Plan = { ...plan, volunteers: plan.volunteers.map((v) => (v.key === key ? { ...v, status: 'valide' as const } : v)) };
-  const html = infoOf(validated, { kind: 'benevole', volunteerKey: key });
+  const html = peopleOf(validated, { kind: 'benevole', key });
   assert.ok(shows(html, 'Planning'));
   assert.ok(shows(html, 'à envoyer'));
   const people = render(<PeopleScreen focus={null} onFocus={noop} onGoToSetup={noop} />, validated);
@@ -2987,4 +2998,28 @@ test("a bénévole's fiche is read out of its mode édition and edited in place 
     assert.ok(shows(html, "Mettre en liste d'attente"), "et la liste d'attente");
   }
   assert.ok(!shows(read, 'Réserve (renfort)') && !shows(edited, 'Réserve (renfort)'));
+});
+
+test('a Personnes fiche folds in categories, the grid panes keep what placing somebody needs', () => {
+  const key = plan.assignments[0]!.volunteerKey;
+  const fiche = peopleOf(plan, { kind: 'benevole', key });
+  for (const title of ['Affectation', 'Souhaits', 'Contraintes', 'Suivi', 'Pratique et formulaire', 'Statut']) {
+    assert.ok(fiche.includes(`<span class="fiche-fold-title">${escapeHtml(title)}</span>`), title);
+  }
+  assert.ok(shows(fiche, 'Tout déplier'));
+  assert.ok(shows(fiche, "Mettre en liste d'attente"), 'the waiting list stays above the folds');
+  // Folded by default: a <details> drawn without its open attribute.
+  assert.ok(!/<details class="fiche-fold[^"]*" open/.test(fiche));
+
+  const exploit = infoOf(plan, { kind: 'benevole', volunteerKey: key });
+  assert.ok(shows(exploit, 'Sa journée') && shows(exploit, 'Ses choix'));
+  assert.ok(!exploit.includes('<span class="fiche-fold-title">Suivi</span>'), 'no Suivi beside the grid');
+  assert.ok(!shows(exploit, "Mettre en liste d'attente"));
+  assert.ok(exploit.includes('<span class="fiche-fold-title">Pratique et formulaire</span>'), 'the practical facts, one fold away');
+
+  const phase = render(
+    <InfoPanel selection={{ kind: 'benevole', volunteerKey: key }} onSelect={noop} grid="phase" />,
+    plan,
+  );
+  assert.ok(!shows(phase, 'Ses choix'), "the exploit's choices are not the montage's question");
 });

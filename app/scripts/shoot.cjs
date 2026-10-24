@@ -582,6 +582,9 @@ async function main() {
         await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
         await sleep(400);
         await shot('86-personnes-fiche-benevole');
+        // Folded in categories since 2026-10-24: the same fiche with every category open.
+        await clickButton(/^Tout déplier$/);
+        await tall('86b-personnes-fiche-depliee');
         await page.keyboard.press('ArrowDown');
         await sleep(400);
         // The 🖍️ at the top right of the fiche (2026-10-24): the same fiche, its fields in place.
@@ -597,6 +600,7 @@ async function main() {
         await sleep(300);
         await tall('88b-personnes-fiche-orga-lecture');
         // Bénévole ↔ orga: the proposal, then the fiche it lands on, then back with Ctrl+Z.
+        // (« Statut » is a category: opened by the « Tout déplier » above, remembered.)
         await clickButton(/^Passer bénévole…$/);
         await page.evaluate(() => document.querySelector('.convert-box')?.scrollIntoView());
         await sleep(300);
@@ -672,8 +676,9 @@ async function main() {
         await shot('96-personnes-candidature');
         await page.evaluate(() => document.querySelector('tr[data-person^="benevole|"] td:nth-child(2)')?.click());
         await sleep(400);
-        await page.$eval('select[name^="registration-status-benevole"]', (el) => el.setAttribute('data-shot', '1'));
-        await page.select('select[data-shot="1"]', 'annule');
+        // Two buttons since 2026-10-24 in place of the list: « Annuler », then its window.
+        await clickButton(/^Annuler$/);
+        await clickButton(/^Annuler (sans mail|sans envoyer de mail|et envoyer)$/);
         await sleep(400);
         await shot('97-personnes-fiche-annulee');
         await clickButton(/^↶$/);
