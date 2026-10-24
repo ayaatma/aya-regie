@@ -292,6 +292,22 @@ export function GridScreen({
     return map;
   }, [index]);
 
+  /**
+   * Orgas in two places at once, on their boxes (per créneau, per orga) and on their bands.
+   * Red like a bénévole's overlap; nothing is removed. See `PlanIndex.organiserConflicts`.
+   */
+  const orgaClashes = useMemo(() => {
+    const { byBox, byRole } = index.organiserConflictNotes();
+    const byShift = new Map<string, Map<string, string[]>>();
+    for (const [boxKey, texts] of byBox) {
+      const [organiserKey, shiftKey] = boxKey.split('|') as [string, string];
+      const held = byShift.get(shiftKey) ?? new Map<string, string[]>();
+      held.set(organiserKey, texts);
+      byShift.set(shiftKey, held);
+    }
+    return { byShift, byRole };
+  }, [index]);
+
   /*
    * The names offered under "Chercher un bénévole", in alphabetical order.
    *
@@ -439,8 +455,9 @@ export function GridScreen({
       event.dataTransfer.effectAllowed = 'move';
 
       /*
-       * An orga is legal everywhere, and that is not a shortcut: no hour rule applies to them at
-       * all, so there is no shift `isLegal` could refuse. The second MIME type is what lets a
+       * An orga is subject to no hour rule, and to one rule only: not two places at once (another
+       * créneau, or a pole they run at that hour; see `PlanIndex.organiserBlockersFor`). Those
+       * créneaux are greyed exactly as a bénévole's illegal ones are. The second MIME type is what lets a
        * pole's frise recognise them while the pointer is still moving; see `DRAG_MIME_ORGA`.
        *
        * `copyMove` AND NOT `move`, and this is why dropping an orga on a pole's frise did nothing
@@ -455,7 +472,10 @@ export function GridScreen({
       if (payload.kind === 'orga') {
         event.dataTransfer.setData(DRAG_MIME_ORGA, payload.personKey);
         event.dataTransfer.effectAllowed = 'copyMove';
-        setDrag({ payload, legalShifts: new Set(plan.shifts.map((s) => s.key)) });
+        const free = plan.shifts.filter(
+          (s) => index.organiserBlockersFor(payload.personKey, s, payload.fromShiftKey).length === 0,
+        );
+        setDrag({ payload, legalShifts: new Set(free.map((s) => s.key)) });
         return;
       }
 
@@ -1413,6 +1433,7 @@ export function GridScreen({
                         onResize={onResizeRole}
                         onSelect={(roleKey) => setSelection({ kind: 'role', roleKey })}
                         pickedRoleKey={selection?.kind === 'role' ? selection.roleKey : null}
+                        clashes={orgaClashes.byRole}
                       />
                     </div>
                   </div>
@@ -1556,6 +1577,7 @@ export function GridScreen({
                                   }
                                   onRemoveOrga={takeOrgaOut}
                                   supportOnlyOrgaKeys={supportOnlyByShift.get(shift.key)}
+                                  clashingOrgas={orgaClashes.byShift.get(shift.key)}
                                   pendingKeys={pendingKeys}
                                   slots={layout.get(shift.key)}
                                   readOnly={readOnly}
@@ -1680,8 +1702,14 @@ function DragReason({
    */
   const message = useMemo((): { kind: 'refused' | 'costly'; text: string } | null => {
     if (!dropShiftKey) return null;
-    const volunteer = index.volunteerByKey.get(drag.payload.personKey);
     const shift = index.shiftByKey.get(dropShiftKey);
+    // An orga has one rule, two places at once, and it costs nothing when it holds.
+    if (drag.payload.kind === 'orga') {
+      if (!shift || drag.legalShifts.has(dropShiftKey)) return null;
+      const texts = index.organiserBlockersFor(drag.payload.personKey, shift, drag.payload.fromShiftKey);
+      return { kind: 'refused', text: texts.join(' ') };
+    }
+    const volunteer = index.volunteerByKey.get(drag.payload.personKey);
     if (!volunteer || !shift) return null;
 
     /*

@@ -201,6 +201,25 @@ async function main() {
         await page.keyboard.press('Escape');
         await sleep(300);
       }
+      if (want('conflit')) {
+        // Two places at once (2026-10-24): the fixture's Responsable on a créneau of another
+        // pole during their window. The box and the band go red; the box opens the fiche.
+        await tab('Grille');
+        const found = await page.evaluate(() => {
+          const box = document.querySelector('.box.is-orga-box.is-illegal');
+          box?.scrollIntoView({ block: 'center', inline: 'center' });
+          return {
+            box: box !== null,
+            bands: document.querySelectorAll('.organiser-band-item.is-illegal').length,
+          };
+        });
+        console.log('conflit:', JSON.stringify(found));
+        await sleep(400);
+        await shot('23-grille-conflit');
+        await page.click('.box.is-orga-box.is-illegal');
+        await sleep(400);
+        await shot('23b-grille-conflit-fiche');
+      }
       if (want('edition')) {
         // Mode édition (2026-09-16): in, a place added, an edge pulled, a créneau created in the
         // void, Échap out; then the same on the montage, and leaving by changing tab. Each check

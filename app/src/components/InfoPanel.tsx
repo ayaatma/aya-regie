@@ -35,6 +35,7 @@ import {
   phasePeople,
   toClock,
   toLabel,
+  type OrganiserConflict,
   type PersonKind,
   type Phase,
   type PhaseId,
@@ -276,15 +277,18 @@ function OrgaBody({
 
   const shifts = plan.organiserShifts.filter((s) => s.organiserKey === organiserKey);
   const roles = index.polesLedBy(organiserKey);
+  const clashes = index.organiserConflicts().filter((c) => c.organiser.key === organiserKey);
 
   return (
     <>
       <Head what={ORGANISER_ROLE_LABEL[organiserRoleOf(person)]} name={organiserName(person)} kind="orga" />
       {!readOnly && <OpenInPeople kind="orga" personKey={organiserKey} />}
       <p className="panel-sub">
-        Le Staff et les responsables ne sont soumis à aucune règle d'heures et le solveur ne les place jamais. Tout ce qui
-        est ici se corrige: ce que le formulaire a dit n'est qu'un point de départ.
+        Le Staff et les responsables ne sont soumis à aucune règle d'heures et le solveur ne les place jamais, mais
+        personne n'est à deux endroits en même temps. Tout ce qui est ici se corrige: ce que le formulaire a dit n'est
+        qu'un point de départ.
       </p>
+      <ConflictList conflicts={clashes} />
 
       {/*
         The poles this person runs, with their hours and a way back out.
@@ -420,10 +424,14 @@ function RoleBody({
 
   const pole = index.poleByKey.get(role.poleKey)?.path ?? role.poleKey;
   const timed = role.start !== null && role.end !== null;
+  const clashes = index
+    .organiserConflicts()
+    .filter((c) => c.other.kind === 'role' && c.other.role.key === roleKey);
 
   return (
     <>
       <Head what="Horaire de responsable" name={organiserName(person)} kind="orga" />
+      <ConflictList conflicts={clashes} />
       <dl className="kv is-near">
         <dt>Pôle</dt>
         <dd>{pole}</dd>
@@ -462,6 +470,26 @@ function RoleBody({
         )}
       </p>
     </>
+  );
+}
+
+/**
+ * A Staff or a Responsable in two places at once, said in full as a bénévole's `chevauchement`
+ * is. Nothing was removed: the régisseur moves one of the two. See `PlanIndex.organiserConflicts`.
+ */
+function ConflictList({ conflicts }: { conflicts: readonly OrganiserConflict[] }) {
+  const { index } = useLoadedPlan();
+  if (conflicts.length === 0) return null;
+  return (
+    <div className="panel-section">
+      <p className="panel-section-title">Signalements</p>
+      {conflicts.map((conflict, i) => (
+        <div key={i} className="issue">
+          <span className="issue-code">chevauchement</span>
+          {index.describeConflict(conflict)}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -552,6 +580,9 @@ function CreneauBody({
    * `Pole.leaderSupportOnly`.
    */
   const inSupport = index.supportOnlyBreaches().filter((b) => b.shift.key === shiftKey);
+  const clashes = index
+    .organiserConflicts()
+    .filter((c) => c.shift.key === shiftKey || (c.other.kind === 'shift' && c.other.shift.key === shiftKey));
 
   return (
     <>
@@ -562,6 +593,8 @@ function CreneauBody({
         {detail.staffHeadcount > 0 &&
           ` · Staff ${detail.staffHeadcount - detail.staffMissing} sur ${detail.staffHeadcount}`}
       </p>
+
+      <ConflictList conflicts={clashes} />
 
       {inSupport.length > 0 && (
         <div className="panel-section">

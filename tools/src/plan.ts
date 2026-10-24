@@ -393,6 +393,16 @@ export interface LeaderOnPole {
   role: LeaderRole;
 }
 
+/**
+ * An orga in two places at once, from `PlanIndex.organiserConflicts`. `shift` is always a créneau
+ * they hold; `other` is a second one, or a responsable window on a pole the créneau is not under.
+ */
+export interface OrganiserConflict {
+  organiser: Organiser;
+  shift: Shift;
+  other: { kind: 'shift'; shift: Shift } | { kind: 'role'; role: LeaderRole; pole: Pole };
+}
+
 /** A maximal run of touching or overlapping shifts worked by one volunteer. */
 export interface Block {
   start: number;
@@ -629,14 +639,24 @@ export class PlanIndex {
   }
 
   /**
-   * Orgas standing in two créneaux that overlap.
+   * Orgas in two places at once: two créneaux that overlap, or a créneau held while they run
+   * another pole.
    *
-   * Reported, never refused, like everything else in this tool: the régisseur is shown what they
-   * did rather than stopped from doing it. This is the one rule an orga is still subject to, by
-   * the decision of 2026-09-10, and it is the only one.
+   * THE ONE RULE AN ORGA IS SUBJECT TO, by the decision of 2026-09-10, and since 2026-10-24 it
+   * also reads the responsable's windows: "je suis responsable sur un pôle et à la fois sur un
+   * créneau Staff dans un autre pôle, ça veut dire que je suis à 2 endroits à la fois". Drawn in
+   * red and greyed during a drag, exactly as a bénévole's `chevauchement`; never refused by an
+   * edit, since nothing in this tool is.
+   *
+   * WHAT IS NOT A CONFLICT. A créneau on the pole the person runs, or under it: holding a place
+   * of your own pole is the ordinary case (`supportOnlyBreaches` says when it is not). A role
+   * with no hours yet: an unsettled window is "not decided", not "the whole event", or every
+   * responsable without hours would go red on their first Staff créneau. Two roles on two poles
+   * at the same hours: watching the bar and the plonge together is written on purpose, see
+   * `LeaderRole`.
    */
-  organiserClashes(): Array<{ organiser: Organiser; first: Shift; second: Shift }> {
-    const found: Array<{ organiser: Organiser; first: Shift; second: Shift }> = [];
+  organiserConflicts(): OrganiserConflict[] {
+    const found: OrganiserConflict[] = [];
     for (const [organiserKey, shifts] of this.shiftsByOrganiser) {
       const organiser = this.organiserByKey.get(organiserKey);
       if (!organiser) continue;
@@ -644,12 +664,80 @@ export class PlanIndex {
       for (let i = 0; i < sorted.length; i++) {
         for (let j = i + 1; j < sorted.length; j++) {
           if (overlaps(sorted[i]!, sorted[j]!)) {
-            found.push({ organiser, first: sorted[i]!, second: sorted[j]! });
+            found.push({ organiser, shift: sorted[i]!, other: { kind: 'shift', shift: sorted[j]! } });
           }
+        }
+        for (const clash of this.rolesClashing(organiserKey, sorted[i]!)) {
+          found.push({ organiser, shift: sorted[i]!, other: clash });
         }
       }
     }
     return found;
+  }
+
+  /**
+   * What putting this orga on this créneau would collide with, as French sentences.
+   *
+   * The drag's question, asked of the plan as it stands with `fromShiftKey` (the box being
+   * dragged) left out, the way `isLegal` is asked with a bénévole's own box removed. Empty means
+   * the créneau is free for them.
+   */
+  organiserBlockersFor(organiserKey: string, shift: Shift, fromShiftKey?: string | null): string[] {
+    const out: string[] = [];
+    for (const other of this.shiftsOfOrganiser(organiserKey)) {
+      if (other.key === shift.key || other.key === fromShiftKey) continue;
+      if (overlaps(other, shift)) out.push(this.describeClash({ kind: 'shift', shift: other }));
+    }
+    for (const clash of this.rolesClashing(organiserKey, shift)) out.push(this.describeClash(clash));
+    return out;
+  }
+
+  /**
+   * `organiserConflicts` filed by where it is drawn: on an orga's box (`orgaKey|shiftKey`) and
+   * on a responsable's band (the role's key), each place carrying the sentences that name the
+   * OTHER place. Both ends of a conflict go red, as both boxes of a bénévole's overlap do.
+   */
+  organiserConflictNotes(): { byBox: Map<string, string[]>; byRole: Map<string, string[]> } {
+    const byBox = new Map<string, string[]>();
+    const byRole = new Map<string, string[]>();
+    const add = (map: Map<string, string[]>, key: string, text: string) =>
+      map.set(key, [...(map.get(key) ?? []), text]);
+    for (const { organiser, shift, other } of this.organiserConflicts()) {
+      add(byBox, `${organiser.key}|${shift.key}`, this.describeClash(other));
+      const back = this.describeClash({ kind: 'shift', shift });
+      if (other.kind === 'shift') add(byBox, `${organiser.key}|${other.shift.key}`, back);
+      else add(byRole, other.role.key, back);
+    }
+    return { byBox, byRole };
+  }
+
+  /** A whole `OrganiserConflict`, as the panel says it: who, and both places. */
+  describeConflict({ organiser, shift, other }: OrganiserConflict): string {
+    const there = other.kind === 'shift'
+      ? `"${this.shiftLabel(other.shift)}"`
+      : `responsable de ${this.polePath(other.pole.key)} (${this.label(other.role.start!)} -> ${this.label(other.role.end!)})`;
+    return `${organiser.firstName} ${organiser.lastName} est à deux endroits en même temps: ` +
+      `"${this.shiftLabel(shift)}" et ${there}.`;
+  }
+
+  /** One side of an `OrganiserConflict`, as a sentence read from the other side. */
+  describeClash(other: OrganiserConflict['other']): string {
+    return other.kind === 'shift'
+      ? `Déjà sur un créneau à la même heure: "${this.shiftLabel(other.shift)}".`
+      : `Responsable de ${this.polePath(other.pole.key)} de ${this.label(other.role.start!)} à ` +
+        `${this.label(other.role.end!)}, à la même heure.`;
+  }
+
+  /** Windows this orga runs on another pole while the créneau lasts. Unset hours never clash. */
+  private rolesClashing(organiserKey: string, shift: Shift): Array<{ kind: 'role'; role: LeaderRole; pole: Pole }> {
+    const out: Array<{ kind: 'role'; role: LeaderRole; pole: Pole }> = [];
+    for (const role of this.polesLedBy(organiserKey)) {
+      if (role.start === null || role.end === null) continue;
+      const pole = this.poleByKey.get(role.poleKey);
+      if (!pole || this.isUnder(shift.poleKey, pole.key)) continue;
+      if (overlaps(shift, { start: role.start, end: role.end })) out.push({ kind: 'role', role, pole });
+    }
+    return out;
   }
 
   /**
@@ -664,7 +752,7 @@ export class PlanIndex {
    * a volunteer of the bar that evening. A role with no hours set covers the whole event, since
    * that is what an unset window means everywhere else it is read.
    *
-   * REPORTED AND NEVER REFUSED, like `organiserClashes` beside it. `validate.ts` does not read
+   * REPORTED AND NEVER REFUSED, like `organiserConflicts` beside it. `validate.ts` does not read
    * this and the solver cannot produce it: only the régisseur can, by hand, and they may have
    * meant it.
    */

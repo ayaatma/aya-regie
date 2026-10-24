@@ -78,6 +78,7 @@ export type {
   Block,
   BuddyPair,
   LeaderOnPole,
+  OrganiserConflict,
   AvailabilityMode,
   Plan,
 } from '@engine/plan.ts';

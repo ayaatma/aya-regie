@@ -2712,6 +2712,13 @@ button {
   user-select: none;
 }
 
+/* Responsable here while standing in a créneau of another pole: red, as `.box.is-illegal`. */
+.organiser-band-item.is-illegal {
+  background: var(--rouge-bg);
+  border-left-color: var(--rouge);
+  color: var(--rouge);
+}
+
 .organiser-band-item.is-moving {
   cursor: grabbing;
   box-shadow: 0 0 0 1px var(--accent);

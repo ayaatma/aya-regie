@@ -408,6 +408,13 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
 
   const [first, ...rest] = plan.artists;
   const lead = organisers[0];
+  const firstRoot = plan.poles.find((x) => x.parentKey === null && x.key !== GENERAL_POLE_KEY);
+  const rootOf = (poleKey: string): string => {
+    let pole = plan.poles.find((x) => x.key === poleKey);
+    while (pole?.parentKey) pole = plan.poles.find((x) => x.key === pole!.parentKey);
+    return pole?.key ?? poleKey;
+  };
+  const elsewhere = plan.shifts.find((s) => s.start < 6 && firstRoot && rootOf(s.poleKey) !== firstRoot.key);
   const artists = first
     ? [
         {
@@ -481,6 +488,9 @@ export function withPhases(plan: Plan, outRoot = 'out'): Plan {
     organiserShifts: [
       ...plan.organiserShifts,
       ...(lead ? [{ key: 'regie-lead', organiserKey: lead.key, shiftKey: 'regie-0' }] : []),
+      // Two places at once (2026-10-24): the Responsable below, on a créneau of another pole
+      // during their window, so the grid has a red orga box and a red band to show.
+      ...(elsewhere && organisers[1] ? [{ key: 'clash-elsewhere', organiserKey: organisers[1].key, shiftKey: elsewhere.key }] : []),
     ],
     leaderRoles: [
       ...plan.leaderRoles,

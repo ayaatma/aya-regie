@@ -115,6 +115,12 @@ export interface ShiftBlockProps {
    * this component holds no opinion of its own about it.
    */
   supportOnlyOrgaKeys?: ReadonlySet<string>;
+  /**
+   * Orgas of this créneau who are somewhere else at the same hour, with the sentences that say
+   * where: another créneau, or a pole they run. Red, as a bénévole's `chevauchement` is. From
+   * `PlanIndex.organiserConflictNotes`, keyed on the orga.
+   */
+  clashingOrgas?: ReadonlyMap<string, readonly string[]>;
   /** `kind|key` of the people still in « Inscription », from `pendingPeople`. Marked ⏳. */
   pendingKeys?: ReadonlySet<string>;
   /**
@@ -183,6 +189,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
     onSelectOrga,
     onRemoveOrga,
     supportOnlyOrgaKeys,
+    clashingOrgas,
     pendingKeys,
     slots,
     editing = false,
@@ -295,10 +302,11 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
       */}
       {report.orgas.map((orga) => {
         const inSupport = supportOnlyOrgaKeys?.has(orga.key) === true;
+        const clash = clashingOrgas?.get(orga.key);
         return (
         <div
           key={`orga-${orga.key}`}
-          className={`box is-orga-box${inSupport ? ' is-warned' : ''}`}
+          className={`box is-orga-box${clash ? ' is-illegal' : inSupport ? ' is-warned' : ''}`}
           role="button"
           // Draggable since 2026-09-12, like a volunteer's box: an orga put on the wrong créneau
           // was removed with the ✕ and placed again from the list, which is two gestures for what
@@ -306,6 +314,7 @@ function ShiftBlockImpl(props: ShiftBlockProps) {
           draggable={!readOnly && !editing}
           title={
             `${orga.name}\nStaff, placé·e à la main. Ne compte dans aucune règle d'heures.` +
+            (clash ? clash.map((text) => `\n${text}`).join('') : '') +
             (inSupport
               ? "\nCe pôle attend son responsable en support, sans créneau. Rien n'a été retiré."
               : '') +

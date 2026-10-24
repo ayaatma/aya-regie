@@ -314,9 +314,15 @@ export const OrganiserBand = memo(function OrganiserBand({
   onResize,
   onSelect,
   pickedRoleKey = null,
+  clashes,
 }: {
   startISO: string;
   organisers: readonly LeaderOnPole[];
+  /**
+   * Windows held while the same person stands in a créneau of another pole, with the sentences
+   * naming it. Red. From `PlanIndex.organiserConflictNotes`, keyed on the role.
+   */
+  clashes?: ReadonlyMap<string, readonly string[]>;
   hours: number;
   pxPerHour: number;
   readOnly?: boolean;
@@ -377,6 +383,7 @@ export const OrganiserBand = memo(function OrganiserBand({
           onResize={onResize}
           onSelect={onSelect}
           picked={entry.role.key === pickedRoleKey}
+          clash={clashes?.get(entry.role.key)}
         />
       ))}
     </div>
@@ -413,6 +420,7 @@ function BandItem({
   onResize,
   onSelect,
   picked,
+  clash,
 }: {
   startISO: string;
   organiser: LeaderOnPole['organiser'];
@@ -426,6 +434,7 @@ function BandItem({
   onResize?(roleKey: string, start: number, end: number): void;
   onSelect?(roleKey: string): void;
   picked: boolean;
+  clash?: readonly string[];
 }) {
   /** What the band would become if the pointer were let go now. Null when nothing is in flight. */
   const [shown, setShown] = useState<{ start: number; end: number } | null>(null);
@@ -501,7 +510,10 @@ function BandItem({
     <>
     <div
       ref={element}
-      className={'organiser-band-item' + (shown ? ' is-moving' : '') + (picked ? ' is-picked' : '')}
+      className={
+        'organiser-band-item' + (shown ? ' is-moving' : '') + (picked ? ' is-picked' : '') +
+        (clash ? ' is-illegal' : '')
+      }
       style={{
         left: window_.start * pxPerHour,
         width: Math.max(10, (window_.end - window_.start) * pxPerHour - 2),
@@ -511,6 +523,7 @@ function BandItem({
       title={
         `${name}, responsable de pôle\n` +
         `${toClock(startISO, window_.start)} à ${toClock(startISO, window_.end)}` +
+        (clash ? clash.map((text) => `\n${text}`).join('') : '') +
         (organiser.phone ? `\n${organiser.phone}` : '') +
         (organiser.email ? `\n${organiser.email}` : '') +
         (readOnly

@@ -900,10 +900,47 @@ test('two overlapping créneaux for one orga are reported, and nothing is remove
     ],
   });
   const index = new PlanIndex({ ...base, organisers: [orga('o1')] });
-  const clashes = index.organiserClashes();
+  const clashes = index.organiserConflicts();
   strictEqual(clashes.length, 1);
-  deepStrictEqual([clashes[0]!.first.key, clashes[0]!.second.key], ['s1', 's2']);
+  const other = clashes[0]!.other;
+  deepStrictEqual([clashes[0]!.shift.key, other.kind === 'shift' ? other.shift.key : null], ['s1', 's2']);
   strictEqual(index.shiftsOfOrganiser('o1').length, 2);
+  // The drag's question: s2 is taken while s1 is held, and free once the box leaves s1.
+  strictEqual(index.organiserBlockersFor('o1', index.shiftByKey.get('s2')!).length, 1);
+  strictEqual(index.organiserBlockersFor('o1', index.shiftByKey.get('s2')!, 's1').length, 0);
+});
+
+/*
+ * "Je suis responsable sur un pôle et à la fois sur un créneau Staff dans un autre pôle": two
+ * places at once, 2026-10-24. A créneau on the pole run, and a role with no hours, are not.
+ */
+test('a responsable window on one pole and a créneau on another at the same hours conflict', () => {
+  const base = makePlan({
+    poles: [pole('bar'), pole('secu')],
+    shifts: [shift('s1', 'secu', 2, 4, 2), shift('s2', 'bar', 2, 4, 2), shift('s3', 'secu', 6, 8, 2)],
+    organiserShifts: [
+      { key: 'os1', organiserKey: 'o1', shiftKey: 's1' },
+      { key: 'os2', organiserKey: 'o1', shiftKey: 's2' },
+      { key: 'os3', organiserKey: 'o1', shiftKey: 's3' },
+    ],
+  });
+  const index = new PlanIndex({
+    ...base,
+    organisers: [orga('o1')],
+    leaderRoles: [
+      { key: 'r1', organiserKey: 'o1', poleKey: 'bar', start: 0, end: 5 },
+      { key: 'r2', organiserKey: 'o1', poleKey: 'bar', start: null, end: null },
+    ],
+  });
+  const roleClashes = index.organiserConflicts().filter((c) => c.other.kind === 'role');
+  deepStrictEqual(roleClashes.map((c) => c.shift.key), ['s1']);
+  strictEqual(index.organiserBlockersFor('o1', index.shiftByKey.get('s3')!).length, 0);
+  ok(index.organiserBlockersFor('o1', index.shiftByKey.get('s1')!).some((m) => m.startsWith('Responsable de')));
+
+  // Both ends go red: the two overlapping boxes and the band, never the box on the pole run.
+  const { byBox, byRole } = index.organiserConflictNotes();
+  deepStrictEqual([...byBox.keys()].sort(), ['o1|s1', 'o1|s2']);
+  deepStrictEqual([...byRole.keys()], ['r1']);
 });
 
 /*
